@@ -167,7 +167,8 @@ static void variax_startup6(struct work_struct *work)
 	CHECK_STARTUP_PROGRESS(variax->startup_progress, VARIAX_STARTUP_SETUP);
 
 	/* ALSA audio interface: */
-	snd_card_register(variax->line6.card);
+	if (snd_card_register(variax->line6.card))
+		dev_err(variax->line6.ifcdev, "Failed to register variax card.\n");
 }
 
 /*
