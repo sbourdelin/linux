@@ -12,7 +12,7 @@
 # Rewritten by Cort Dougan and Paul Mackerras
 #
 
-HAS_BIARCH	:= $(call cc-option-yn, -m32)
+HAS_BIARCH	:= $(call cc-option-yn, -m32 -m64)
 
 # Set default 32 bits cross compilers for vdso and boot wrapper
 CROSS32_COMPILE ?=
@@ -166,6 +166,7 @@ CFLAGS-$(CONFIG_PPC32)	+= $(call cc-option, $(MULTIPLEWORD))
 
 CFLAGS-$(CONFIG_PPC32)	+= $(call cc-option,-mno-readonly-in-sdata)
 
+ifdef CONFIG_PPC64
 ifdef CONFIG_PPC_BOOK3S_64
 ifdef CONFIG_CPU_LITTLE_ENDIAN
 CFLAGS-$(CONFIG_GENERIC_CPU) += -mcpu=power8
@@ -176,6 +177,7 @@ CFLAGS-$(CONFIG_GENERIC_CPU) += $(call cc-option,-mcpu=power5,-mcpu=power4)
 endif
 else
 CFLAGS-$(CONFIG_GENERIC_CPU) += -mcpu=powerpc64
+endif
 endif
 
 ifdef CONFIG_FUNCTION_TRACER
