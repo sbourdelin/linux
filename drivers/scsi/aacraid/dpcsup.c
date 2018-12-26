@@ -270,6 +270,8 @@ static void aac_aif_callback(void *context, struct fib * fibptr)
 		FsaNormal,
 		0, 1,
 		(fib_callback)aac_aif_callback, fibctx);
+	if (status)
+		pr_err("failure in aac_fib_send: %d\n", status);
 }
 
 
