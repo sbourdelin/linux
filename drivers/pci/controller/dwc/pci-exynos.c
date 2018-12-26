@@ -226,9 +226,12 @@ static void exynos_pcie_assert_reset(struct exynos_pcie *ep)
 	struct dw_pcie *pci = ep->pci;
 	struct device *dev = pci->dev;
 
-	if (ep->reset_gpio >= 0)
-		devm_gpio_request_one(dev, ep->reset_gpio,
-				GPIOF_OUT_INIT_HIGH, "RESET");
+	if (ep->reset_gpio >= 0) {
+		if (devm_gpio_request_one(dev, ep->reset_gpio,
+				GPIOF_OUT_INIT_HIGH, "RESET"))
+			dev_err(dev, "Failed requesting reset gpio %d\n",
+					ep->reset_gpio);
+	}
 }
 
 static int exynos_pcie_establish_link(struct exynos_pcie *ep)
