@@ -32,10 +32,10 @@
 static void rtl871x_load_fw_cb(const struct firmware *firmware, void *context)
 {
 	struct _adapter *padapter = context;
+	struct usb_device *udev = padapter->dvobjpriv.pusbdev;
 
 	complete(&padapter->rtl8712_fw_ready);
 	if (!firmware) {
-		struct usb_device *udev = padapter->dvobjpriv.pusbdev;
 		struct usb_interface *pusb_intf = padapter->pusb_intf;
 
 		dev_err(&udev->dev, "r8712u: Firmware request failed\n");
@@ -45,7 +45,8 @@ static void rtl871x_load_fw_cb(const struct firmware *firmware, void *context)
 	}
 	padapter->fw = firmware;
 	/* firmware available - start netdev */
-	register_netdev(padapter->pnetdev);
+	if (register_netdev(padapter->pnetdev))
+		dev_err(&udev->dev, "r8712u: Registering netdev failed\n");
 }
 
 static const char firmware_file[] = "rtlwifi/rtl8712u.bin";
