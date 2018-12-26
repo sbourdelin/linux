@@ -739,7 +739,6 @@ lpfc_get_scsi_buf_s4(struct lpfc_hba *phba, struct lpfc_nodelist *ndlp)
 	lpfc_cmd->cur_iocbq.iocb_flag = LPFC_IO_FCP;
 	lpfc_cmd->prot_seg_cnt = 0;
 	lpfc_cmd->seg_cnt = 0;
-	lpfc_cmd->waitq = NULL;
 	lpfc_cmd->timeout = 0;
 	lpfc_cmd->flags = 0;
 	lpfc_cmd->start_time = jiffies;
@@ -3939,13 +3938,15 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	cmd->scsi_done(cmd);
 
 	/*
-	 * If there is a thread waiting for command completion
+	 * If there is an abort thread waiting for command completion
 	 * wake up the thread.
 	 */
-	spin_lock_irqsave(shost->host_lock, flags);
-	if (lpfc_cmd->waitq)
-		wake_up(lpfc_cmd->waitq);
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	if (unlikely(lpfc_cmd->cur_iocbq.iocb_flag & LPFC_DRIVER_ABORTED)) {
+		spin_lock_irqsave(shost->host_lock, flags);
+		if (lpfc_cmd->waitq)
+			wake_up(lpfc_cmd->waitq);
+		spin_unlock_irqrestore(shost->host_lock, flags);
+	}
 
 	lpfc_release_scsi_buf(phba, lpfc_cmd);
 }
