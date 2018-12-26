@@ -1011,6 +1011,7 @@ xfs_fs_dirty_inode(
 	struct xfs_inode		*ip = XFS_I(inode);
 	struct xfs_mount		*mp = ip->i_mount;
 	struct xfs_trans		*tp;
+	int error;
 
 	if (!(inode->i_sb->s_flags & SB_LAZYTIME))
 		return;
@@ -1022,7 +1023,10 @@ xfs_fs_dirty_inode(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_TIMESTAMP);
-	xfs_trans_commit(tp);
+	error = xfs_trans_commit(tp);
+	if (error)
+		xfs_err(mp,
+				"Error in xfs_trans_commit: %d\n", error);
 }
 
 /*
