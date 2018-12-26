@@ -141,7 +141,8 @@ void __init proc_root_init(void)
 	proc_mkdir("bus", NULL);
 	proc_sys_init();
 
-	register_filesystem(&proc_fs_type);
+	if (register_filesystem(&proc_fs_type))
+		pr_err("failed to register the filesystem.\n");
 }
 
 static int proc_root_getattr(const struct path *path, struct kstat *stat,
