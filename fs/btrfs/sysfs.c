@@ -860,6 +860,8 @@ void btrfs_sysfs_feature_update(struct btrfs_fs_info *fs_info,
 	 */
 	sysfs_remove_group(fsid_kobj, &btrfs_feature_attr_group);
 	ret = sysfs_create_group(fsid_kobj, &btrfs_feature_attr_group);
+	if (ret)
+		pr_err("failed to create btrfs_feature_attr_group.\n");
 }
 
 static int btrfs_init_debugfs(void)
