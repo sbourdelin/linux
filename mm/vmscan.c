@@ -1113,6 +1113,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 {
 	LIST_HEAD(ret_pages);
 	LIST_HEAD(free_pages);
+	LIST_HEAD(move_pages);
 	int pgactivate = 0;
 	unsigned nr_unqueued_dirty = 0;
 	unsigned nr_dirty = 0;
@@ -1122,6 +1123,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 	unsigned nr_immediate = 0;
 	unsigned nr_ref_keep = 0;
 	unsigned nr_unmap_fail = 0;
+	int page_on_dram = is_node_dram(pgdat->node_id);
 
 	cond_resched();
 
@@ -1273,6 +1275,21 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		case PAGEREF_RECLAIM:
 		case PAGEREF_RECLAIM_CLEAN:
 			; /* try to reclaim the page below */
+		}
+
+		/*
+		 * Check if the page is in DRAM numa node.
+		 * Skip MADV_FREE pages as it might be freed
+		 * immediately to buddy system if it's clean.
+		 */
+		if (node_online(pgdat->peer_node) &&
+			PageAnon(page) && (PageSwapBacked(page) || PageTransHuge(page))) {
+			if (page_on_dram) {
+				/* Add to the page list which will be moved to pmem numa node. */
+				list_add(&page->lru, &move_pages);
+				unlock_page(page);
+				continue;
+			}
 		}
 
 		/*
@@ -1495,6 +1512,22 @@ keep_locked:
 keep:
 		list_add(&page->lru, &ret_pages);
 		VM_BUG_ON_PAGE(PageLRU(page) || PageUnevictable(page), page);
+	}
+
+	/* Move the anonymous pages to PMEM numa node. */
+	if (!list_empty(&move_pages)) {
+		int err;
+
+		/* Could not block. */
+		err = migrate_pages(&move_pages, alloc_new_node_page, NULL,
+					pgdat->peer_node,
+					MIGRATE_ASYNC, MR_NUMA_MISPLACED);
+		if (err) {
+			putback_movable_pages(&move_pages);
+
+			/* Join the pages which were not migrated.  */
+			list_splice(&ret_pages, &move_pages);
+		}
 	}
 
 	mem_cgroup_uncharge_list(&free_pages);
