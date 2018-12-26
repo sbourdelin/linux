@@ -1443,7 +1443,9 @@ static int qcom_slim_ngd_ctrl_probe(struct platform_device *pdev)
 	init_completion(&ctrl->reconf);
 	init_completion(&ctrl->qmi.qmi_comp);
 
-	platform_driver_register(&qcom_slim_ngd_driver);
+	ret = platform_driver_register(&qcom_slim_ngd_driver);
+	if (ret)
+		dev_err(&pdev->dev, "registering driver failed\n");
 	return of_qcom_slim_ngd_register(dev, ctrl);
 }
 
