@@ -387,9 +387,13 @@ static int samsung_keypad_probe(struct platform_device *pdev)
 	keypad->stopped = true;
 	init_waitqueue_head(&keypad->wait);
 
-	if (pdev->dev.of_node)
-		keypad->type = of_device_is_compatible(pdev->dev.of_node,
-					"samsung,s5pv210-keypad");
+	if (pdev->dev.of_node) {
+		error = of_device_is_compatible(pdev->dev.of_node,
+				"samsung,s5pv210-keypad");
+		if (!error)
+			return -EINVAL;
+		keypad->type = error;
+	}
 	else
 		keypad->type = platform_get_device_id(pdev)->driver_data;
 
