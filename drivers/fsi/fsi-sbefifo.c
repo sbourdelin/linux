@@ -900,8 +900,10 @@ static int sbefifo_user_release(struct inode *inode, struct file *file)
 	if (!user)
 		return -EINVAL;
 
+	mutex_lock(&user->file_lock);
 	sbefifo_release_command(user);
 	free_page((unsigned long)user->cmd_page);
+	mutex_unlock(&user->file_lock);
 	kfree(user);
 
 	return 0;
