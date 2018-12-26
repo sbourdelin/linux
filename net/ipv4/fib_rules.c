@@ -200,9 +200,13 @@ static struct fib_table *fib_empty_table(struct net *net)
 {
 	u32 id;
 
-	for (id = 1; id <= RT_TABLE_MAX; id++)
+	for (id = 1; id <= RT_TABLE_MAX; id++) {
 		if (!fib_get_table(net, id))
 			return fib_new_table(net, id);
+
+		if (id == RT_TABLE_MAX)
+			break;
+	}
 	return NULL;
 }
 
