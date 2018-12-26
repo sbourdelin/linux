@@ -400,6 +400,7 @@ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd)
 	struct mii_ioctl_data *mii_data = if_mii(ifr);
 	u16 val = mii_data->val_in;
 	bool change_autoneg = false;
+	int rc;
 
 	switch (cmd) {
 	case SIOCGMIIPHY:
@@ -447,8 +448,10 @@ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd)
 			}
 		}
 
-		mdiobus_write(phydev->mdio.bus, mii_data->phy_id,
-			      mii_data->reg_num, val);
+		rc = mdiobus_write(phydev->mdio.bus, mii_data->phy_id,
+				   mii_data->reg_num, val);
+		if (rc)
+			return rc;
 
 		if (mii_data->phy_id == phydev->mdio.addr &&
 		    mii_data->reg_num == MII_BMCR &&
