@@ -764,7 +764,10 @@ static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
 {
 	struct sh_cmt_channel *ch = ced_to_sh_cmt(ced);
 
-	clk_prepare(ch->cmt->clk);
+	if (clk_prepare(ch->cmt->clk))
+		dev_err(&ch->cmt->pdev->dev, "ch%u: failed to prepare clk\n",
+			ch->index);
+
 	pm_genpd_syscore_poweron(&ch->cmt->pdev->dev);
 }
 
