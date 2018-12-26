@@ -65,10 +65,6 @@ static spinlock_t nf_conncount_locks[CONNCOUNT_LOCK_SLOTS] __cacheline_aligned_i
 struct nf_conncount_data {
 	unsigned int keylen;
 	struct rb_root root[CONNCOUNT_SLOTS];
-	struct net *net;
-	struct work_struct gc_work;
-	unsigned long pending_trees[BITS_TO_LONGS(CONNCOUNT_SLOTS)];
-	unsigned int gc_tree;
 };
 
 static u_int32_t conncount_rnd __read_mostly;
@@ -329,12 +325,6 @@ static void tree_nodes_free(struct rb_root *root,
 	}
 }
 
-static void schedule_gc_worker(struct nf_conncount_data *data, int tree)
-{
-	set_bit(tree, data->pending_trees);
-	schedule_work(&data->gc_work);
-}
-
 static unsigned int
 insert_tree(struct net *net,
 	    struct nf_conncount_data *data,
@@ -391,18 +381,8 @@ insert_tree(struct net *net,
 			gc_nodes[gc_count++] = rbconn;
 	}
 
-	if (gc_count) {
+	if (gc_count)
 		tree_nodes_free(root, gc_nodes, gc_count);
-		/* tree_node_free before new allocation permits
-		 * allocator to re-use newly free'd object.
-		 *
-		 * This is a rare event; in most cases we will find
-		 * existing node to re-use. (or gc_count is 0).
-		 */
-
-		if (gc_count >= ARRAY_SIZE(gc_nodes))
-			schedule_gc_worker(data, hash);
-	}
 
 	if (node_found)
 		goto out_unlock;
@@ -491,44 +471,6 @@ count_tree(struct net *net,
 	return insert_tree(net, data, root, hash, key, keylen, tuple, zone);
 }
 
-static void tree_gc_worker(struct work_struct *work)
-{
-	struct nf_conncount_data *data = container_of(work, struct nf_conncount_data, gc_work);
-	struct nf_conncount_rb *gc_nodes[CONNCOUNT_GC_MAX_NODES], *rbconn;
-	struct rb_root *root;
-	struct rb_node *node;
-	unsigned int tree, next_tree, gc_count = 0;
-
-	tree = data->gc_tree % CONNCOUNT_LOCK_SLOTS;
-	root = &data->root[tree];
-
-	rcu_read_lock();
-	for (node = rb_first(root); node != NULL; node = rb_next(node)) {
-		rbconn = rb_entry(node, struct nf_conncount_rb, node);
-		if (nf_conncount_gc_list(data->net, &rbconn->list))
-			gc_nodes[gc_count++] = rbconn;
-	}
-	rcu_read_unlock();
-
-	spin_lock_bh(&nf_conncount_locks[tree]);
-
-	if (gc_count) {
-		tree_nodes_free(root, gc_nodes, gc_count);
-	}
-
-	clear_bit(tree, data->pending_trees);
-
-	next_tree = (tree + 1) % CONNCOUNT_SLOTS;
-	next_tree = find_next_bit(data->pending_trees, next_tree, CONNCOUNT_SLOTS);
-
-	if (next_tree < CONNCOUNT_SLOTS) {
-		data->gc_tree = next_tree;
-		schedule_work(work);
-	}
-
-	spin_unlock_bh(&nf_conncount_locks[tree]);
-}
-
 /* Count and return number of conntrack entries in 'net' with particular 'key'.
  * If 'tuple' is not null, insert it into the accounting data structure.
  * Call with RCU read lock.
@@ -570,8 +512,6 @@ struct nf_conncount_data *nf_conncount_init(struct net *net, unsigned int family
 		data->root[i] = RB_ROOT;
 
 	data->keylen = keylen / sizeof(u32);
-	data->net = net;
-	INIT_WORK(&data->gc_work, tree_gc_worker);
 
 	return data;
 }
@@ -607,7 +547,6 @@ void nf_conncount_destroy(struct net *net, unsigned int family,
 {
 	unsigned int i;
 
-	cancel_work_sync(&data->gc_work);
 	nf_ct_netns_put(net, family);
 
 	for (i = 0; i < ARRAY_SIZE(data->root); ++i)
