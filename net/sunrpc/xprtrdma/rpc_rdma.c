@@ -1123,7 +1123,6 @@ rpcrdma_decode_msg(struct rpcrdma_xprt *r_xprt, struct rpcrdma_rep *rep,
 {
 	struct xdr_stream *xdr = &rep->rr_stream;
 	u32 writelist, replychunk, rpclen;
-	char *base;
 
 	/* Decode the chunk lists */
 	if (decode_read_list(xdr))
@@ -1138,10 +1137,9 @@ rpcrdma_decode_msg(struct rpcrdma_xprt *r_xprt, struct rpcrdma_rep *rep,
 		return -EIO;
 
 	/* Build the RPC reply's Payload stream in rqst->rq_rcv_buf */
-	base = (char *)xdr_inline_decode(xdr, 0);
 	rpclen = xdr_stream_remaining(xdr);
 	r_xprt->rx_stats.fixup_copy_count +=
-		rpcrdma_inline_fixup(rqst, base, rpclen, writelist & 3);
+		rpcrdma_inline_fixup(rqst, xdr->p, rpclen, writelist & 3);
 
 	r_xprt->rx_stats.total_rdma_reply += writelist;
 	return rpclen + xdr_align_size(writelist);
