@@ -766,10 +766,27 @@ static int veth_xsk_poll(struct napi_struct *napi, int budget)
 		struct sk_buff *skb;
 		struct page *page;
 		void *vaddr;
+		u64 handle;
 		u32 len;
 
 		if (!xsk_umem_consume_tx_virtual(peer_rq->xsk_umem, &vaddr, &len))
 			break;
+
+		if (rq->xsk_umem && xsk_umem_peek_addr(rq->xsk_umem, &handle)) {
+			char *daddr;
+			u64 hr = 0;
+
+			/* the peer side also has umem enabled,
+			 * copy directly to it.
+			 */
+			handle &= rq->xsk_umem->chunk_mask;
+			hr = rq->xsk_umem->headroom + XDP_PACKET_HEADROOM;
+			daddr = xdp_umem_get_data(rq->xsk_umem, handle);
+			daddr += hr;
+			memcpy((void *)daddr, vaddr, len);
+			xsk_umem_discard_addr(rq->xsk_umem);
+			vaddr = daddr;
+		}
 
 		xdpf.data = vaddr + metasize;
 		xdpf.len = len;
