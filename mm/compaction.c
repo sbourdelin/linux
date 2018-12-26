@@ -1879,9 +1879,7 @@ int sysctl_compaction_handler(struct ctl_table *table, int write,
 int sysctl_extfrag_handler(struct ctl_table *table, int write,
 			void __user *buffer, size_t *length, loff_t *ppos)
 {
-	proc_dointvec_minmax(table, write, buffer, length, ppos);
-
-	return 0;
+	return proc_dointvec_minmax(table, write, buffer, length, ppos);
 }
 
 #if defined(CONFIG_SYSFS) && defined(CONFIG_NUMA)
