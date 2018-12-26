@@ -51,6 +51,9 @@ on the Qualcomm Hexagon core.
 	qcom,msm8916-mss-pil:
 	qcom,msm8974-mss-pil:
 		    must be "iface", "bus", "mem", "xo"
+	qcom,msm8996-mss-pil:
+		    must be "xo", "pnoc", "qdss", "iface", "bus", "mem",
+		    "gpll0_mss_clk", "snoc_axi", "mnoc_axi"
 	qcom,sdm845-mss-pil:
 		    must be "xo", "prng", "iface", "bus", "mem", "gpll0_mss",
 		    "snoc_axi", "mnoc_axi"
