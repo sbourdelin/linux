@@ -5689,6 +5689,14 @@ LPFC_BBCR_ATTR_RW(enable_bbcr, 1, 0, 1, "Enable BBC Recovery");
  */
 LPFC_ATTR_RW(enable_dpp, 1, 0, 1, "Enable Direct Packet Push");
 
+/*
+ * lpfc_enable_scsi_mq: Enable SCSI MQ support in lpfc
+ *       0  = disabled
+ *       1  = enabled (default)
+ * Value range is [0,1]. Default value is 1
+ */
+LPFC_ATTR_R(enable_scsi_mq, 1, 0, 1, "Enable SCSI MQ support in LPFC");
+
 struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_nvme_info,
 	&dev_attr_scsi_stat,
@@ -5803,6 +5811,7 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_lpfc_ras_fwlog_func,
 	&dev_attr_lpfc_enable_bbcr,
 	&dev_attr_lpfc_enable_dpp,
+	&dev_attr_lpfc_enable_scsi_mq,
 	NULL,
 };
 
@@ -6840,6 +6849,7 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	lpfc_hdw_queue_init(phba, lpfc_hdw_queue);
 	lpfc_enable_bbcr_init(phba, lpfc_enable_bbcr);
 	lpfc_enable_dpp_init(phba, lpfc_enable_dpp);
+	lpfc_enable_scsi_mq_init(phba, lpfc_enable_scsi_mq);
 
 	if (phba->sli_rev != LPFC_SLI_REV4) {
 		/* NVME only supported on SLI4 */

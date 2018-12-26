@@ -4063,7 +4063,9 @@ lpfc_create_port(struct lpfc_hba *phba, int instance, struct device *dev)
 	shost->max_lun = vport->cfg_max_luns;
 	shost->this_id = -1;
 	shost->max_cmd_len = 16;
-	shost->nr_hw_queues = phba->cfg_hdw_queue;
+	if (shost_use_blk_mq(shost) && phba->cfg_enable_scsi_mq) {
+		shost->nr_hw_queues = phba->cfg_hdw_queue;
+	}
 	if (phba->sli_rev == LPFC_SLI_REV4) {
 		shost->dma_boundary =
 			phba->sli4_hba.pc_sli4_params.sge_supp_len-1;
@@ -10984,6 +10986,9 @@ lpfc_pci_probe_one_s3(struct pci_dev *pdev, const struct pci_device_id *pid)
 				"1404 Failed to set up driver resource.\n");
 		goto out_unset_pci_mem_s3;
 	}
+
+	/* no SCSI MQ support for SLI 3 */
+	phba->cfg_enable_scsi_mq = 0;
 
 	/* Initialize and populate the iocb list per host */
 

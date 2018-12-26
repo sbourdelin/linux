@@ -619,7 +619,7 @@ struct lpfc_ras_fwlog {
 struct lpfc_hba {
 	/* SCSI interface function jump table entries */
 	struct lpfc_scsi_buf * (*lpfc_get_scsi_buf)
-		(struct lpfc_hba *, struct lpfc_nodelist *);
+		(struct lpfc_hba *, struct lpfc_nodelist *, struct scsi_cmnd *);
 	int (*lpfc_scsi_prep_dma_buf)
 		(struct lpfc_hba *, struct lpfc_scsi_buf *);
 	void (*lpfc_scsi_unprep_dma_buf)
@@ -876,6 +876,7 @@ struct lpfc_hba {
 #define LPFC_ENABLE_NVME 2
 #define LPFC_ENABLE_BOTH 3
 	uint32_t cfg_enable_pbde;
+	uint32_t cfg_enable_scsi_mq;
 	struct nvmet_fc_target_port *targetport;
 	lpfc_vpd_t vpd;		/* vital product data */
 
