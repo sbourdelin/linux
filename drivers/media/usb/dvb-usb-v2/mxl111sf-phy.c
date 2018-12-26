@@ -130,7 +130,8 @@ int mxl111sf_config_mpeg_in(struct mxl111sf_state *state,
 	mxl_fail(ret);
 
 	/* Configure MPEG Clock phase */
-	mxl111sf_read_reg(state, V6_MPEG_IN_CLK_INV_REG, &mode);
+	ret = mxl111sf_read_reg(state, V6_MPEG_IN_CLK_INV_REG, &mode);
+	mxl_fail(ret);
 
 	if (clock_phase == TSIF_NORMAL)
 		mode &= ~V6_INVERTED_CLK_PHASE;
