@@ -426,9 +426,13 @@ static void arcnet_reply_tasklet(unsigned long data)
 	serr->ee.ee_data = skb_shinfo(skb)->tskey;
 	serr->ee.ee_info = lp->reply_status;
 
+	spin_lock_irqsave(&lp->lock, flags);
+
 	/* finally erasing outgoing skb */
 	dev_kfree_skb(lp->outgoing.skb);
 	lp->outgoing.skb = NULL;
+
+	spin_unlock_irqrestore(&lp->lock, flags);
 
 	ackskb->dev = lp->dev;
 
