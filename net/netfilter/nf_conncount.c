@@ -49,7 +49,6 @@ struct nf_conncount_tuple {
 	struct nf_conntrack_zone	zone;
 	int				cpu;
 	u32				jiffies32;
-	bool				dead;
 	struct rcu_head			rcu_head;
 };
 
@@ -103,7 +102,6 @@ nf_conncount_add(struct nf_conncount_list *list,
 	conn->zone = *zone;
 	conn->cpu = raw_smp_processor_id();
 	conn->jiffies32 = (u32)jiffies;
-	conn->dead = false;
 	spin_lock_bh(&list->list_lock);
 	if (list->dead == true) {
 		kmem_cache_free(conncount_conn_cachep, conn);
@@ -130,22 +128,13 @@ static bool conn_free(struct nf_conncount_list *list,
 {
 	bool free_entry = false;
 
-	spin_lock_bh(&list->list_lock);
-
-	if (conn->dead) {
-		spin_unlock_bh(&list->list_lock);
-		return free_entry;
-	}
-
 	list->count--;
-	conn->dead = true;
 	list_del_rcu(&conn->node);
 	if (list->count == 0) {
 		list->dead = true;
 		free_entry = true;
 	}
 
-	spin_unlock_bh(&list->list_lock);
 	call_rcu(&conn->rcu_head, __conn_free);
 	return free_entry;
 }
@@ -195,6 +184,7 @@ void nf_conncount_lookup(struct net *net,
 	*addit = tuple ? true : false;
 
 	/* check the saved connections */
+	spin_lock_bh(&list->list_lock);
 	list_for_each_entry_safe(conn, conn_n, &list->head, node) {
 		if (collect > CONNCOUNT_GC_MAX_NODES)
 			break;
@@ -239,6 +229,7 @@ void nf_conncount_lookup(struct net *net,
 
 		nf_ct_put(found_ct);
 	}
+	spin_unlock_bh(&list->list_lock);
 }
 EXPORT_SYMBOL_GPL(nf_conncount_lookup);
 
@@ -262,12 +253,15 @@ bool nf_conncount_gc_list(struct net *net,
 	bool free_entry = false;
 	bool ret = false;
 
+	spin_lock(&list->list_lock);
 	list_for_each_entry_safe(conn, conn_n, &list->head, node) {
 		found = find_or_evict(net, list, conn, &free_entry);
 		if (IS_ERR(found)) {
 			if (PTR_ERR(found) == -ENOENT)  {
-				if (free_entry)
+				if (free_entry) {
+					spin_unlock(&list->list_lock);
 					return true;
+				}
 				collected++;
 			}
 			continue;
@@ -280,23 +274,24 @@ bool nf_conncount_gc_list(struct net *net,
 			 * closed already -> ditch it
 			 */
 			nf_ct_put(found_ct);
-			if (conn_free(list, conn))
+			if (conn_free(list, conn)) {
+				spin_unlock(&list->list_lock);
 				return true;
+			}
 			collected++;
 			continue;
 		}
 
 		nf_ct_put(found_ct);
 		if (collected > CONNCOUNT_GC_MAX_NODES)
-			return false;
+			break;
 	}
 
-	spin_lock_bh(&list->list_lock);
 	if (!list->count) {
 		list->dead = true;
 		ret = true;
 	}
-	spin_unlock_bh(&list->list_lock);
+	spin_unlock(&list->list_lock);
 
 	return ret;
 }
