@@ -1183,8 +1183,12 @@ static int hmm_devmem_match(struct device *dev, void *data, void *match_data)
 
 static void hmm_devmem_pages_remove(struct hmm_devmem *devmem)
 {
-	devres_release(devmem->device, &hmm_devmem_release,
-		       &hmm_devmem_match, devmem->resource);
+	int rc;
+
+	rc = devres_release(devmem->device, &hmm_devmem_release,
+				&hmm_devmem_match, devmem->resource);
+	if (rc)
+		WARN_ON(rc);
 }
 
 /*
