@@ -1819,6 +1819,9 @@ void efx_mcdi_set_id_led(struct efx_nic *efx, enum efx_led_mode mode)
 
 	rc = efx_mcdi_rpc(efx, MC_CMD_SET_ID_LED, inbuf, sizeof(inbuf),
 			  NULL, 0, NULL);
+	if (rc)
+		netif_err(efx, hw, efx->net_dev, "%s: failed rc=%d\n",
+				__func__, rc);
 }
 
 static int efx_mcdi_reset_func(struct efx_nic *efx)
