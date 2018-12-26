@@ -1182,6 +1182,8 @@ static int vector_net_open(struct net_device *dev)
 			vp->rx_header_size,
 			MAX_IOV_SIZE
 		);
+		if (!vp->rx_queue)
+			goto out_close;
 		vp->rx_queue->queue_depth = get_depth(vp->parsed);
 	} else {
 		vp->header_rxbuffer = kmalloc(
@@ -1198,6 +1200,8 @@ static int vector_net_open(struct net_device *dev)
 			vp->header_size,
 			MAX_IOV_SIZE
 		);
+		if (!vp->tx_queue)
+			goto out_close;
 	} else {
 		vp->header_txbuffer = kmalloc(vp->header_size, GFP_KERNEL);
 		if (vp->header_txbuffer == NULL)
