@@ -775,28 +775,37 @@ static void ib_nl_set_path_rec_attrs(struct sk_buff *skb,
 	/* Now build the attributes */
 	if (comp_mask & IB_SA_PATH_REC_SERVICE_ID) {
 		val64 = be64_to_cpu(sa_rec->service_id);
-		nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_SERVICE_ID,
-			sizeof(val64), &val64);
+		if (nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_SERVICE_ID,
+			sizeof(val64), &val64))
+			pr_warn("nla_put failed\n");
 	}
-	if (comp_mask & IB_SA_PATH_REC_DGID)
-		nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_DGID,
-			sizeof(sa_rec->dgid), &sa_rec->dgid);
-	if (comp_mask & IB_SA_PATH_REC_SGID)
-		nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_SGID,
-			sizeof(sa_rec->sgid), &sa_rec->sgid);
-	if (comp_mask & IB_SA_PATH_REC_TRAFFIC_CLASS)
-		nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_TCLASS,
-			sizeof(sa_rec->traffic_class), &sa_rec->traffic_class);
+	if (comp_mask & IB_SA_PATH_REC_DGID) {
+		if (nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_DGID,
+			sizeof(sa_rec->dgid), &sa_rec->dgid))
+			pr_warn("nla_put failed\n");
+	}
+	if (comp_mask & IB_SA_PATH_REC_SGID) {
+		if (nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_SGID,
+			sizeof(sa_rec->sgid), &sa_rec->sgid))
+			pr_warn("nla_put failed\n");
+	}
+	if (comp_mask & IB_SA_PATH_REC_TRAFFIC_CLASS) {
+		if (nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_TCLASS,
+			sizeof(sa_rec->traffic_class), &sa_rec->traffic_class))
+			pr_warn("nla_put failed\n");
+	}
 
 	if (comp_mask & IB_SA_PATH_REC_PKEY) {
 		val16 = be16_to_cpu(sa_rec->pkey);
-		nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_PKEY,
-			sizeof(val16), &val16);
+		if (nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_PKEY,
+			sizeof(val16), &val16))
+			pr_warn("nla_put failed\n");
 	}
 	if (comp_mask & IB_SA_PATH_REC_QOS_CLASS) {
 		val16 = be16_to_cpu(sa_rec->qos_class);
-		nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_QOS_CLASS,
-			sizeof(val16), &val16);
+		if (nla_put(skb, RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_QOS_CLASS,
+			sizeof(val16), &val16))
+			pr_warn("nla_put failed\n");
 	}
 }
 
