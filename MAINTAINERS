@@ -3652,8 +3652,10 @@ F:	drivers/platform/chrome/
 
 CHROMEOS EC CODEC DRIVER
 M:	Cheng-Yi Chiang <cychiang@chromium.org>
+R:	Enric Balletbo i Serra <enric.balletbo@collabora.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/sound/google,cros-ec-codec.txt
+F:	sound/soc/codecs/cros_ec_codec.*
 
 CIRRUS LOGIC AUDIO CODEC DRIVERS
 M:	Brian Austin <brian.austin@cirrus.com>
