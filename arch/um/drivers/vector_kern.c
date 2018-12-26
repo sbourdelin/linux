@@ -507,12 +507,12 @@ static struct vector_queue *create_queue(
 		return NULL;
 	result->max_depth = max_size;
 	result->dev = vp->dev;
-	result->mmsg_vector = kmalloc(
-		(sizeof(struct mmsghdr) * max_size), GFP_KERNEL);
+	result->mmsg_vector = kmalloc_array(max_size, sizeof(struct mmsghdr),
+					    GFP_KERNEL);
 	if (result->mmsg_vector == NULL)
 		goto out_mmsg_fail;
-	result->skbuff_vector = kmalloc(
-		(sizeof(void *) * max_size), GFP_KERNEL);
+	result->skbuff_vector = kmalloc_array(max_size, sizeof(void *),
+					      GFP_KERNEL);
 	if (result->skbuff_vector == NULL)
 		goto out_skb_fail;
 
