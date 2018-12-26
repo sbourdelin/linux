@@ -1531,8 +1531,10 @@ call_ad(struct sock *ctnl, struct sk_buff *skb, struct ip_set *set,
 		memcpy(&errmsg->msg, nlh, nlh->nlmsg_len);
 		cmdattr = (void *)&errmsg->msg + min_len;
 
-		nla_parse(cda, IPSET_ATTR_CMD_MAX, cmdattr,
+		ret = nla_parse(cda, IPSET_ATTR_CMD_MAX, cmdattr,
 			  nlh->nlmsg_len - min_len, ip_set_adt_policy, NULL);
+		if (ret)
+			return ret;
 
 		errline = nla_data(cda[IPSET_ATTR_LINENO]);
 
