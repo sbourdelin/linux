@@ -109,7 +109,8 @@ int xsk_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 
 	len = xdp->data_end - xdp->data;
 
-	return (xdp->rxq->mem.type == MEM_TYPE_ZERO_COPY) ?
+	return (xdp->rxq->mem.type == MEM_TYPE_ZERO_COPY ||
+		xdp->rxq->mem.type == MEM_TYPE_ZERO_COPY_VDEV) ?
 		__xsk_rcv_zc(xs, xdp, len) : __xsk_rcv(xs, xdp, len);
 }
 

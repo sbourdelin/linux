@@ -38,6 +38,7 @@ enum xdp_mem_type {
 	MEM_TYPE_PAGE_ORDER0,     /* Orig XDP full page model */
 	MEM_TYPE_PAGE_POOL,
 	MEM_TYPE_ZERO_COPY,
+	MEM_TYPE_ZERO_COPY_VDEV,
 	MEM_TYPE_MAX,
 };
 
