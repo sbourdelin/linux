@@ -170,21 +170,18 @@ void xsk_umem_consume_tx_done(struct xdp_umem *umem)
 }
 EXPORT_SYMBOL(xsk_umem_consume_tx_done);
 
-bool xsk_umem_consume_tx(struct xdp_umem *umem, dma_addr_t *dma, u32 *len)
+static __always_inline bool __xsk_umem_consume_tx(struct xdp_umem *umem,
+						  struct xdp_desc *desc)
 {
-	struct xdp_desc desc;
 	struct xdp_sock *xs;
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(xs, &umem->xsk_list, list) {
-		if (!xskq_peek_desc(xs->tx, &desc))
+		if (!xskq_peek_desc(xs->tx, desc))
 			continue;
 
-		if (xskq_produce_addr_lazy(umem->cq, desc.addr))
+		if (xskq_produce_addr_lazy(umem->cq, desc->addr))
 			goto out;
-
-		*dma = xdp_umem_get_dma(umem, desc.addr);
-		*len = desc.len;
 
 		xskq_discard_desc(xs->tx);
 		rcu_read_unlock();
@@ -195,7 +192,34 @@ out:
 	rcu_read_unlock();
 	return false;
 }
+
+bool xsk_umem_consume_tx(struct xdp_umem *umem, dma_addr_t *dma, u32 *len)
+{
+	struct xdp_desc desc;
+
+	if (!__xsk_umem_consume_tx(umem, &desc))
+		return false;
+
+	*dma = xdp_umem_get_dma(umem, desc.addr);
+	*len = desc.len;
+
+	return true;
+}
 EXPORT_SYMBOL(xsk_umem_consume_tx);
+
+bool xsk_umem_consume_tx_virtual(struct xdp_umem *umem, void **vaddr, u32 *len)
+{
+	struct xdp_desc desc;
+
+	if (!__xsk_umem_consume_tx(umem, &desc))
+		return false;
+
+	*vaddr = xdp_umem_get_data(umem, desc.addr);
+	*len = desc.len;
+
+	return true;
+}
+EXPORT_SYMBOL(xsk_umem_consume_tx_virtual);
 
 static int xsk_zc_xmit(struct sock *sk)
 {
