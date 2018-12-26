@@ -761,45 +761,34 @@ static int veth_xsk_poll(struct napi_struct *napi, int budget)
 	while (peer_rq->xsk_umem && budget--) {
 		unsigned int inner_xdp_xmit = 0;
 		unsigned int metasize = 0;
-		struct xdp_frame *xdpf;
+		struct xdp_frame xdpf;
 		bool dropped = false;
 		struct sk_buff *skb;
 		struct page *page;
 		void *vaddr;
-		void *addr;
 		u32 len;
 
 		if (!xsk_umem_consume_tx_virtual(peer_rq->xsk_umem, &vaddr, &len))
 			break;
 
-		page = dev_alloc_page();
-		if (!page) {
-			xsk_umem_complete_tx(peer_rq->xsk_umem, 1);
-			xsk_umem_consume_tx_done(peer_rq->xsk_umem);
-			return -ENOMEM;
-		}
+		xdpf.data = vaddr + metasize;
+		xdpf.len = len;
+		xdpf.headroom = 0;
+		xdpf.metasize = metasize;
+		xdpf.mem.type = MEM_TYPE_ZERO_COPY_VDEV;
 
-		addr = page_to_virt(page);
-		xdpf = addr;
-		memset(xdpf, 0, sizeof(*xdpf));
-
-		addr += sizeof(*xdpf);
-		memcpy(addr, vaddr, len);
-
-		xdpf->data = addr + metasize;
-		xdpf->len = len;
-		xdpf->headroom = 0;
-		xdpf->metasize = metasize;
-		xdpf->mem.type = MEM_TYPE_PAGE_SHARED;
+		page = virt_to_head_page(vaddr);
+		if (page->mem_cgroup)
+			page->mem_cgroup = NULL;
 
 		/* put into rq */
-		skb = veth_xdp_rcv_one(rq, xdpf, &inner_xdp_xmit);
+		skb = veth_xdp_rcv_one(rq, &xdpf, &inner_xdp_xmit);
 		if (!skb) {
 			/* Peer side has XDP program attached */
 			if (inner_xdp_xmit & VETH_XDP_TX) {
 				/* Not supported */
 				pr_warn("veth: peer XDP_TX not supported\n");
-				xdp_return_frame(xdpf);
+				xdp_return_frame(&xdpf);
 				dropped = true;
 				goto skip_tx;
 			} else if (inner_xdp_xmit & VETH_XDP_REDIR) {
@@ -808,7 +797,8 @@ static int veth_xsk_poll(struct napi_struct *napi, int budget)
 				dropped = true;
 			}
 		} else {
-			napi_gro_receive(&rq->xdp_napi, skb);
+			napi_gro_receive(&rq->xdp_napi, skb_copy(skb, GFP_KERNEL));
+			kfree(skb);
 		}
 skip_tx:
 		xsk_umem_complete_tx(peer_rq->xsk_umem, 1);
@@ -855,6 +845,11 @@ static int veth_poll(struct napi_struct *napi, int budget)
 	if (xdp_xmit & VETH_XDP_REDIR)
 		xdp_do_flush_map();
 	xdp_clear_return_frame_no_direct();
+
+	/* schedule again so the CPU can keep receiving
+	 * at higher rate
+	 */
+	napi_schedule(&rq->xdp_napi);
 
 	return done > budget ? budget : done;
 }
