@@ -430,10 +430,13 @@ enum macvlan_macaddr_mode {
 enum {
 	IFLA_VRF_UNSPEC,
 	IFLA_VRF_TABLE,
+	IFLA_VRF_FLAGS,
 	__IFLA_VRF_MAX
 };
 
 #define IFLA_VRF_MAX (__IFLA_VRF_MAX - 1)
+
+#define VRF_F_BYPASS_RCV_NF     0x01
 
 enum {
 	IFLA_VRF_PORT_UNSPEC,

@@ -52,6 +52,7 @@ struct net_vrf {
 	struct fib6_table	*fib6_table;
 #endif
 	u32                     tb_id;
+	u8                      flags;
 };
 
 struct pcpu_dstats {
@@ -898,6 +899,10 @@ static struct sk_buff *vrf_rcv_nfhook(u8 pf, unsigned int hook,
 				      struct net_device *dev)
 {
 	struct net *net = dev_net(dev);
+	struct net_vrf *vrf = netdev_priv(dev);
+
+	if (vrf->flags & VRF_F_BYPASS_RCV_NF)
+		return skb;
 
 	if (nf_hook(pf, hook, net, NULL, skb, dev, NULL, vrf_rcv_finish) != 1)
 		skb = NULL;    /* kfree_skb(skb) handled by nf code */
@@ -1323,6 +1328,9 @@ static int vrf_newlink(struct net *src_net, struct net_device *dev,
 		return -EINVAL;
 	}
 
+	if (data[IFLA_VRF_FLAGS])
+		vrf->flags = nla_get_u8(data[IFLA_VRF_FLAGS]);
+
 	dev->priv_flags |= IFF_L3MDEV_MASTER;
 
 	err = register_netdevice(dev);
@@ -1346,7 +1354,8 @@ out:
 
 static size_t vrf_nl_getsize(const struct net_device *dev)
 {
-	return nla_total_size(sizeof(u32));  /* IFLA_VRF_TABLE */
+	return nla_total_size(sizeof(u32)) +  /* IFLA_VRF_TABLE */
+		nla_total_size(sizeof(u8));   /* IFLA_VRF_FLAGS */
 }
 
 static int vrf_fillinfo(struct sk_buff *skb,
@@ -1354,7 +1363,13 @@ static int vrf_fillinfo(struct sk_buff *skb,
 {
 	struct net_vrf *vrf = netdev_priv(dev);
 
-	return nla_put_u32(skb, IFLA_VRF_TABLE, vrf->tb_id);
+	if (nla_put_u32(skb, IFLA_VRF_TABLE, vrf->tb_id))
+		return -EMSGSIZE;
+
+	if (nla_put_u8(skb, IFLA_VRF_FLAGS, vrf->flags))
+		return -EMSGSIZE;
+
+	return 0;
 }
 
 static size_t vrf_get_slave_size(const struct net_device *bond_dev,
@@ -1377,6 +1392,7 @@ static int vrf_fill_slave_info(struct sk_buff *skb,
 
 static const struct nla_policy vrf_nl_policy[IFLA_VRF_MAX + 1] = {
 	[IFLA_VRF_TABLE] = { .type = NLA_U32 },
+	[IFLA_VRF_FLAGS] = { .type = NLA_U8 },
 };
 
 static struct rtnl_link_ops vrf_link_ops __read_mostly = {
