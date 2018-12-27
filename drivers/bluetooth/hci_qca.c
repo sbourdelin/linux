@@ -1287,6 +1287,8 @@ static void qca_power_shutdown(struct hci_uart *hu)
 	 * still open, discard all the garbage data received on the Rx line.
 	 */
 	set_bit(STATE_DISCARD_RX, &qca->flags);
+	clear_bit(STATE_IN_BAND_SLEEP_ENABLED, &qca->flags);
+	qca_flush(hu);
 	host_set_baudrate(hu, 2400);
 	qca_send_power_pulse(hu, QCA_WCN3990_POWEROFF_PULSE);
 	qca_power_setup(hu, false);
