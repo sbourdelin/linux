@@ -290,6 +290,40 @@ run_numerictests()
 	test_rc
 }
 
+check_failure()
+{
+	echo -n "Testing that $1 fails as expected..."
+	reset_vals
+	TEST_STR="$1"
+	orig="$(cat $TARGET)"
+	echo -n "$TEST_STR" > $TARGET 2> /dev/null
+
+	# write should fail and $TARGET should retain its original value
+	if [ $? = 0 ] || [ "$(cat $TARGET)" != "$orig" ]; then
+		echo "FAIL" >&2
+		rc=1
+	else
+		echo "ok"
+	fi
+	test_rc
+}
+
+run_wideint_tests()
+{
+	# check negative and positive 64-bit values, with and without
+	# bits set in the lower 31, and with and without bit 31 (sign
+	# bit of a 32-bit int) set.  None of these are representable
+	# in 32 bits, and hence all should fail.
+	check_failure 0x0000010000000000
+	check_failure 0x0000010080000000
+	check_failure 0x000001ff7fffffff
+	check_failure 0x000001ffffffffff
+	check_failure 0xffffffff7fffffff
+	check_failure 0xffffffffffffffff
+	check_failure 0xffffff0000000000
+	check_failure 0xffffff0080000000
+}
+
 # Your test must accept digits 3 and 4 to use this
 run_limit_digit()
 {
@@ -556,6 +590,7 @@ sysctl_test_0001()
 	TEST_STR=$(( $ORIG + 1 ))
 
 	run_numerictests
+	run_wideint_tests
 	run_limit_digit
 }
 
@@ -580,6 +615,7 @@ sysctl_test_0003()
 	TEST_STR=$(( $ORIG + 1 ))
 
 	run_numerictests
+	run_wideint_tests
 	run_limit_digit
 	run_limit_digit_int
 }
@@ -592,6 +628,7 @@ sysctl_test_0004()
 	TEST_STR=$(( $ORIG + 1 ))
 
 	run_numerictests
+	run_wideint_tests
 	run_limit_digit
 	run_limit_digit_uint
 }
