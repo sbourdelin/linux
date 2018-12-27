@@ -60,7 +60,8 @@
 
 #define IBS_WAKE_RETRANS_TIMEOUT_MS	100
 #define IBS_TX_IDLE_TIMEOUT_MS		2000
-#define BAUDRATE_SETTLE_TIMEOUT_MS	300
+#define ROME_BD_SETTLE_TIMEOUT_MS	300
+#define WCN3990_BD_SETTLE_TIMEOUT_MS	100
 
 /* susclk rate */
 #define SUSCLK_RATE_32KHZ	32768
@@ -972,8 +973,11 @@ static int qca_set_baudrate(struct hci_dev *hdev, uint8_t baudrate)
 	struct hci_uart *hu = hci_get_drvdata(hdev);
 	struct qca_data *qca = hu->priv;
 	struct sk_buff *skb;
+	struct qca_serdev *qcadev;
+	unsigned int bd_settling_timeout;
 	u8 cmd[] = { 0x01, 0x48, 0xFC, 0x01, 0x00 };
 
+	qcadev = serdev_device_get_drvdata(hu->serdev);
 	if (baudrate > QCA_BAUDRATE_3200000)
 		return -EINVAL;
 
@@ -996,8 +1000,12 @@ static int qca_set_baudrate(struct hci_dev *hdev, uint8_t baudrate)
 	 * controller will come back after they receive this HCI command
 	 * then host can communicate with new baudrate to controller
 	 */
+	bd_settling_timeout = qcadev->btsoc_type == QCA_WCN3990 ?
+			       WCN3990_BD_SETTLE_TIMEOUT_MS :
+			       ROME_BD_SETTLE_TIMEOUT_MS;
+
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(msecs_to_jiffies(BAUDRATE_SETTLE_TIMEOUT_MS));
+	schedule_timeout(msecs_to_jiffies(bd_settling_timeout));
 	set_current_state(TASK_RUNNING);
 
 	return 0;
