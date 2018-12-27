@@ -3353,7 +3353,11 @@ void sdhci_cqe_enable(struct mmc_host *mmc)
 
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 	ctrl &= ~SDHCI_CTRL_DMA_MASK;
-	if (host->flags & SDHCI_USE_64_BIT_DMA)
+	/* CQE need to use ADMA3 as it need to fetch task descriptor along
+	 * with transfer descriptor, so force DMA Select to ADMA64 during CQE
+	 */
+	if ((host->flags & SDHCI_USE_64_BIT_DMA) ||
+			(host->quirks2 & SDHCI_QUIRK2_BROKEN_64_BIT_DMA))
 		ctrl |= SDHCI_CTRL_ADMA64;
 	else
 		ctrl |= SDHCI_CTRL_ADMA32;
