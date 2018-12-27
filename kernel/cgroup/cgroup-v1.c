@@ -1280,8 +1280,8 @@ out_unlock:
 		mutex_lock(&cgroup_mutex);
 		percpu_ref_reinit(&root->cgrp.self.refcnt);
 		mutex_unlock(&cgroup_mutex);
+		cgroup_get(&root->cgrp);
 	}
-	cgroup_get(&root->cgrp);
 
 	/*
 	 * If @pinned_sb, we're reusing an existing root and holding an
