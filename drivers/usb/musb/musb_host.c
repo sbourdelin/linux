@@ -292,18 +292,71 @@ static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
 {
 	void __iomem		*epio = qh->hw_ep->regs;
 	u16			csr;
+	struct musb *musb = qh->hw_ep->musb;
 
 	/*
 	 * FIXME: the current Mentor DMA code seems to have
 	 * problems getting toggle correct.
 	 */
 
-	if (is_in)
-		csr = musb_readw(epio, MUSB_RXCSR) & MUSB_RXCSR_H_DATATOGGLE;
-	else
-		csr = musb_readw(epio, MUSB_TXCSR) & MUSB_TXCSR_H_DATATOGGLE;
+	/* MediaTek controller has private toggle register */
+	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
+		u16 toggle;
+		u8 epnum = qh->hw_ep->epnum;
+
+		if (is_in)
+			toggle = musb_readl(musb->mregs, MUSB_RXTOG);
+		else
+			toggle = musb_readl(musb->mregs, MUSB_TXTOG);
+
+		csr = toggle & (1 << epnum);
+	} else {
+		if (is_in)
+			csr = musb_readw(epio, MUSB_RXCSR)
+				& MUSB_RXCSR_H_DATATOGGLE;
+		else
+			csr = musb_readw(epio, MUSB_TXCSR)
+				& MUSB_TXCSR_H_DATATOGGLE;
+	}
 
 	usb_settoggle(urb->dev, qh->epnum, !is_in, csr ? 1 : 0);
+}
+
+static inline u16 musb_set_toggle(struct musb_qh *qh, int is_in,
+					struct urb *urb)
+{
+	u16 csr = 0;
+	u16 toggle = 0;
+	struct musb *musb = qh->hw_ep->musb;
+	u8 epnum = qh->hw_ep->epnum;
+
+	toggle = usb_gettoggle(urb->dev, qh->epnum, !is_in);
+
+	/* MediaTek controller has private toggle register */
+	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
+		if (is_in) {
+			musb_writel(musb->mregs, MUSB_RXTOGEN, (1 << epnum));
+			musb_writel(musb->mregs, MUSB_RXTOG, (toggle << epnum));
+		} else {
+			musb_writel(musb->mregs, MUSB_TXTOGEN, (1 << epnum));
+			musb_writel(musb->mregs, MUSB_TXTOG, (toggle << epnum));
+		}
+	} else {
+		if (is_in) {
+			if (toggle)
+				csr = MUSB_RXCSR_H_WR_DATATOGGLE
+						| MUSB_RXCSR_H_DATATOGGLE;
+			else
+				csr = 0;
+		} else {
+			if (toggle)
+				csr |= MUSB_TXCSR_H_WR_DATATOGGLE
+						| MUSB_TXCSR_H_DATATOGGLE;
+			else
+				csr |= MUSB_TXCSR_CLRDATATOG;
+		}
+	}
+	return csr;
 }
 
 /*
@@ -772,13 +825,8 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
 					);
 			csr |= MUSB_TXCSR_MODE;
 
-			if (!hw_ep->tx_double_buffered) {
-				if (usb_gettoggle(urb->dev, qh->epnum, 1))
-					csr |= MUSB_TXCSR_H_WR_DATATOGGLE
-						| MUSB_TXCSR_H_DATATOGGLE;
-				else
-					csr |= MUSB_TXCSR_CLRDATATOG;
-			}
+			if (!hw_ep->tx_double_buffered)
+				csr |= musb_set_toggle(qh, !is_out, urb);
 
 			musb_writew(epio, MUSB_TXCSR, csr);
 			/* REVISIT may need to clear FLUSHFIFO ... */
@@ -860,17 +908,12 @@ finish:
 
 	/* IN/receive */
 	} else {
-		u16	csr;
+		u16	csr = 0;
 
 		if (hw_ep->rx_reinit) {
 			musb_rx_reinit(musb, qh, epnum);
+			csr |= musb_set_toggle(qh, !is_out, urb);
 
-			/* init new state: toggle and NYET, maybe DMA later */
-			if (usb_gettoggle(urb->dev, qh->epnum, 0))
-				csr = MUSB_RXCSR_H_WR_DATATOGGLE
-					| MUSB_RXCSR_H_DATATOGGLE;
-			else
-				csr = 0;
 			if (qh->type == USB_ENDPOINT_XFER_INT)
 				csr |= MUSB_RXCSR_DISNYET;
 

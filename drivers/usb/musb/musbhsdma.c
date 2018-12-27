@@ -263,7 +263,7 @@ static int dma_channel_abort(struct dma_channel *channel)
 	return 0;
 }
 
-static irqreturn_t dma_controller_irq(int irq, void *private_data)
+irqreturn_t dma_controller_irq(int irq, void *private_data)
 {
 	struct musb_dma_controller *controller = private_data;
 	struct musb *musb = controller->private_data;
@@ -285,6 +285,8 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
 	spin_lock_irqsave(&musb->lock, flags);
 
 	int_hsdma = musb_readb(mbase, MUSB_HSDMA_INTR);
+	if (musb->ops->quirks & MUSB_MTK_QUIRKS)
+		musb_writeb(musb->mregs, MUSB_HSDMA_INTR, int_hsdma);
 
 	if (!int_hsdma) {
 		musb_dbg(musb, "spurious DMA irq");
@@ -377,15 +379,17 @@ done:
 	spin_unlock_irqrestore(&musb->lock, flags);
 	return retval;
 }
+EXPORT_SYMBOL_GPL(dma_controller_irq);
 
 void musbhs_dma_controller_destroy(struct dma_controller *c)
 {
 	struct musb_dma_controller *controller = container_of(c,
 			struct musb_dma_controller, controller);
+	struct musb *musb = controller->private_data;
 
 	dma_controller_stop(controller);
 
-	if (controller->irq)
+	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS) && controller->irq)
 		free_irq(controller->irq, c);
 
 	kfree(controller);
@@ -398,11 +402,15 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
 	struct musb_dma_controller *controller;
 	struct device *dev = musb->controller;
 	struct platform_device *pdev = to_platform_device(dev);
-	int irq = platform_get_irq_byname(pdev, "dma");
+	int irq = -1;
 
-	if (irq <= 0) {
-		dev_err(dev, "No DMA interrupt line!\n");
-		return NULL;
+	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
+		irq = platform_get_irq_byname(pdev, "dma");
+
+		if (irq < 0) {
+			dev_err(dev, "No DMA interrupt line!\n");
+			return NULL;
+		}
 	}
 
 	controller = kzalloc(sizeof(*controller), GFP_KERNEL);
@@ -418,15 +426,17 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
 	controller->controller.channel_program = dma_channel_program;
 	controller->controller.channel_abort = dma_channel_abort;
 
-	if (request_irq(irq, dma_controller_irq, 0,
+	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
+		if (request_irq(irq, dma_controller_irq, 0,
 			dev_name(musb->controller), &controller->controller)) {
-		dev_err(dev, "request_irq %d failed!\n", irq);
-		musb_dma_controller_destroy(&controller->controller);
+			dev_err(dev, "request_irq %d failed!\n", irq);
+			musb_dma_controller_destroy(&controller->controller);
 
-		return NULL;
+			return NULL;
+		}
+
+		controller->irq = irq;
 	}
-
-	controller->irq = irq;
 
 	return &controller->controller;
 }

@@ -1028,6 +1028,16 @@ static void musb_disable_interrupts(struct musb *musb)
 	temp = musb_readb(mbase, MUSB_INTRUSB);
 	temp = musb_readw(mbase, MUSB_INTRTX);
 	temp = musb_readw(mbase, MUSB_INTRRX);
+
+	/*  MediaTek controller interrupt status is W1C */
+	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
+		musb_writeb(mbase, MUSB_INTRUSB,
+			musb_readb(mbase, MUSB_INTRUSB));
+		musb_writew(mbase, MUSB_INTRRX,
+			musb_readw(mbase, MUSB_INTRRX));
+		musb_writew(mbase, MUSB_INTRTX,
+			musb_readw(mbase, MUSB_INTRTX));
+	}
 }
 
 static void musb_enable_interrupts(struct musb *musb)

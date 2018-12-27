@@ -273,6 +273,12 @@
 #define MUSB_RXHUBADDR		0x06
 #define MUSB_RXHUBPORT		0x07
 
+/* MediaTek controller toggle enable and status reg */
+#define MUSB_RXTOG		0x80
+#define MUSB_RXTOGEN		0x82
+#define MUSB_TXTOG		0x84
+#define MUSB_TXTOGEN		0x86
+
 static inline u8 musb_read_configdata(void __iomem *mbase)
 {
 	musb_writeb(mbase, MUSB_INDEX, 0);
