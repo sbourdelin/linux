@@ -111,6 +111,9 @@
 extern unsigned long *bitmap_alloc(unsigned int nbits, gfp_t flags);
 extern unsigned long *bitmap_zalloc(unsigned int nbits, gfp_t flags);
 extern void bitmap_free(const unsigned long *bitmap);
+extern unsigned long *bitmap_valloc(unsigned int nbits, gfp_t flags);
+extern unsigned long *bitmap_vzalloc(unsigned int nbits, gfp_t flags);
+extern void bitmap_vfree(const unsigned long *bitmap);
 
 /*
  * lib/bitmap.c provides these functions:

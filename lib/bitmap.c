@@ -1139,6 +1139,25 @@ void bitmap_free(const unsigned long *bitmap)
 }
 EXPORT_SYMBOL(bitmap_free);
 
+unsigned long *bitmap_valloc(unsigned int nbits, gfp_t flags)
+{
+	return kvmalloc_array(BITS_TO_LONGS(nbits), sizeof(unsigned long),
+			     flags);
+}
+EXPORT_SYMBOL(bitmap_valloc);
+
+unsigned long *bitmap_vzalloc(unsigned int nbits, gfp_t flags)
+{
+	return bitmap_valloc(nbits, flags | __GFP_ZERO);
+}
+EXPORT_SYMBOL(bitmap_vzalloc);
+
+void bitmap_vfree(const unsigned long *bitmap)
+{
+	kvfree(bitmap);
+}
+EXPORT_SYMBOL(bitmap_vfree);
+
 #if BITS_PER_LONG == 64
 /**
  * bitmap_from_arr32 - copy the contents of u32 array of bits to bitmap
