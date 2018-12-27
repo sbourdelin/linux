@@ -250,3 +250,29 @@ MODULE_PARM_DESC(mock_selftests, "Run selftests before loading, using mock hardw
 
 module_param_named_unsafe(live_selftests, i915_selftest.live, int, 0400);
 MODULE_PARM_DESC(live_selftests, "Run selftests after driver initialisation on the live system (0:disabled [default], 1:run tests then continue, -1:run tests then exit module)");
+
+module_param_named_unsafe(inject_load_failure, i915_selftest.inject_load_failure, uint, 0400);
+MODULE_PARM_DESC(inject_load_failure,
+		 "Force an error after a number of failure check points (0:disabled (default), N:force failure at the Nth failure check point)");
+
+static unsigned int i915_load_fail_count;
+
+bool __i915_inject_load_failure(const char *func, int line)
+{
+	if (i915_load_fail_count >= i915_selftest.inject_load_failure)
+		return false;
+
+	if (++i915_load_fail_count == i915_selftest.inject_load_failure) {
+		DRM_INFO("Injecting failure at checkpoint %u [%s:%d]\n",
+			 i915_selftest.inject_load_failure, func, line);
+		i915_selftest.inject_load_failure = 0;
+		return true;
+	}
+
+	return false;
+}
+
+bool i915_error_injected(void)
+{
+	return i915_load_fail_count && !i915_selftest.inject_load_failure;
+}
