@@ -31,6 +31,48 @@
 #include "intel_drv.h"
 #include "i915_drv.h"
 
+static const struct drm_prop_enum_list gen10_hdmi_colorspaces[] = {
+	/* For Default case, driver will set the colorspace */
+	{ COLORIMETRY_DEFAULT, "Default" },
+	/* Standard Definition Colorimetry based on CEA 861 */
+	{ COLORIMETRY_ITU_601, "ITU_601" },
+	{ COLORIMETRY_ITU_709, "ITU_709" },
+	/* Standard Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_601, "XV_YCC_601" },
+	/* High Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_709, "XV_YCC_709" },
+	/* Colorimetry based on IEC 61966-2-1/Amendment 1 */
+	{ COLORIMETRY_S_YCC_601, "S_YCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 [33] */
+	{ COLORIMETRY_OPYCC_601, "opYCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 */
+	{ COLORIMETRY_OPRGB, "opRGB" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_RGB, "BT2020_RGB" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_YCC, "BT2020_YCC" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_CYCC, "BT2020_CYCC" },
+};
+
+static const struct drm_prop_enum_list legacy_hdmi_colorspaces[] = {
+	/* For Default case, driver will set the colorspace */
+	{ COLORIMETRY_DEFAULT, "Default" },
+	/* Standard Definition Colorimetry based on CEA 861 */
+	{ COLORIMETRY_ITU_601, "ITU_601" },
+	{ COLORIMETRY_ITU_709, "ITU_709" },
+	/* Standard Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_601, "XV_YCC_601" },
+	/* High Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_709, "XV_YCC_709" },
+	/* Colorimetry based on IEC 61966-2-1/Amendment 1 */
+	{ COLORIMETRY_S_YCC_601, "S_YCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 [33] */
+	{ COLORIMETRY_OPYCC_601, "opYCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 */
+	{ COLORIMETRY_OPRGB, "opRGB" },
+};
+
 int intel_connector_init(struct intel_connector *connector)
 {
 	struct intel_digital_connector_state *conn_state;
@@ -261,4 +303,25 @@ intel_attach_aspect_ratio_property(struct drm_connector *connector)
 		drm_object_attach_property(&connector->base,
 			connector->dev->mode_config.aspect_ratio_property,
 			DRM_MODE_PICTURE_ASPECT_NONE);
+}
+
+void
+intel_attach_colorspace_property(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+
+	if (INTEL_GEN(dev_priv) >= 10) {
+		if (!drm_mode_create_colorspace_property(connector,
+			gen10_hdmi_colorspaces,
+			ARRAY_SIZE(gen10_hdmi_colorspaces)))
+			drm_object_attach_property(&connector->base,
+				connector->colorspace_property, 0);
+	} else {
+		if (!drm_mode_create_colorspace_property(connector,
+			legacy_hdmi_colorspaces,
+			ARRAY_SIZE(legacy_hdmi_colorspaces)))
+			drm_object_attach_property(&connector->base,
+				connector->colorspace_property, 0);
+	}
 }
