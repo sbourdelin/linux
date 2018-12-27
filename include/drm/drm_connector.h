@@ -31,6 +31,7 @@
 #include <drm/drm_util.h>
 
 #include <uapi/drm/drm_mode.h>
+#include <drm/drm_property.h>
 
 struct drm_connector_helper_funcs;
 struct drm_modeset_acquire_ctx;
@@ -495,6 +496,13 @@ struct drm_connector_state {
 	 * protection. This is most commonly used for HDCP.
 	 */
 	unsigned int content_protection;
+
+	/**
+	 * @colorspace: State variable for Connector property to request
+	 * colorspace change on Sink. This is most commonly used to switch
+	 * to wider color gamuts like BT2020.
+	 */
+	enum absolute_colorimetry_list colorspace;
 
 	/**
 	 * @writeback_job: Writeback job for writeback connectors
@@ -989,6 +997,12 @@ struct drm_connector {
 	struct drm_property *content_protection_property;
 
 	/**
+	 * @colorspace_property: Connector property to set the suitable
+	 * colorspace supported by the sink.
+	 */
+	struct drm_property *colorspace_property;
+
+	/**
 	 * @path_blob_ptr:
 	 *
 	 * DRM blob property data for the DP MST path property. This should only
@@ -1261,6 +1275,9 @@ int drm_connector_attach_vrr_capable_property(
 int drm_connector_attach_content_protection_property(
 		struct drm_connector *connector);
 int drm_mode_create_aspect_ratio_property(struct drm_device *dev);
+int drm_mode_create_colorspace_property(struct drm_connector *connector,
+					const struct drm_prop_enum_list *props,
+					int num_values);
 int drm_mode_create_content_type_property(struct drm_device *dev);
 void drm_hdmi_avi_infoframe_content_type(struct hdmi_avi_infoframe *frame,
 					 const struct drm_connector_state *conn_state);

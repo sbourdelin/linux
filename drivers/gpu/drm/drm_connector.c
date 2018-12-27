@@ -826,6 +826,54 @@ static struct drm_prop_enum_list drm_cp_enum_list[] = {
 };
 DRM_ENUM_NAME_FN(drm_get_content_protection_name, drm_cp_enum_list)
 
+/* List of HDMI Colorspaces supported */
+static const struct drm_prop_enum_list hdmi_colorspaces[] = {
+	/* For Default case, driver will set the colorspace */
+	{ COLORIMETRY_DEFAULT, "Default" },
+	/* Standard Definition Colorimetry based on CEA 861 */
+	{ COLORIMETRY_ITU_601, "ITU_601" },
+	{ COLORIMETRY_ITU_709, "ITU_709" },
+	/* Standard Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_601, "XV_YCC_601" },
+	/* High Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_709, "XV_YCC_709" },
+	/* Colorimetry based on IEC 61966-2-1/Amendment 1 */
+	{ COLORIMETRY_S_YCC_601, "S_YCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 [33] */
+	{ COLORIMETRY_OPYCC_601, "opYCC_601" },
+	/* Colorimetry based on IEC 61966-2-5 */
+	{ COLORIMETRY_OPRGB, "opRGB" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_RGB, "BT2020_RGB" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_YCC, "BT2020_YCC" },
+	/* Colorimetry based on ITU-R BT.2020 */
+	{ COLORIMETRY_BT2020_CYCC, "BT2020_CYCC" },
+};
+
+/* List of DP Colorspaces supported */
+static const struct drm_prop_enum_list dp_colorspaces[] = {
+	/* For Default case, driver will set the colorspace */
+	{ COLORIMETRY_DEFAULT, "Default" },
+	/* Standard Definition Colorimetry based on CEA 861 */
+	{ COLORIMETRY_ITU_601, "ITU_601" },
+	{ COLORIMETRY_ITU_709, "ITU_709" },
+	/* Standard Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_601, "XV_YCC_601" },
+	/* High Definition Colorimetry based on IEC 61966-2-4 */
+	{ COLORIMETRY_XV_YCC_709, "XV_YCC_709" },
+	/* Colorimetry based on IEC 61966-2-5 */
+	{ COLORIMETRY_OPRGB, "opRGB" },
+	/* DP MSA Colorimetry */
+	{ DP_COLORIMETRY_Y_CBCR_ITU_601, "YCBCR_ITU_601" },
+	{ DP_COLORIMETRY_Y_CBCR_ITU_709, "YCBCR_ITU_709" },
+	{ DP_COLORIMETRY_SRGB, "sRGB" },
+	{ DP_COLORIMETRY_RGB_WIDE_GAMUT, "RGB Wide Gamut" },
+	{ DP_COLORIMETRY_SCRGB, "scRGB" },
+	{ DP_COLORIMETRY_DCI_P3, "DCI-P3" },
+	{ DP_COLORIMETRY_CUSTOM_COLOR_PROFILE, "Custom Profile" },
+};
+
 /**
  * DOC: standard connector properties
  *
@@ -1499,6 +1547,37 @@ int drm_mode_create_aspect_ratio_property(struct drm_device *dev)
 	return 0;
 }
 EXPORT_SYMBOL(drm_mode_create_aspect_ratio_property);
+
+/**
+ * DOC: standard connector properties
+ *
+ * Colorspace:
+ *     drm_mode_create_colorspace_property - create colorspace property
+ *     This property helps select a suitable colorspace based on the sink
+ *     capability. Modern sink devices support wider gamut like BT2020.
+ *     This helps switch to BT2020 mode if the BT2020 encoded video stream
+ *     is being played by the user, same for any other colorspace.
+ *     Called by a driver the first time it's needed, must be attached to
+ *     desired connectors.
+ */
+int drm_mode_create_colorspace_property(struct drm_connector *connector,
+					const struct drm_prop_enum_list *props,
+					int num_values)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	prop = drm_property_create_enum(dev, DRM_MODE_PROP_ENUM,
+					"Colorspace",
+					props, num_values);
+	if (!prop)
+		return -ENOMEM;
+
+	connector->colorspace_property = prop;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_mode_create_colorspace_property);
 
 /**
  * drm_mode_create_content_type_property - create content type property
