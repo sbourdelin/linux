@@ -139,11 +139,17 @@ void __init setup_smp(void)
 	int cpu;
 
 	while ((node = of_find_node_by_type(node, "cpu"))) {
-		if (!of_device_is_available(node))
+		if (!of_device_is_available(node)) {
+			of_node_put(node);
 			continue;
+		}
 
-		if (of_property_read_u32(node, "reg", &cpu))
+		if (of_property_read_u32(node, "reg", &cpu)) {
+			of_node_put(node);
 			continue;
+		}
+
+		of_node_put(node);
 
 		if (cpu >= NR_CPUS)
 			continue;
