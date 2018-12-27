@@ -75,7 +75,7 @@ enum lm363x_regulator_id {
  * struct ti_lmu
  *
  * @dev:	Parent device pointer
- * @regmap:	Used for i2c communcation on accessing registers
+ * @regmap:	Used for i2c communication on accessing registers
  * @en_gpio:	GPIO for HWEN pin [Optional]
  * @notifier:	Notifier for reporting hwmon event
  */
