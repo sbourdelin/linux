@@ -180,8 +180,13 @@ static irqreturn_t rv8803_handle_irq(int irq, void *dev_id)
 
 	if (events) {
 		rtc_update_irq(rv8803->rtc, 1, events);
-		rv8803_write_reg(client, RV8803_FLAG, flags);
-		rv8803_write_reg(rv8803->client, RV8803_CTRL, rv8803->ctrl);
+		if (rv8803_write_reg(client, RV8803_FLAG, flags))
+			dev_warn(&client->dev, "Failed to write RV8803 reg.\n");
+
+		if (rv8803_write_reg(rv8803->client, RV8803_CTRL,
+					rv8803->ctrl))
+			dev_warn(&rv8803->client->dev,
+				"Failed to write RV8803_CTRL reg.\n");
 	}
 
 	mutex_unlock(&rv8803->flags_lock);
