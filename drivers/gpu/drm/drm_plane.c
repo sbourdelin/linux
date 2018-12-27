@@ -1072,17 +1072,17 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 		switch (page_flip->flags & DRM_MODE_PAGE_FLIP_TARGET) {
 		case DRM_MODE_PAGE_FLIP_TARGET_ABSOLUTE:
 			if ((int)(target_vblank - current_vblank) > 1) {
-				DRM_DEBUG("Invalid absolute flip target %u, "
-					  "must be <= %u\n", target_vblank,
-					  current_vblank + 1);
+				DRM_DEBUG_CORE("Invalid absolute flip target %u, "
+					       "must be <= %u\n", target_vblank,
+					       current_vblank + 1);
 				drm_crtc_vblank_put(crtc);
 				return -EINVAL;
 			}
 			break;
 		case DRM_MODE_PAGE_FLIP_TARGET_RELATIVE:
 			if (target_vblank != 0 && target_vblank != 1) {
-				DRM_DEBUG("Invalid relative flip target %u, "
-					  "must be 0 or 1\n", target_vblank);
+				DRM_DEBUG_CORE("Invalid relative flip target %u, "
+					       "must be 0 or 1\n", target_vblank);
 				drm_crtc_vblank_put(crtc);
 				return -EINVAL;
 			}

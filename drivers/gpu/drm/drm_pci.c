@@ -158,8 +158,8 @@ static int drm_pci_irq_by_busid(struct drm_device *dev, struct drm_irq_busid *p)
 
 	p->irq = dev->pdev->irq;
 
-	DRM_DEBUG("%d:%d:%d => IRQ %d\n", p->busnum, p->devnum, p->funcnum,
-		  p->irq);
+	DRM_DEBUG_CORE("%d:%d:%d => IRQ %d\n", p->busnum, p->devnum, p->funcnum,
+		       p->irq);
 	return 0;
 }
 
@@ -238,7 +238,7 @@ int drm_get_pci_dev(struct pci_dev *pdev, const struct pci_device_id *ent,
 	struct drm_device *dev;
 	int ret;
 
-	DRM_DEBUG("\n");
+	DRM_DEBUG_CORE("\n");
 
 	dev = drm_dev_alloc(driver, &pdev->dev);
 	if (IS_ERR(dev))
@@ -293,7 +293,7 @@ int drm_legacy_pci_init(struct drm_driver *driver, struct pci_driver *pdriver)
 	const struct pci_device_id *pid;
 	int i;
 
-	DRM_DEBUG("\n");
+	DRM_DEBUG_CORE("\n");
 
 	if (WARN_ON(!(driver->driver_features & DRIVER_LEGACY)))
 		return -EINVAL;
@@ -347,7 +347,7 @@ int drm_irq_by_busid(struct drm_device *dev, void *data,
 void drm_legacy_pci_exit(struct drm_driver *driver, struct pci_driver *pdriver)
 {
 	struct drm_device *dev, *tmp;
-	DRM_DEBUG("\n");
+	DRM_DEBUG_CORE("\n");
 
 	if (!(driver->driver_features & DRIVER_LEGACY)) {
 		WARN_ON(1);

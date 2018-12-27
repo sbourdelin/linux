@@ -1380,7 +1380,7 @@ bool drm_edid_block_valid(u8 *raw_edid, int block, bool print_bad_edid,
 			 */
 			if (edid_corrupt)
 				*edid_corrupt = true;
-			DRM_DEBUG("Fixing EDID header, your hardware may be failing\n");
+			DRM_DEBUG_CORE("Fixing EDID header, your hardware may be failing\n");
 			memcpy(raw_edid, edid_header, sizeof(edid_header));
 		} else {
 			if (edid_corrupt)
@@ -1396,8 +1396,8 @@ bool drm_edid_block_valid(u8 *raw_edid, int block, bool print_bad_edid,
 
 		/* allow CEA to slide through, switches mangle this */
 		if (raw_edid[0] == CEA_EXT) {
-			DRM_DEBUG("EDID checksum is invalid, remainder is %d\n", csum);
-			DRM_DEBUG("Assuming a KVM switch modified the CEA block but left the original checksum\n");
+			DRM_DEBUG_CORE("EDID checksum is invalid, remainder is %d\n", csum);
+			DRM_DEBUG_CORE("Assuming a KVM switch modified the CEA block but left the original checksum\n");
 		} else {
 			if (print_bad_edid)
 				DRM_NOTE("EDID checksum is invalid, remainder is %d\n", csum);
@@ -1415,7 +1415,7 @@ bool drm_edid_block_valid(u8 *raw_edid, int block, bool print_bad_edid,
 		}
 
 		if (edid->revision > 4)
-			DRM_DEBUG("EDID minor > 4, assuming backward compatibility\n");
+			DRM_DEBUG_CORE("EDID minor > 4, assuming backward compatibility\n");
 		break;
 
 	default:
@@ -3797,8 +3797,8 @@ static void fixup_detailed_cea_mode_clock(struct drm_display_mode *mode)
 	if (mode->clock == clock)
 		return;
 
-	DRM_DEBUG("detailed mode matches %s VIC %d, adjusting clock %d -> %d\n",
-		  type, vic, mode->clock, clock);
+	DRM_DEBUG_CORE("detailed mode matches %s VIC %d, adjusting clock %d -> %d\n",
+		       type, vic, mode->clock, clock);
 	mode->clock = clock;
 }
 
@@ -4349,32 +4349,32 @@ static void drm_parse_hdmi_deep_color_info(struct drm_connector *connector,
 	if (hdmi[6] & DRM_EDID_HDMI_DC_30) {
 		dc_bpc = 10;
 		info->edid_hdmi_dc_modes |= DRM_EDID_HDMI_DC_30;
-		DRM_DEBUG("%s: HDMI sink does deep color 30.\n",
-			  connector->name);
+		DRM_DEBUG_CORE("%s: HDMI sink does deep color 30.\n",
+			       connector->name);
 	}
 
 	if (hdmi[6] & DRM_EDID_HDMI_DC_36) {
 		dc_bpc = 12;
 		info->edid_hdmi_dc_modes |= DRM_EDID_HDMI_DC_36;
-		DRM_DEBUG("%s: HDMI sink does deep color 36.\n",
-			  connector->name);
+		DRM_DEBUG_CORE("%s: HDMI sink does deep color 36.\n",
+			       connector->name);
 	}
 
 	if (hdmi[6] & DRM_EDID_HDMI_DC_48) {
 		dc_bpc = 16;
 		info->edid_hdmi_dc_modes |= DRM_EDID_HDMI_DC_48;
-		DRM_DEBUG("%s: HDMI sink does deep color 48.\n",
-			  connector->name);
+		DRM_DEBUG_CORE("%s: HDMI sink does deep color 48.\n",
+			       connector->name);
 	}
 
 	if (dc_bpc == 0) {
-		DRM_DEBUG("%s: No deep color support on this HDMI sink.\n",
-			  connector->name);
+		DRM_DEBUG_CORE("%s: No deep color support on this HDMI sink.\n",
+			       connector->name);
 		return;
 	}
 
-	DRM_DEBUG("%s: Assigning HDMI sink color depth as %d bpc.\n",
-		  connector->name, dc_bpc);
+	DRM_DEBUG_CORE("%s: Assigning HDMI sink color depth as %d bpc.\n",
+		       connector->name, dc_bpc);
 	info->bpc = dc_bpc;
 
 	/*
@@ -4387,8 +4387,8 @@ static void drm_parse_hdmi_deep_color_info(struct drm_connector *connector,
 	/* YCRCB444 is optional according to spec. */
 	if (hdmi[6] & DRM_EDID_HDMI_DC_Y444) {
 		info->color_formats |= DRM_COLOR_FORMAT_YCRCB444;
-		DRM_DEBUG("%s: HDMI sink does YCRCB444 in deep color.\n",
-			  connector->name);
+		DRM_DEBUG_CORE("%s: HDMI sink does YCRCB444 in deep color.\n",
+			       connector->name);
 	}
 
 	/*
@@ -4396,8 +4396,8 @@ static void drm_parse_hdmi_deep_color_info(struct drm_connector *connector,
 	 * then deep color 36 bit must be supported.
 	 */
 	if (!(hdmi[6] & DRM_EDID_HDMI_DC_36)) {
-		DRM_DEBUG("%s: HDMI sink should do DC_36, but does not!\n",
-			  connector->name);
+		DRM_DEBUG_CORE("%s: HDMI sink should do DC_36, but does not!\n",
+			       connector->name);
 	}
 }
 
@@ -4510,8 +4510,8 @@ u32 drm_add_display_info(struct drm_connector *connector, const struct edid *edi
 	if ((info->bpc == 0) && (edid->revision < 4) &&
 	    (edid->input & DRM_EDID_DIGITAL_TYPE_DVI)) {
 		info->bpc = 8;
-		DRM_DEBUG("%s: Assigning DFP sink color depth as %d bpc.\n",
-			  connector->name, info->bpc);
+		DRM_DEBUG_CORE("%s: Assigning DFP sink color depth as %d bpc.\n",
+			       connector->name, info->bpc);
 	}
 
 	/* Only defined for 1.4 with digital displays */
@@ -4543,8 +4543,8 @@ u32 drm_add_display_info(struct drm_connector *connector, const struct edid *edi
 		break;
 	}
 
-	DRM_DEBUG("%s: Assigning EDID-1.4 digital sink color depth as %d bpc.\n",
-			  connector->name, info->bpc);
+	DRM_DEBUG_CORE("%s: Assigning EDID-1.4 digital sink color depth as %d bpc.\n",
+		       connector->name, info->bpc);
 
 	info->color_formats |= DRM_COLOR_FORMAT_RGB444;
 	if (edid->features & DRM_EDID_FEATURE_RGB_YCRCB444)

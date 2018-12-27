@@ -178,7 +178,7 @@ static int drm_minor_register(struct drm_device *dev, unsigned int type)
 	unsigned long flags;
 	int ret;
 
-	DRM_DEBUG("\n");
+	DRM_DEBUG_CORE("\n");
 
 	minor = *drm_minor_get_slot(dev, type);
 	if (!minor)
@@ -199,7 +199,7 @@ static int drm_minor_register(struct drm_device *dev, unsigned int type)
 	idr_replace(&drm_minors_idr, minor, minor->index);
 	spin_unlock_irqrestore(&drm_minor_lock, flags);
 
-	DRM_DEBUG("new minor registered %d\n", minor->index);
+	DRM_DEBUG_CORE("new minor registered %d\n", minor->index);
 	return 0;
 
 err_debugfs:
@@ -309,7 +309,7 @@ void drm_minor_release(struct drm_minor *minor)
  */
 void drm_put_dev(struct drm_device *dev)
 {
-	DRM_DEBUG("\n");
+	DRM_DEBUG_CORE("\n");
 
 	if (!dev) {
 		DRM_ERROR("cleanup called no dev\n");
@@ -919,7 +919,7 @@ static int drm_stub_open(struct inode *inode, struct file *filp)
 	struct drm_minor *minor;
 	int err;
 
-	DRM_DEBUG("\n");
+	DRM_DEBUG_CORE("\n");
 
 	mutex_lock(&drm_global_mutex);
 	minor = drm_minor_acquire(iminor(inode));
@@ -988,7 +988,7 @@ static int __init drm_core_init(void)
 
 	drm_core_init_complete = true;
 
-	DRM_DEBUG("Initialized\n");
+	DRM_DEBUG_CORE("Initialized\n");
 	return 0;
 
 error:

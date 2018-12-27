@@ -70,7 +70,7 @@ int drm_getmagic(struct drm_device *dev, void *data, struct drm_file *file_priv)
 	auth->magic = file_priv->magic;
 	mutex_unlock(&dev->master_mutex);
 
-	DRM_DEBUG("%u\n", auth->magic);
+	DRM_DEBUG_CORE("%u\n", auth->magic);
 
 	return ret < 0 ? ret : 0;
 }
@@ -81,7 +81,7 @@ int drm_authmagic(struct drm_device *dev, void *data,
 	struct drm_auth *auth = data;
 	struct drm_file *file;
 
-	DRM_DEBUG("%u\n", auth->magic);
+	DRM_DEBUG_CORE("%u\n", auth->magic);
 
 	mutex_lock(&dev->master_mutex);
 	file = idr_find(&file_priv->master->magic_map, auth->magic);

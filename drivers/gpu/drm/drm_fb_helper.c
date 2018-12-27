@@ -1646,11 +1646,11 @@ int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 	if (var->bits_per_pixel != fb->format->cpp[0] * 8 ||
 	    var->xres > fb->width || var->yres > fb->height ||
 	    var->xres_virtual > fb->width || var->yres_virtual > fb->height) {
-		DRM_DEBUG("fb requested width/height/bpp can't fit in current fb "
-			  "request %dx%d-%d (virtual %dx%d) > %dx%d-%d\n",
-			  var->xres, var->yres, var->bits_per_pixel,
-			  var->xres_virtual, var->yres_virtual,
-			  fb->width, fb->height, fb->format->cpp[0] * 8);
+		DRM_DEBUG_CORE("fb requested width/height/bpp can't fit in current fb "
+			       "request %dx%d-%d (virtual %dx%d) > %dx%d-%d\n",
+			       var->xres, var->yres, var->bits_per_pixel,
+			       var->xres_virtual, var->yres_virtual,
+			       fb->width, fb->height, fb->format->cpp[0] * 8);
 		return -EINVAL;
 	}
 
@@ -1659,7 +1659,7 @@ int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 	 * so reject all pixel format changing requests.
 	 */
 	if (!drm_fb_pixel_format_equal(var, &info->var)) {
-		DRM_DEBUG("fbdev emulation doesn't support changing the pixel format\n");
+		DRM_DEBUG_CORE("fbdev emulation doesn't support changing the pixel format\n");
 		return -EINVAL;
 	}
 
@@ -3166,7 +3166,7 @@ static int drm_fbdev_client_hotplug(struct drm_client_dev *client)
 		return drm_fb_helper_hotplug_event(dev->fb_helper);
 
 	if (!dev->mode_config.num_connector) {
-		DRM_DEV_DEBUG(dev->dev, "No connectors found, will not create framebuffer!\n");
+		DRM_DEV_DEBUG_CORE(dev->dev, "No connectors found, will not create framebuffer!\n");
 		return 0;
 	}
 
@@ -3241,7 +3241,7 @@ int drm_fbdev_generic_setup(struct drm_device *dev, unsigned int preferred_bpp)
 
 	ret = drm_fbdev_client_hotplug(&fb_helper->client);
 	if (ret)
-		DRM_DEV_DEBUG(dev->dev, "client hotplug ret=%d\n", ret);
+		DRM_DEV_DEBUG_CORE(dev->dev, "client hotplug ret=%d\n", ret);
 
 	return 0;
 }

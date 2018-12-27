@@ -208,7 +208,7 @@ static vm_fault_t drm_vm_shm_fault(struct vm_fault *vmf)
 	get_page(page);
 	vmf->page = page;
 
-	DRM_DEBUG("shm_fault 0x%lx\n", offset);
+	DRM_DEBUG_CORE("shm_fault 0x%lx\n", offset);
 	return 0;
 }
 
@@ -229,8 +229,8 @@ static void drm_vm_shm_close(struct vm_area_struct *vma)
 	struct drm_map_list *r_list;
 	int found_maps = 0;
 
-	DRM_DEBUG("0x%08lx,0x%08lx\n",
-		  vma->vm_start, vma->vm_end - vma->vm_start);
+	DRM_DEBUG_CORE("0x%08lx,0x%08lx\n",
+		       vma->vm_start, vma->vm_end - vma->vm_start);
 
 	map = vma->vm_private_data;
 
@@ -314,7 +314,7 @@ static vm_fault_t drm_vm_dma_fault(struct vm_fault *vmf)
 	get_page(page);
 	vmf->page = page;
 
-	DRM_DEBUG("dma_fault 0x%lx (page %lu)\n", offset, page_nr);
+	DRM_DEBUG_CORE("dma_fault 0x%lx (page %lu)\n", offset, page_nr);
 	return 0;
 }
 
@@ -386,8 +386,8 @@ static void drm_vm_open_locked(struct drm_device *dev,
 {
 	struct drm_vma_entry *vma_entry;
 
-	DRM_DEBUG("0x%08lx,0x%08lx\n",
-		  vma->vm_start, vma->vm_end - vma->vm_start);
+	DRM_DEBUG_CORE("0x%08lx,0x%08lx\n",
+		       vma->vm_start, vma->vm_end - vma->vm_start);
 
 	vma_entry = kmalloc(sizeof(*vma_entry), GFP_KERNEL);
 	if (vma_entry) {
@@ -412,8 +412,8 @@ static void drm_vm_close_locked(struct drm_device *dev,
 {
 	struct drm_vma_entry *pt, *temp;
 
-	DRM_DEBUG("0x%08lx,0x%08lx\n",
-		  vma->vm_start, vma->vm_end - vma->vm_start);
+	DRM_DEBUG_CORE("0x%08lx,0x%08lx\n",
+		       vma->vm_start, vma->vm_end - vma->vm_start);
 
 	list_for_each_entry_safe(pt, temp, &dev->vmalist, head) {
 		if (pt->vma == vma) {
@@ -461,8 +461,8 @@ static int drm_mmap_dma(struct file *filp, struct vm_area_struct *vma)
 
 	dev = priv->minor->dev;
 	dma = dev->dma;
-	DRM_DEBUG("start = 0x%lx, end = 0x%lx, page offset = 0x%lx\n",
-		  vma->vm_start, vma->vm_end, vma->vm_pgoff);
+	DRM_DEBUG_CORE("start = 0x%lx, end = 0x%lx, page offset = 0x%lx\n",
+		       vma->vm_start, vma->vm_end, vma->vm_pgoff);
 
 	/* Length must match exact page count */
 	if (!dma || (length >> PAGE_SHIFT) != dma->page_count) {
@@ -523,8 +523,8 @@ static int drm_mmap_locked(struct file *filp, struct vm_area_struct *vma)
 	resource_size_t offset = 0;
 	struct drm_hash_item *hash;
 
-	DRM_DEBUG("start = 0x%lx, end = 0x%lx, page offset = 0x%lx\n",
-		  vma->vm_start, vma->vm_end, vma->vm_pgoff);
+	DRM_DEBUG_CORE("start = 0x%lx, end = 0x%lx, page offset = 0x%lx\n",
+		       vma->vm_start, vma->vm_end, vma->vm_pgoff);
 
 	if (!priv->authenticated)
 		return -EACCES;
@@ -595,10 +595,10 @@ static int drm_mmap_locked(struct file *filp, struct vm_area_struct *vma)
 				       vma->vm_end - vma->vm_start,
 				       vma->vm_page_prot))
 			return -EAGAIN;
-		DRM_DEBUG("   Type = %d; start = 0x%lx, end = 0x%lx,"
-			  " offset = 0x%llx\n",
-			  map->type,
-			  vma->vm_start, vma->vm_end, (unsigned long long)(map->offset + offset));
+		DRM_DEBUG_CORE("   Type = %d; start = 0x%lx, end = 0x%lx,"
+			       " offset = 0x%llx\n",
+			       map->type,
+			       vma->vm_start, vma->vm_end, (unsigned long long)(map->offset + offset));
 
 		vma->vm_ops = &drm_vm_ops;
 		break;

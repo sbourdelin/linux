@@ -227,10 +227,11 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
  * The following categories are defined:
  *
  * CORE: Used in the generic drm code: drm_ioctl.c, drm_mm.c, drm_memory.c, ...
- *	 This is the category used by the DRM_DEBUG() macro.
+ *	 This is the category used by the DRM_DEBUG_CORE() macro.
  *
  * DRIVER: Used in the vendor specific part of the driver: i915, radeon, ...
- *	   This is the category used by the DRM_DEBUG_DRIVER() macro.
+ *	   This is the category used by the DRM_DEBUG() and DRM_DEBUG_DRIVER()
+ *	   macros.
  *
  * KMS: used in the modesetting code.
  *	This is the category used by the DRM_DEBUG_KMS() macro.
@@ -346,15 +347,20 @@ void drm_err(const char *format, ...);
  * @dev: device pointer
  * @fmt: printf() like format string.
  */
-#define DRM_DEV_DEBUG(dev, fmt, ...)					\
+#define DRM_DEV_DEBUG_CORE(dev, fmt, ...)				\
 	drm_dev_dbg(dev, DRM_UT_CORE, fmt, ##__VA_ARGS__)
-#define DRM_DEBUG(fmt, ...)						\
+#define DRM_DEBUG_CORE(fmt, ...)					\
 	drm_dbg(DRM_UT_CORE, fmt, ##__VA_ARGS__)
 
-#define DRM_DEV_DEBUG_DRIVER(dev, fmt, ...)				\
-	drm_dev_dbg(dev, DRM_UT_DRIVER,	fmt, ##__VA_ARGS__)
-#define DRM_DEBUG_DRIVER(fmt, ...)					\
+#define DRM_DEV_DEBUG(dev, fmt, ...)					\
+	drm_dev_dbg(dev, DRM_UT_DRIVER, fmt, ##__VA_ARGS__)
+#define DRM_DEBUG(fmt, ...)						\
 	drm_dbg(DRM_UT_DRIVER, fmt, ##__VA_ARGS__)
+
+#define DRM_DEV_DEBUG_DRIVER(dev, fmt, ...)				\
+	DRM_DEV_DEBUG(dev, fmt, ##__VA_ARGS__)
+#define DRM_DEBUG_DRIVER(fmt, ...)					\
+	DRM_DEBUG(fmt, ##__VA_ARGS__)
 
 #define DRM_DEV_DEBUG_KMS(dev, fmt, ...)				\
 	drm_dev_dbg(dev, DRM_UT_KMS, fmt, ##__VA_ARGS__)
@@ -399,17 +405,17 @@ void drm_err(const char *format, ...);
  * @dev: device pointer
  * @fmt: printf() like format string.
  */
-#define DRM_DEV_DEBUG_RATELIMITED(dev, fmt, ...)			\
+#define DRM_DEV_DEBUG_CORE_RATELIMITED(dev, fmt, ...)			\
 	_DEV_DRM_DEFINE_DEBUG_RATELIMITED(dev, DRM_UT_CORE,		\
+					  fmt, ##__VA_ARGS__)
+#define DRM_DEBUG_CORE_RATELIMITED(fmt, ...)				\
+	DRM_DEV_DEBUG_CORE_RATELIMITED(NULL, fmt, ##__VA_ARGS__)
+
+#define DRM_DEV_DEBUG_RATELIMITED(dev, fmt, ...)			\
+	_DEV_DRM_DEFINE_DEBUG_RATELIMITED(dev, DRM_UT_DRIVER,		\
 					  fmt, ##__VA_ARGS__)
 #define DRM_DEBUG_RATELIMITED(fmt, ...)					\
 	DRM_DEV_DEBUG_RATELIMITED(NULL, fmt, ##__VA_ARGS__)
-
-#define DRM_DEV_DEBUG_DRIVER_RATELIMITED(dev, fmt, ...)			\
-	_DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, DRM_UT_DRIVER,		\
-					  fmt, ##__VA_ARGS__)
-#define DRM_DEBUG_DRIVER_RATELIMITED(fmt, ...)				\
-	DRM_DEV_DEBUG_DRIVER_RATELIMITED(NULL, fmt, ##__VA_ARGS__)
 
 #define DRM_DEV_DEBUG_KMS_RATELIMITED(dev, fmt, ...)			\
 	_DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, DRM_UT_KMS,		\

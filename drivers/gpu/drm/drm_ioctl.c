@@ -426,7 +426,7 @@ done:
 int drm_noop(struct drm_device *dev, void *data,
 	     struct drm_file *file_priv)
 {
-	DRM_DEBUG("\n");
+	DRM_DEBUG_CORE("\n");
 	return 0;
 }
 EXPORT_SYMBOL(drm_noop);
@@ -823,7 +823,7 @@ long drm_ioctl(struct file *filp,
 		out_size = 0;
 	ksize = max(max(in_size, out_size), drv_size);
 
-	DRM_DEBUG("pid=%d, dev=0x%lx, auth=%d, %s\n",
+	DRM_DEBUG_CORE("pid=%d, dev=0x%lx, auth=%d, %s\n",
 		  task_pid_nr(current),
 		  (long)old_encode_dev(file_priv->minor->kdev->devt),
 		  file_priv->authenticated, ioctl->name);
@@ -832,7 +832,7 @@ long drm_ioctl(struct file *filp,
 	func = ioctl->func;
 
 	if (unlikely(!func)) {
-		DRM_DEBUG("no function\n");
+		DRM_DEBUG_CORE("no function\n");
 		retcode = -EINVAL;
 		goto err_i1;
 	}
@@ -861,15 +861,15 @@ long drm_ioctl(struct file *filp,
 
       err_i1:
 	if (!ioctl)
-		DRM_DEBUG("invalid ioctl: pid=%d, dev=0x%lx, auth=%d, cmd=0x%02x, nr=0x%02x\n",
-			  task_pid_nr(current),
-			  (long)old_encode_dev(file_priv->minor->kdev->devt),
-			  file_priv->authenticated, cmd, nr);
+		DRM_DEBUG_CORE("invalid ioctl: pid=%d, dev=0x%lx, auth=%d, cmd=0x%02x, nr=0x%02x\n",
+			       task_pid_nr(current),
+			       (long)old_encode_dev(file_priv->minor->kdev->devt),
+			       file_priv->authenticated, cmd, nr);
 
 	if (kdata != stack_kdata)
 		kfree(kdata);
 	if (retcode)
-		DRM_DEBUG("pid=%d, ret = %d\n", task_pid_nr(current), retcode);
+		DRM_DEBUG_CORE("pid=%d, ret = %d\n", task_pid_nr(current), retcode);
 	return retcode;
 }
 EXPORT_SYMBOL(drm_ioctl);

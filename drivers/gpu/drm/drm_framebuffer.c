@@ -118,7 +118,7 @@ int drm_mode_addfb(struct drm_device *dev, struct drm_mode_fb_cmd *or,
 
 	r.pixel_format = drm_driver_legacy_fb_format(dev, or->bpp, or->depth);
 	if (r.pixel_format == DRM_FORMAT_INVALID) {
-		DRM_DEBUG("bad {bpp:%d, depth:%d}\n", or->bpp, or->depth);
+		DRM_DEBUG_CORE("bad {bpp:%d, depth:%d}\n", or->bpp, or->depth);
 		return -EINVAL;
 	}
 

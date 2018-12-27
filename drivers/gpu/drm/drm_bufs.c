@@ -159,8 +159,8 @@ static int drm_addmap_core(struct drm_device *dev, resource_size_t offset,
 		kfree(map);
 		return -EINVAL;
 	}
-	DRM_DEBUG("offset = 0x%08llx, size = 0x%08lx, type = %d\n",
-		  (unsigned long long)map->offset, map->size, map->type);
+	DRM_DEBUG_CORE("offset = 0x%08llx, size = 0x%08lx, type = %d\n",
+		       (unsigned long long)map->offset, map->size, map->type);
 
 	/* page-align _DRM_SHM maps. They are allocated here so there is no security
 	 * hole created by that and it works around various broken drivers that use
@@ -193,10 +193,10 @@ static int drm_addmap_core(struct drm_device *dev, resource_size_t offset,
 		list = drm_find_matching_map(dev, map);
 		if (list != NULL) {
 			if (list->map->size != map->size) {
-				DRM_DEBUG("Matching maps of type %d with "
-					  "mismatched sizes, (%ld vs %ld)\n",
-					  map->type, map->size,
-					  list->map->size);
+				DRM_DEBUG_CORE("Matching maps of type %d with "
+					       "mismatched sizes, (%ld vs %ld)\n",
+					       map->type, map->size,
+					       list->map->size);
 				list->map->size = map->size;
 			}
 
@@ -227,9 +227,9 @@ static int drm_addmap_core(struct drm_device *dev, resource_size_t offset,
 		list = drm_find_matching_map(dev, map);
 		if (list != NULL) {
 			if (list->map->size != map->size) {
-				DRM_DEBUG("Matching maps of type %d with "
-					  "mismatched sizes, (%ld vs %ld)\n",
-					  map->type, map->size, list->map->size);
+				DRM_DEBUG_CORE("Matching maps of type %d with "
+					       "mismatched sizes, (%ld vs %ld)\n",
+					       map->type, map->size, list->map->size);
 				list->map->size = map->size;
 			}
 
@@ -238,8 +238,8 @@ static int drm_addmap_core(struct drm_device *dev, resource_size_t offset,
 			return 0;
 		}
 		map->handle = vmalloc_user(map->size);
-		DRM_DEBUG("%lu %d %p\n",
-			  map->size, order_base_2(map->size), map->handle);
+		DRM_DEBUG_CORE("%lu %d %p\n",
+			       map->size, order_base_2(map->size), map->handle);
 		if (!map->handle) {
 			kfree(map);
 			return -ENOMEM;
@@ -296,8 +296,8 @@ static int drm_addmap_core(struct drm_device *dev, resource_size_t offset,
 			kfree(map);
 			return -EPERM;
 		}
-		DRM_DEBUG("AGP offset = 0x%08llx, size = 0x%08lx\n",
-			  (unsigned long long)map->offset, map->size);
+		DRM_DEBUG_CORE("AGP offset = 0x%08llx, size = 0x%08lx\n",
+			       (unsigned long long)map->offset, map->size);
 
 		break;
 	}
@@ -711,13 +711,13 @@ int drm_legacy_addbufs_agp(struct drm_device *dev,
 	byte_count = 0;
 	agp_offset = dev->agp->base + request->agp_start;
 
-	DRM_DEBUG("count:      %d\n", count);
-	DRM_DEBUG("order:      %d\n", order);
-	DRM_DEBUG("size:       %d\n", size);
-	DRM_DEBUG("agp_offset: %lx\n", agp_offset);
-	DRM_DEBUG("alignment:  %d\n", alignment);
-	DRM_DEBUG("page_order: %d\n", page_order);
-	DRM_DEBUG("total:      %d\n", total);
+	DRM_DEBUG_CORE("count:      %d\n", count);
+	DRM_DEBUG_CORE("order:      %d\n", order);
+	DRM_DEBUG_CORE("size:       %d\n", size);
+	DRM_DEBUG_CORE("agp_offset: %lx\n", agp_offset);
+	DRM_DEBUG_CORE("alignment:  %d\n", alignment);
+	DRM_DEBUG_CORE("page_order: %d\n", page_order);
+	DRM_DEBUG_CORE("total:      %d\n", total);
 
 	if (order < DRM_MIN_ORDER || order > DRM_MAX_ORDER)
 		return -EINVAL;
@@ -732,7 +732,7 @@ int drm_legacy_addbufs_agp(struct drm_device *dev,
 		}
 	}
 	if (!list_empty(&dev->agp->memory) && !valid) {
-		DRM_DEBUG("zone invalid\n");
+		DRM_DEBUG_CORE("zone invalid\n");
 		return -EINVAL;
 	}
 	spin_lock(&dev->buf_lock);
@@ -795,14 +795,14 @@ int drm_legacy_addbufs_agp(struct drm_device *dev,
 			return -ENOMEM;
 		}
 
-		DRM_DEBUG("buffer %d @ %p\n", entry->buf_count, buf->address);
+		DRM_DEBUG_CORE("buffer %d @ %p\n", entry->buf_count, buf->address);
 
 		offset += alignment;
 		entry->buf_count++;
 		byte_count += PAGE_SIZE << page_order;
 	}
 
-	DRM_DEBUG("byte_count: %d\n", byte_count);
+	DRM_DEBUG_CORE("byte_count: %d\n", byte_count);
 
 	temp_buflist = krealloc(dma->buflist,
 				(dma->buf_count + entry->buf_count) *
@@ -825,8 +825,8 @@ int drm_legacy_addbufs_agp(struct drm_device *dev,
 	dma->page_count += byte_count >> PAGE_SHIFT;
 	dma->byte_count += byte_count;
 
-	DRM_DEBUG("dma->buf_count : %d\n", dma->buf_count);
-	DRM_DEBUG("entry->buf_count : %d\n", entry->buf_count);
+	DRM_DEBUG_CORE("dma->buf_count : %d\n", dma->buf_count);
+	DRM_DEBUG_CORE("entry->buf_count : %d\n", entry->buf_count);
 
 	mutex_unlock(&dev->struct_mutex);
 
@@ -874,8 +874,8 @@ int drm_legacy_addbufs_pci(struct drm_device *dev,
 	order = order_base_2(request->size);
 	size = 1 << order;
 
-	DRM_DEBUG("count=%d, size=%d (%d), order=%d\n",
-		  request->count, request->size, size, order);
+	DRM_DEBUG_CORE("count=%d, size=%d (%d), order=%d\n",
+		       request->count, request->size, size, order);
 
 	if (order < DRM_MIN_ORDER || order > DRM_MAX_ORDER)
 		return -EINVAL;
@@ -937,8 +937,8 @@ int drm_legacy_addbufs_pci(struct drm_device *dev,
 	}
 	memcpy(temp_pagelist,
 	       dma->pagelist, dma->page_count * sizeof(*dma->pagelist));
-	DRM_DEBUG("pagelist: %d entries\n",
-		  dma->page_count + (count << page_order));
+	DRM_DEBUG_CORE("pagelist: %d entries\n",
+		       dma->page_count + (count << page_order));
 
 	entry->buf_size = size;
 	entry->page_order = page_order;
@@ -961,9 +961,9 @@ int drm_legacy_addbufs_pci(struct drm_device *dev,
 		}
 		entry->seglist[entry->seg_count++] = dmah;
 		for (i = 0; i < (1 << page_order); i++) {
-			DRM_DEBUG("page %d @ 0x%08lx\n",
-				  dma->page_count + page_count,
-				  (unsigned long)dmah->vaddr + PAGE_SIZE * i);
+			DRM_DEBUG_CORE("page %d @ 0x%08lx\n",
+				       dma->page_count + page_count,
+				       (unsigned long)dmah->vaddr + PAGE_SIZE * i);
 			temp_pagelist[dma->page_count + page_count++]
 				= (unsigned long)dmah->vaddr + PAGE_SIZE * i;
 		}
@@ -997,8 +997,8 @@ int drm_legacy_addbufs_pci(struct drm_device *dev,
 				return -ENOMEM;
 			}
 
-			DRM_DEBUG("buffer %d @ %p\n",
-				  entry->buf_count, buf->address);
+			DRM_DEBUG_CORE("buffer %d @ %p\n",
+				       entry->buf_count, buf->address);
 		}
 		byte_count += PAGE_SIZE << page_order;
 	}
@@ -1086,13 +1086,13 @@ static int drm_legacy_addbufs_sg(struct drm_device *dev,
 	byte_count = 0;
 	agp_offset = request->agp_start;
 
-	DRM_DEBUG("count:      %d\n", count);
-	DRM_DEBUG("order:      %d\n", order);
-	DRM_DEBUG("size:       %d\n", size);
-	DRM_DEBUG("agp_offset: %lu\n", agp_offset);
-	DRM_DEBUG("alignment:  %d\n", alignment);
-	DRM_DEBUG("page_order: %d\n", page_order);
-	DRM_DEBUG("total:      %d\n", total);
+	DRM_DEBUG_CORE("count:      %d\n", count);
+	DRM_DEBUG_CORE("order:      %d\n", order);
+	DRM_DEBUG_CORE("size:       %d\n", size);
+	DRM_DEBUG_CORE("agp_offset: %lu\n", agp_offset);
+	DRM_DEBUG_CORE("alignment:  %d\n", alignment);
+	DRM_DEBUG_CORE("page_order: %d\n", page_order);
+	DRM_DEBUG_CORE("total:      %d\n", total);
 
 	if (order < DRM_MIN_ORDER || order > DRM_MAX_ORDER)
 		return -EINVAL;
@@ -1158,14 +1158,14 @@ static int drm_legacy_addbufs_sg(struct drm_device *dev,
 			return -ENOMEM;
 		}
 
-		DRM_DEBUG("buffer %d @ %p\n", entry->buf_count, buf->address);
+		DRM_DEBUG_CORE("buffer %d @ %p\n", entry->buf_count, buf->address);
 
 		offset += alignment;
 		entry->buf_count++;
 		byte_count += PAGE_SIZE << page_order;
 	}
 
-	DRM_DEBUG("byte_count: %d\n", byte_count);
+	DRM_DEBUG_CORE("byte_count: %d\n", byte_count);
 
 	temp_buflist = krealloc(dma->buflist,
 				(dma->buf_count + entry->buf_count) *
@@ -1188,8 +1188,8 @@ static int drm_legacy_addbufs_sg(struct drm_device *dev,
 	dma->page_count += byte_count >> PAGE_SHIFT;
 	dma->byte_count += byte_count;
 
-	DRM_DEBUG("dma->buf_count : %d\n", dma->buf_count);
-	DRM_DEBUG("entry->buf_count : %d\n", entry->buf_count);
+	DRM_DEBUG_CORE("dma->buf_count : %d\n", dma->buf_count);
+	DRM_DEBUG_CORE("entry->buf_count : %d\n", entry->buf_count);
 
 	mutex_unlock(&dev->struct_mutex);
 
@@ -1290,7 +1290,7 @@ int __drm_legacy_infobufs(struct drm_device *dev,
 			++count;
 	}
 
-	DRM_DEBUG("count = %d\n", count);
+	DRM_DEBUG_CORE("count = %d\n", count);
 
 	if (*p >= count) {
 		for (i = 0, count = 0; i < DRM_MAX_ORDER + 1; i++) {
@@ -1298,12 +1298,12 @@ int __drm_legacy_infobufs(struct drm_device *dev,
 			if (from->buf_count) {
 				if (f(data, count, from) < 0)
 					return -EFAULT;
-				DRM_DEBUG("%d %d %d %d %d\n",
-					  i,
-					  dma->bufs[i].buf_count,
-					  dma->bufs[i].buf_size,
-					  dma->bufs[i].low_mark,
-					  dma->bufs[i].high_mark);
+				DRM_DEBUG_CORE("%d %d %d %d %d\n",
+					       i,
+					       dma->bufs[i].buf_count,
+					       dma->bufs[i].buf_size,
+					       dma->bufs[i].low_mark,
+					       dma->bufs[i].high_mark);
 				++count;
 			}
 		}
@@ -1362,8 +1362,8 @@ int drm_legacy_markbufs(struct drm_device *dev, void *data,
 	if (!dma)
 		return -EINVAL;
 
-	DRM_DEBUG("%d, %d, %d\n",
-		  request->size, request->low_mark, request->high_mark);
+	DRM_DEBUG_CORE("%d, %d, %d\n",
+		       request->size, request->low_mark, request->high_mark);
 	order = order_base_2(request->size);
 	if (order < DRM_MIN_ORDER || order > DRM_MAX_ORDER)
 		return -EINVAL;
@@ -1410,7 +1410,7 @@ int drm_legacy_freebufs(struct drm_device *dev, void *data,
 	if (!dma)
 		return -EINVAL;
 
-	DRM_DEBUG("%d\n", request->count);
+	DRM_DEBUG_CORE("%d\n", request->count);
 	for (i = 0; i < request->count; i++) {
 		if (copy_from_user(&idx, &request->list[i], sizeof(idx)))
 			return -EFAULT;
@@ -1510,7 +1510,7 @@ int __drm_legacy_mapbufs(struct drm_device *dev, void *data, int *p,
 	}
       done:
 	*p = dma->buf_count;
-	DRM_DEBUG("%d buffers, retcode = %d\n", *p, retcode);
+	DRM_DEBUG_CORE("%d buffers, retcode = %d\n", *p, retcode);
 
 	return retcode;
 }
