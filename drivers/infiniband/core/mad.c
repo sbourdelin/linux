@@ -3,7 +3,7 @@
  * Copyright (c) 2005 Intel Corporation.  All rights reserved.
  * Copyright (c) 2005 Mellanox Technologies Ltd.  All rights reserved.
  * Copyright (c) 2009 HNR Consulting. All rights reserved.
- * Copyright (c) 2014 Intel Corporation.  All rights reserved.
+ * Copyright (c) 2014,2018 Intel Corporation.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -50,6 +50,51 @@
 #include "smi.h"
 #include "opa_smi.h"
 #include "agent.h"
+
+struct rdma_mad_trace_addr {
+	u32 dlid;
+	struct roce_ah_attr roce_addr;
+	u8 sl;
+	u16 pkey;
+	u32 rqpn;
+	u32 rqkey;
+};
+static void trace_create_mad_addr(struct ib_device *dev, u8 pnum,
+				  struct ib_ud_wr *wr,
+				  struct rdma_mad_trace_addr *addr)
+{
+	struct rdma_ah_attr attr;
+
+	memset(&attr, 0, sizeof(attr));
+	rdma_query_ah(wr->ah, &attr);
+
+	/* These are common */
+	addr->sl = attr.sl;
+	ib_query_pkey(dev, pnum, wr->pkey_index, &addr->pkey);
+	addr->rqpn = wr->remote_qpn;
+	addr->rqkey = wr->remote_qkey;
+
+	switch (attr.type) {
+	case RDMA_AH_ATTR_TYPE_IB:
+		addr->dlid = attr.ib.dlid;
+		memset(&addr->roce_addr, 0, sizeof(addr->roce_addr));
+		break;
+	case RDMA_AH_ATTR_TYPE_OPA:
+		addr->dlid = attr.opa.dlid;
+		memset(&addr->roce_addr, 0, sizeof(addr->roce_addr));
+		break;
+	case RDMA_AH_ATTR_TYPE_ROCE:
+		addr->dlid = 0;
+		memcpy(&addr->roce_addr, &attr.roce, sizeof(addr->roce_addr));
+		break;
+	case RDMA_AH_ATTR_TYPE_UNDEFINED:
+		addr->dlid = 0;
+		memset(&addr->roce_addr, 0, sizeof(addr->roce_addr));
+		break;
+	}
+}
+#define CREATE_TRACE_POINTS
+#include <trace/events/ib_mad.h>
 
 static int mad_sendq_size = IB_MAD_QP_SEND_SIZE;
 static int mad_recvq_size = IB_MAD_QP_RECV_SIZE;
@@ -1223,6 +1268,14 @@ int ib_send_mad(struct ib_mad_send_wr_private *mad_send_wr)
 
 	spin_lock_irqsave(&qp_info->send_queue.lock, flags);
 	if (qp_info->send_queue.count < qp_info->send_queue.max_active) {
+		if (trace_ib_mad_ib_send_mad_enabled()) {
+			struct rdma_mad_trace_addr addr;
+
+			trace_create_mad_addr(qp_info->port_priv->device,
+					      qp_info->port_priv->port_num,
+					      &mad_send_wr->send_wr, &addr);
+			trace_ib_mad_ib_send_mad(mad_send_wr, &addr);
+		}
 		ret = ib_post_send(mad_agent->qp, &mad_send_wr->send_wr.wr,
 				   NULL);
 		list = &qp_info->send_queue.list;
@@ -2496,6 +2549,8 @@ static void ib_mad_send_done(struct ib_cq *cq, struct ib_wc *wc)
 	send_queue = mad_list->mad_queue;
 	qp_info = send_queue->qp_info;
 
+	trace_ib_mad_send_done_handler(mad_send_wr, wc);
+
 retry:
 	ib_dma_unmap_single(mad_send_wr->send_buf.mad_agent->device,
 			    mad_send_wr->header_mapping,
@@ -2527,6 +2582,14 @@ retry:
 	ib_mad_complete_send_wr(mad_send_wr, &mad_send_wc);
 
 	if (queued_send_wr) {
+		if (trace_ib_mad_send_done_resend_enabled()) {
+			struct rdma_mad_trace_addr addr;
+
+			trace_create_mad_addr(qp_info->port_priv->device,
+					      qp_info->port_priv->port_num,
+					      &mad_send_wr->send_wr, &addr);
+			trace_ib_mad_send_done_resend(queued_send_wr, &addr);
+		}
 		ret = ib_post_send(qp_info->qp, &queued_send_wr->send_wr.wr,
 				   NULL);
 		if (ret) {
@@ -2574,6 +2637,14 @@ static bool ib_mad_send_error(struct ib_mad_port_private *port_priv,
 		if (mad_send_wr->retry) {
 			/* Repost send */
 			mad_send_wr->retry = 0;
+			if (trace_ib_mad_error_handler_enabled()) {
+				struct rdma_mad_trace_addr addr;
+
+				trace_create_mad_addr(qp_info->port_priv->device,
+						      qp_info->port_priv->port_num,
+						      &mad_send_wr->send_wr, &addr);
+				trace_ib_mad_error_handler(mad_send_wr, &addr);
+			}
 			ret = ib_post_send(qp_info->qp, &mad_send_wr->send_wr.wr,
 					   NULL);
 			if (!ret)
