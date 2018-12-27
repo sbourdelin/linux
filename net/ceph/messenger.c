@@ -3216,12 +3216,16 @@ void ceph_msg_revoke_incoming(struct ceph_msg *msg)
  */
 void ceph_con_keepalive(struct ceph_connection *con)
 {
+	bool pending;
+
 	dout("con_keepalive %p\n", con);
 	mutex_lock(&con->mutex);
 	clear_standby(con);
+	pending = (con_flag_test_and_set(con,
+					 CON_FLAG_KEEPALIVE_PENDING) == 0 &&
+		   con_flag_test_and_set(con, CON_FLAG_WRITE_PENDING) == 0);
 	mutex_unlock(&con->mutex);
-	if (con_flag_test_and_set(con, CON_FLAG_KEEPALIVE_PENDING) == 0 &&
-	    con_flag_test_and_set(con, CON_FLAG_WRITE_PENDING) == 0)
+	if (pending)
 		queue_con(con);
 }
 EXPORT_SYMBOL(ceph_con_keepalive);
