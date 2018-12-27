@@ -142,7 +142,7 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
 	if (!kref_put(&irq->refcount, vgic_irq_release)) {
 		spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
 		return;
-	};
+	}
 
 	list_del(&irq->lpi_list);
 	dist->lpi_list_count--;
