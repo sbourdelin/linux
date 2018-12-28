@@ -205,6 +205,12 @@ static inline int alternatives_text_reserved(void *start, void *end)
 	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature)		\
 		: output : "i" (0), ## input)
 
+/* Like alternative_io, but with a common tail instruction. */
+#define alternative_io_tail(oldinstr, newinstr, feature, tail,		\
+			    output, input...)				\
+	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature) tail	\
+		: output : "i" (0), ## input)
+
 /* Like alternative_io, but for replacing a direct call with another one. */
 #define alternative_call(oldfunc, newfunc, feature, output, input...)	\
 	asm volatile (ALTERNATIVE("call %P[old]", "call %P[new]", feature) \

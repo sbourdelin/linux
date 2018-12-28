@@ -495,12 +495,14 @@ do {									\
 	bool __ret;							\
 	typeof(pcp1) __o1 = (o1), __n1 = (n1);				\
 	typeof(pcp2) __o2 = (o2), __n2 = (n2);				\
-	alternative_io("leaq %P1,%%rsi\n\tcall this_cpu_cmpxchg16b_emu\n\t", \
-		       "cmpxchg16b " __percpu_arg(1) "\n\tsetz %0\n\t",	\
-		       X86_FEATURE_CX16,				\
-		       ASM_OUTPUT2("=a" (__ret), "+m" (pcp1),		\
-				   "+m" (pcp2), "+d" (__o2)),		\
-		       "b" (__n1), "c" (__n2), "a" (__o1) : "rsi");	\
+	alternative_io_tail("leaq %P1,%%rsi\n\tcall this_cpu_cmpxchg16b_emu", \
+			    "cmpxchg16b "__percpu_arg(1),		\
+			    X86_FEATURE_CX16,				\
+			    CC_SET(z),					\
+			    ASM_OUTPUT2(CC_OUT(z) (__ret),		\
+					"+m" (pcp1), "+m" (pcp2),	\
+					"+a" (__o1), "+d" (__o2)),	\
+			    "b" (__n1), "c" (__n2) : "rsi");		\
 	__ret;								\
 })
 

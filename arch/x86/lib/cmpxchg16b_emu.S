@@ -17,20 +17,20 @@
  * %rdx : high 64 bits of old value
  * %rbx : low 64 bits of new value
  * %rcx : high 64 bits of new value
- * %al  : Operation successful
+ *
+ * Outputs:
+ * %rflags.zf: set if the destination operand and %rdx:%rax are equal
  */
 ENTRY(this_cpu_cmpxchg16b_emu)
 
 #
-# Emulate 'cmpxchg16b %gs:(%rsi)' except we return the result in %al not
-# via the ZF.  Caller will access %al to get result.
+# Emulate 'cmpxchg16b %gs:(%rsi)'
 #
 # Note that this is only useful for a cpuops operation.  Meaning that we
 # do *not* have a fully atomic operation but just an operation that is
 # *atomic* on a single cpu (as provided by the this_cpu_xx class of
 # macros).
 #
-	pushfq
 	cli
 
 	cmpq PER_CPU_VAR((%rsi)), %rax
@@ -41,13 +41,9 @@ ENTRY(this_cpu_cmpxchg16b_emu)
 	movq %rbx, PER_CPU_VAR((%rsi))
 	movq %rcx, PER_CPU_VAR(8(%rsi))
 
-	popfq
-	mov $1, %al
-	ret
-
 .Lnot_same:
-	popfq
-	xor %al,%al
+	sti
+	nop
 	ret
 
 ENDPROC(this_cpu_cmpxchg16b_emu)
