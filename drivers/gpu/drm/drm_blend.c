@@ -175,9 +175,22 @@
  *		 plane does not expose the "alpha" property, then this is
  *		 assumed to be 1.0
  *
- * Note that all the property extensions described here apply either to the
- * plane or the CRTC (e.g. for the background color, which currently is not
- * exposed and assumed to be black).
+ * The property extensions described above all apply to the plane.  Drivers
+ * may also expose the following crtc property extension:
+ *
+ * BACKGROUND_COLOR:
+ *	Background color is setup with drm_crtc_add_bgcolor_property().  It
+ *	controls the ARGB color of a full-screen layer that exists below all
+ *	planes.  This color will be used for pixels not covered by any plane
+ *	and may also be blended with plane contents as allowed by a plane's
+ *	alpha values.  The background color defaults to black, and is assumed
+ *	to be black for drivers that do not expose this property.  Although
+ *	background color isn't a plane, it is assumed that the color provided
+ *	here undergoes the same pipe-level degamma/CSC/gamma transformations
+ *	that planes undergo.  Note that the color value provided here includes
+ *	an alpha channel...non-opaque background color values are allowed,
+ *	but are generally only honored in special cases (e.g., when a memory
+ *	writeback connector is in use).
  */
 
 /**
@@ -593,3 +606,11 @@ int drm_plane_create_blend_mode_property(struct drm_plane *plane,
 	return 0;
 }
 EXPORT_SYMBOL(drm_plane_create_blend_mode_property);
+
+void drm_crtc_add_bgcolor_property(struct drm_crtc *crtc)
+{
+	drm_object_attach_property(&crtc->base,
+				   crtc->dev->mode_config.bgcolor_property,
+				   drm_argb(16, 0xffff, 0, 0, 0));
+}
+EXPORT_SYMBOL(drm_crtc_add_bgcolor_property);
