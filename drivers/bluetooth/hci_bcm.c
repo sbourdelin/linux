@@ -1442,7 +1442,12 @@ int __init bcm_init(void)
 	/* For now, we need to keep both platform device
 	 * driver (ACPI generated) and serdev driver (DT).
 	 */
-	platform_driver_register(&bcm_driver);
+	int rc;
+
+	rc = platform_driver_register(&bcm_driver);
+	if (rc)
+		return rc;
+
 	serdev_device_driver_register(&bcm_serdev_driver);
 
 	return hci_uart_register_proto(&bcm_proto);
