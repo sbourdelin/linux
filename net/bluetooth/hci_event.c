@@ -1183,6 +1183,29 @@ static void hci_cc_le_set_scan_param(struct hci_dev *hdev, struct sk_buff *skb)
 	hci_dev_unlock(hdev);
 }
 
+
+static void hci_cc_write_auth_payload_to (struct hci_dev *hdev, struct sk_buff *skb)
+{
+        __u8 status = *((__u8 *) skb->data);
+        struct hci_cp_write_auth_payload_to *cp;
+        struct hci_conn *conn;
+
+	BT_DBG("%s status 0x%2.2x", hdev->name, status);
+
+        if (status)
+                return;
+
+        cp = hci_sent_cmd_data(hdev, HCI_OP_WRITE_AUTH_PAYLOAD_TO);
+        if (!cp)
+                return;
+
+        hci_dev_lock(hdev);
+
+        conn->handle = cp->conn_handle;
+
+        hci_dev_unlock(hdev);
+}
+
 static void hci_cc_le_set_ext_scan_param(struct hci_dev *hdev,
 					 struct sk_buff *skb)
 {
@@ -5919,6 +5942,7 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 		hci_remote_oob_data_request_evt(hdev, skb);
 		break;
 
+
 #if IS_ENABLED(CONFIG_BT_HS)
 	case HCI_EV_CHANNEL_SELECTED:
 		hci_chan_selected_evt(hdev, skb);
@@ -5944,6 +5968,10 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 	case HCI_EV_NUM_COMP_BLOCKS:
 		hci_num_comp_blocks_evt(hdev, skb);
 		break;
+
+        case HCI_OP_WRITE_AUTH_PAYLOAD_TO:
+                hci_cc_write_auth_payload_to(hdev, skb);
+                break;
 
 	default:
 		BT_DBG("%s event 0x%2.2x", hdev->name, event);

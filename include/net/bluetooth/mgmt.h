@@ -654,6 +654,15 @@ struct mgmt_cp_set_phy_confguration {
 } __packed;
 #define MGMT_SET_PHY_CONFIGURATION_SIZE	4
 
+
+#define MGMT_OP_WRITE_AUTH_PAYLOAD_TO   0x0046
+struct mgmt_cp_write_auth_payload_to {
+       __le16  conn_handle;
+       __le16  auth_to;
+} __packed;
+#define MGMT_OP_WRITE_AUTH_PAYLOAD_TO_SIZE  4
+
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;

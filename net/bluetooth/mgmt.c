@@ -106,6 +106,7 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_START_LIMITED_DISCOVERY,
 	MGMT_OP_READ_EXT_INFO,
 	MGMT_OP_SET_APPEARANCE,
+	MGMT_OP_WRITE_AUTH_PAYLOAD_TO,
 };
 
 static const u16 mgmt_events[] = {
@@ -3595,6 +3596,96 @@ remove:
 	mgmt_pending_remove(cmd);
 }
 
+static void write_auth_payload_to_complete(struct hci_dev *hdev, u8 status,
+                                     u16 opcode, struct sk_buff *skb)
+{
+        struct mgmt_cp_write_auth_payload_to *cp;
+        struct mgmt_pending_cmd *cmd;
+        BT_DBG("");
+        BT_INFO("status 0x%02x\n", status);
+
+        hci_dev_lock(hdev);
+
+        cmd = pending_find(MGMT_OP_WRITE_AUTH_PAYLOAD_TO, hdev);
+        if (!cmd)
+                goto unlock;
+        cp = cmd->param;
+
+        if (status) {
+                mgmt_cmd_status(cmd->sk, hdev->id,
+                                MGMT_OP_WRITE_AUTH_PAYLOAD_TO,
+                                mgmt_status(status));
+        } else {
+                mgmt_cmd_complete(cmd->sk, hdev->id,
+                                  MGMT_OP_WRITE_AUTH_PAYLOAD_TO, 0,
+                                  NULL, 0);
+        }
+
+        mgmt_pending_remove(cmd);
+
+unlock:
+        hci_dev_unlock(hdev);
+}
+
+
+static int write_auth_payload_to(struct sock *sk, struct hci_dev *hdev, void *data,
+                      u16 len)
+{
+	struct mgmt_cp_write_auth_payload_to *cp = data;
+	struct hci_cp_write_auth_payload_to cp_payload;
+	struct mgmt_pending_cmd *cmd;
+	struct hci_request req;
+	u16 handle;
+	u16 timeout;
+	int err;
+
+	hci_dev_lock(hdev);
+	if (!hdev_is_powered(hdev)) {
+		err = mgmt_cmd_status(sk, hdev->id,
+                                     MGMT_OP_WRITE_AUTH_PAYLOAD_TO,
+                                     MGMT_STATUS_REJECTED);
+		goto unlock;
+	}
+
+	if (pending_find(MGMT_OP_WRITE_AUTH_PAYLOAD_TO, hdev)) {
+		err = mgmt_cmd_status(sk, hdev->id,
+                                     MGMT_OP_WRITE_AUTH_PAYLOAD_TO,
+                                     MGMT_STATUS_BUSY);
+		goto unlock;
+	}
+
+	err = mgmt_cmd_complete(sk, hdev->id,
+                                       MGMT_OP_WRITE_AUTH_PAYLOAD_TO,
+                                       0, NULL, 0);
+
+	cmd = mgmt_pending_add(sk, MGMT_OP_WRITE_AUTH_PAYLOAD_TO, hdev, data,
+                              len);
+	if (!cmd) {
+		err = -ENOMEM;
+		goto unlock;
+	}
+	hci_req_init(&req, hdev);
+
+	handle = cp->conn_handle;
+	timeout = cp->auth_to;
+
+	memset(&cp_payload, 0, sizeof(cp_payload));
+
+	cp_payload.conn_handle = handle;
+	cp_payload.timeout = timeout;
+
+	hci_req_add(&req, HCI_OP_WRITE_AUTH_PAYLOAD_TO, sizeof(cp_payload), &cp_payload);
+
+	err = hci_req_run_skb(&req, write_auth_payload_to_complete);
+	if (err < 0)
+		mgmt_pending_remove(cmd);
+
+unlock:
+	hci_dev_unlock(hdev);
+	return err;
+}
+
+
 static int read_local_oob_data(struct sock *sk, struct hci_dev *hdev,
 			       void *data, u16 data_len)
 {
@@ -6921,6 +7012,7 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ set_appearance,	   MGMT_SET_APPEARANCE_SIZE },
 	{ get_phy_configuration,   MGMT_GET_PHY_CONFIGURATION_SIZE },
 	{ set_phy_configuration,   MGMT_SET_PHY_CONFIGURATION_SIZE },
+	{ write_auth_payload_to,   MGMT_OP_WRITE_AUTH_PAYLOAD_TO_SIZE },
 };
 
 void mgmt_index_added(struct hci_dev *hdev)
