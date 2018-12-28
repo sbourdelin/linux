@@ -238,9 +238,14 @@ static void hfi_sys_init_done(struct venus_core *core, struct venus_inst *inst,
 	}
 
 	error = hfi_parser(core, inst, pkt->data, rem_bytes);
+	dprintk(DBG,
+		"supported_codecs[%d]: enc = %#x, dec = %#x\n",
+		core->codecs_count, core->enc_codecs,
+		core->dec_codecs);
 
 done:
 	core->error = error;
+	dprintk(INFO, "sys init ret: %d", core->error);
 	complete(&core->done);
 }
 

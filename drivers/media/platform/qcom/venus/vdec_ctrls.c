@@ -91,8 +91,11 @@ int vdec_ctrl_init(struct venus_inst *inst)
 	int ret;
 
 	ret = v4l2_ctrl_handler_init(&inst->ctrl_handler, 7);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "CTRL ERR: Control handler init failed, %d\n",
+			inst->ctrl_handler.error);
 		return ret;
+	}
 
 	ctrl = v4l2_ctrl_new_std_menu(&inst->ctrl_handler, &vdec_ctrl_ops,
 		V4L2_CID_MPEG_VIDEO_MPEG4_PROFILE,
@@ -147,6 +150,8 @@ int vdec_ctrl_init(struct venus_inst *inst)
 
 	ret = inst->ctrl_handler.error;
 	if (ret) {
+		dprintk(ERR, "Error adding ctrl to ctrl handle, %d\n",
+			inst->ctrl_handler.error);
 		v4l2_ctrl_handler_free(&inst->ctrl_handler);
 		return ret;
 	}

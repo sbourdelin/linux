@@ -13,6 +13,7 @@
  *
  */
 #include <linux/clk.h>
+#include <linux/debugfs.h>
 #include <linux/init.h>
 #include <linux/ioctl.h>
 #include <linux/list.h>
@@ -30,6 +31,50 @@
 #include "vdec.h"
 #include "venc.h"
 #include "firmware.h"
+
+struct dentry *debugfs_root;
+int venus_debug = ERR;
+EXPORT_SYMBOL_GPL(venus_debug);
+
+static struct dentry *venus_debugfs_init_drv(void)
+{
+	bool ok = false;
+	struct dentry *dir = NULL;
+
+	dir = debugfs_create_dir("venus", NULL);
+	if (IS_ERR_OR_NULL(dir)) {
+		dir = NULL;
+		pr_err("failed to create debug dir");
+		goto failed_create_dir;
+	}
+
+#define __debugfs_create(__type, __fname, __value) ({                          \
+	struct dentry *f = debugfs_create_##__type(__fname, 0644,	\
+		dir, __value);                                                \
+	if (IS_ERR_OR_NULL(f)) {                                              \
+		dprintk(ERR, "Failed creating debugfs file '%pd/%s'\n",  \
+			dir, __name);                                         \
+		f = NULL;                                                     \
+	}                                                                     \
+	f;                                                                    \
+})
+
+	ok =
+	__debugfs_create(x32, "debug_level", &venus_debug);
+
+#undef __debugfs_create
+
+	if (!ok)
+		goto failed_create_dir;
+
+	return dir;
+
+failed_create_dir:
+	if (dir)
+		debugfs_remove_recursive(debugfs_root);
+
+	return NULL;
+}
 
 static void venus_event_notify(struct venus_core *core, u32 event)
 {
@@ -137,6 +182,7 @@ static int venus_clks_enable(struct venus_core *core)
 
 	return 0;
 err:
+	dprintk(ERR, "Failed to enable clk:%d\n", i);
 	while (i--)
 		clk_disable_unprepare(core->clks[i]);
 
@@ -236,6 +282,8 @@ static int venus_probe(struct platform_device *pdev)
 	struct resource *r;
 	int ret;
 
+	debugfs_root = venus_debugfs_init_drv();
+
 	core = devm_kzalloc(dev, sizeof(*core), GFP_KERNEL);
 	if (!core)
 		return -ENOMEM;
@@ -245,8 +293,10 @@ static int venus_probe(struct platform_device *pdev)
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	core->base = devm_ioremap_resource(dev, r);
-	if (IS_ERR(core->base))
+	if (IS_ERR(core->base)) {
+		dprintk(ERR, "Failed to ioremap platform resources");
 		return PTR_ERR(core->base);
+		}
 
 	core->irq = platform_get_irq(pdev, 0);
 	if (core->irq < 0)
@@ -297,8 +347,10 @@ static int venus_probe(struct platform_device *pdev)
 		goto err_runtime_disable;
 
 	ret = venus_firmware_init(core);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to init video firmware\n");
 		goto err_runtime_disable;
+		}
 
 	ret = venus_boot(core);
 	if (ret)
@@ -321,8 +373,10 @@ static int venus_probe(struct platform_device *pdev)
 		goto err_venus_shutdown;
 
 	ret = v4l2_device_register(dev, &core->v4l2_dev);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to register v4l2 device\n");
 		goto err_core_deinit;
+		}
 
 	ret = pm_runtime_put_sync(dev);
 	if (ret)
@@ -365,6 +419,8 @@ static int venus_remove(struct platform_device *pdev)
 	pm_runtime_disable(dev);
 
 	v4l2_device_unregister(&core->v4l2_dev);
+
+	debugfs_remove_recursive(debugfs_root);
 
 	return ret;
 }

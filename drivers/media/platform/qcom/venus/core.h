@@ -25,6 +25,38 @@
 
 #define VIDC_CLKS_NUM_MAX	4
 
+extern int venus_debug;
+enum venus_msg_prio {
+	ERR  = 0x0001,
+	WARN = 0x0002,
+	INFO = 0x0004,
+	DBG  = 0x0008,
+};
+
+static inline char *get_debug_level_str(int level)
+{
+	switch (level) {
+	case ERR:
+		return "err";
+	case WARN:
+		return "warn";
+	case INFO:
+		return "info";
+	case DBG:
+		return "dbg";
+	default:
+		return "???";
+	}
+}
+
+#define dprintk(dbg_lvl, fmt, arg...)				\
+	do {							\
+		if (venus_debug & dbg_lvl)				\
+			pr_info("venus:" fmt, \
+					get_debug_level_str(dbg_lvl),	\
+					## arg);	\
+	} while (0)
+
 struct freq_tbl {
 	unsigned int load;
 	unsigned long freq;
