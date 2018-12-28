@@ -216,6 +216,14 @@ struct bcr_fp_arcv2 {
 #endif
 };
 
+struct bcr_actionpoint {
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	unsigned int pad:20, type:4, ver:8;
+#else
+	unsigned int ver:8, type:4, pad:20;
+#endif
+};
+
 #include <soc/arc/timers.h>
 
 struct bcr_bpu_arcompact {
