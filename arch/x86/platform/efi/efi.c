@@ -581,7 +581,7 @@ void __init efi_memory_uc(u64 addr, unsigned long size)
 	set_memory_uc(addr, npages);
 }
 
-void __init old_map_region(efi_memory_desc_t *md)
+int __init old_map_region(efi_memory_desc_t *md)
 {
 	u64 start_pfn, end_pfn, end;
 	unsigned long size;
@@ -601,10 +601,14 @@ void __init old_map_region(efi_memory_desc_t *md)
 		va = efi_ioremap(md->phys_addr, size,
 				 md->type, md->attribute);
 
-	md->virt_addr = (u64) (unsigned long) va;
-	if (!va)
+	if (!va) {
 		pr_err("ioremap of 0x%llX failed!\n",
 		       (unsigned long long)md->phys_addr);
+		return -ENOMEM;
+	}
+
+	md->virt_addr = (u64)(unsigned long)va;
+	return 0;
 }
 
 /* Merge contiguous regions of the same type and attribute */
@@ -797,7 +801,9 @@ static void * __init efi_map_regions(int *count, int *pg_shift)
 		if (!should_map_region(md))
 			continue;
 
-		efi_map_region(md);
+		if (efi_map_region(md))
+			return NULL;
+
 		get_systab_virt_addr(md);
 
 		if (left < desc_size) {
@@ -849,7 +855,12 @@ static void __init kexec_enter_virtual_mode(void)
 	* fixed addr which was used in first kernel of a kexec boot.
 	*/
 	for_each_efi_memory_desc(md) {
-		efi_map_region_fixed(md); /* FIXME: add error handling */
+		if (efi_map_region_fixed(md)) {
+			pr_err("Error mapping EFI regions, EFI runtime non-functional!\n");
+			clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+			return;
+		}
+
 		get_systab_virt_addr(md);
 	}
 

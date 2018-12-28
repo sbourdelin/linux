@@ -408,7 +408,7 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 	return 0;
 }
 
-static void __init __map_region(efi_memory_desc_t *md, u64 va)
+static int __init __map_region(efi_memory_desc_t *md, u64 va)
 {
 	unsigned long flags = _PAGE_RW;
 	unsigned long pfn;
@@ -421,12 +421,16 @@ static void __init __map_region(efi_memory_desc_t *md, u64 va)
 		flags |= _PAGE_ENC;
 
 	pfn = md->phys_addr >> PAGE_SHIFT;
-	if (kernel_map_pages_in_pgd(pgd, pfn, va, md->num_pages, flags))
-		pr_warn("Error mapping PA 0x%llx -> VA 0x%llx!\n",
-			   md->phys_addr, va);
+	if (kernel_map_pages_in_pgd(pgd, pfn, va, md->num_pages, flags)) {
+		pr_err("Error mapping PA 0x%llx -> VA 0x%llx!\n",
+		       md->phys_addr, va);
+		return -ENOMEM;
+	}
+
+	return 0;
 }
 
-void __init efi_map_region(efi_memory_desc_t *md)
+int __init efi_map_region(efi_memory_desc_t *md)
 {
 	unsigned long size = md->num_pages << PAGE_SHIFT;
 	u64 pa = md->phys_addr;
@@ -439,7 +443,8 @@ void __init efi_map_region(efi_memory_desc_t *md)
 	 * firmware which doesn't update all internal pointers after switching
 	 * to virtual mode and would otherwise crap on us.
 	 */
-	__map_region(md, md->phys_addr);
+	if (__map_region(md, md->phys_addr))
+		return -ENOMEM;
 
 	/*
 	 * Enforce the 1:1 mapping as the default virtual address when
@@ -448,7 +453,7 @@ void __init efi_map_region(efi_memory_desc_t *md)
 	 */
 	if (!efi_is_native () && IS_ENABLED(CONFIG_EFI_MIXED)) {
 		md->virt_addr = md->phys_addr;
-		return;
+		return 0;
 	}
 
 	efi_va -= size;
@@ -468,13 +473,16 @@ void __init efi_map_region(efi_memory_desc_t *md)
 	}
 
 	if (efi_va < EFI_VA_END) {
-		pr_warn(FW_WARN "VA address range overflow!\n");
-		return;
+		pr_err(FW_WARN "VA address range overflow!\n");
+		return -ENOMEM;
 	}
 
 	/* Do the VA map */
-	__map_region(md, efi_va);
+	if (__map_region(md, efi_va))
+		return -ENOMEM;
+
 	md->virt_addr = efi_va;
+	return 0;
 }
 
 /*
@@ -482,10 +490,15 @@ void __init efi_map_region(efi_memory_desc_t *md)
  * md->virt_addr is the original virtual address which had been mapped in kexec
  * 1st kernel.
  */
-void __init efi_map_region_fixed(efi_memory_desc_t *md)
+int __init efi_map_region_fixed(efi_memory_desc_t *md)
 {
-	__map_region(md, md->phys_addr);
-	__map_region(md, md->virt_addr);
+	if (__map_region(md, md->phys_addr))
+		return -ENOMEM;
+
+	if (__map_region(md, md->virt_addr))
+		return -ENOMEM;
+
+	return 0;
 }
 
 void __iomem *__init efi_ioremap(unsigned long phys_addr, unsigned long size,
