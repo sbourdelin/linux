@@ -52,6 +52,7 @@ static u32 to_codec_type(u32 pixfmt)
 	case V4L2_PIX_FMT_HEVC:
 		return HFI_VIDEO_CODEC_HEVC;
 	default:
+		dprintk(WARN, "Wrong codec: fmt %x\n", pixfmt);
 		return 0;
 	}
 }
@@ -62,8 +63,11 @@ int hfi_core_init(struct venus_core *core)
 
 	mutex_lock(&core->lock);
 
-	if (core->state >= CORE_INIT)
+	if (core->state >= CORE_INIT) {
+		dprintk(INFO, "Video core is already in state: %d\n",
+			core->state);
 		goto unlock;
+	}
 
 	reinit_completion(&core->done);
 
@@ -71,8 +75,11 @@ int hfi_core_init(struct venus_core *core)
 	if (ret)
 		goto unlock;
 
+	dprintk(DBG, "Waiting for HFI_MSG_SYS_INIT\n");
 	ret = wait_for_completion_timeout(&core->done, TIMEOUT);
 	if (!ret) {
+		dprintk(ERR, "%s: Wait interrupted or timed out\n",
+			__func__);
 		ret = -ETIMEDOUT;
 		goto unlock;
 	}
@@ -85,6 +92,7 @@ int hfi_core_init(struct venus_core *core)
 	}
 
 	core->state = CORE_INIT;
+	dprintk(DBG, "SYS_INIT_DONE!!!\n");
 unlock:
 	mutex_unlock(&core->lock);
 	return ret;
@@ -207,13 +215,21 @@ int hfi_session_init(struct venus_inst *inst, u32 pixfmt)
 	const struct hfi_ops *ops = core->ops;
 	int ret;
 
+	if (inst->state >= INST_INIT && inst->state < INST_STOP) {
+		dprintk(INFO, "inst: %pK is already in state: %d\n",
+			inst, inst->state);
+		return 0;
+		}
 	inst->hfi_codec = to_codec_type(pixfmt);
 	reinit_completion(&inst->done);
 
+	dprintk(DBG, "%s: inst %pK\n", __func__, inst);
 	ret = ops->session_init(inst, inst->session_type, inst->hfi_codec);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to init session, type = %d\n",
+			inst->session_type);
 		return ret;
-
+	}
 	ret = wait_session_msg(inst);
 	if (ret)
 		return ret;
@@ -241,17 +257,27 @@ int hfi_session_deinit(struct venus_inst *inst)
 	const struct hfi_ops *ops = inst->core->ops;
 	int ret;
 
-	if (inst->state == INST_UNINIT)
+	if (inst->state == INST_UNINIT) {
+		dprintk(INFO,
+			"inst: %pK is already in state: %d\n",
+		inst, inst->state);
 		return 0;
+	}
 
-	if (inst->state < INST_INIT)
+	if (inst->state < INST_INIT) {
+		dprintk(ERR, "%s: inst %pK is in invalid state\n",
+			__func__, inst);
 		return -EINVAL;
+	}
 
 	reinit_completion(&inst->done);
 
+	dprintk(DBG, "%s: inst %pK\n", __func__, inst);
 	ret = ops->session_end(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to send close\n");
 		return ret;
+		}
 
 	ret = wait_session_msg(inst);
 	if (ret)
@@ -268,14 +294,20 @@ int hfi_session_start(struct venus_inst *inst)
 	const struct hfi_ops *ops = inst->core->ops;
 	int ret;
 
-	if (inst->state != INST_LOAD_RESOURCES)
+	if (inst->state != INST_LOAD_RESOURCES) {
+		dprintk(ERR,
+			"%s: inst %pK is in invalid state\n",
+			__func__, inst);
 		return -EINVAL;
+	}
 
 	reinit_completion(&inst->done);
 
 	ret = ops->session_start(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to send start\n");
 		return ret;
+		}
 
 	ret = wait_session_msg(inst);
 	if (ret)
@@ -291,11 +323,16 @@ int hfi_session_stop(struct venus_inst *inst)
 	const struct hfi_ops *ops = inst->core->ops;
 	int ret;
 
-	if (inst->state != INST_START)
+	if (inst->state != INST_START) {
+		dprintk(ERR,
+			"%s: inst %pK is in invalid state\n",
+			__func__, inst);
 		return -EINVAL;
+	}
 
 	reinit_completion(&inst->done);
 
+	dprintk(DBG, "%s: inst %pK\n", __func__, inst);
 	ret = ops->session_stop(inst);
 	if (ret)
 		return ret;
@@ -328,12 +365,17 @@ int hfi_session_abort(struct venus_inst *inst)
 	reinit_completion(&inst->done);
 
 	ret = ops->session_abort(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "session_abort failed ret: %d\n", ret);
 		return ret;
+	}
 
 	ret = wait_session_msg(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "%s: inst %pK session %x abort timed out\n",
+			__func__, inst, inst->session_type);
 		return ret;
+	}
 
 	return 0;
 }
@@ -343,15 +385,21 @@ int hfi_session_load_res(struct venus_inst *inst)
 	const struct hfi_ops *ops = inst->core->ops;
 	int ret;
 
-	if (inst->state != INST_INIT)
+	if (inst->state != INST_INIT) {
+		dprintk(ERR,
+			"%s: inst %pK is in invalid state\n",
+			__func__, inst);
 		return -EINVAL;
+	}
 
 	reinit_completion(&inst->done);
 
+	dprintk(DBG, "%s: inst %pK\n", __func__, inst);
 	ret = ops->session_load_res(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to send load resources\n");
 		return ret;
-
+	}
 	ret = wait_session_msg(inst);
 	if (ret)
 		return ret;
@@ -366,14 +414,21 @@ int hfi_session_unload_res(struct venus_inst *inst)
 	const struct hfi_ops *ops = inst->core->ops;
 	int ret;
 
-	if (inst->state != INST_STOP)
+	if (inst->state != INST_STOP) {
+		dprintk(ERR,
+			"%s: inst %pK is in invalid state\n",
+			__func__, inst);
 		return -EINVAL;
+		}
 
 	reinit_completion(&inst->done);
 
+	dprintk(DBG, "%s: inst %pK\n", __func__, inst);
 	ret = ops->session_release_res(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to send release resources\n");
 		return ret;
+		}
 
 	ret = wait_session_msg(inst);
 	if (ret)
@@ -461,8 +516,10 @@ int hfi_session_set_property(struct venus_inst *inst, u32 ptype, void *pdata)
 {
 	const struct hfi_ops *ops = inst->core->ops;
 
-	if (inst->state < INST_INIT || inst->state >= INST_STOP)
+	if (inst->state < INST_INIT || inst->state >= INST_STOP) {
+		dprintk(ERR, "Not in proper state to set property\n");
 		return -EINVAL;
+		}
 
 	return ops->session_set_property(inst, ptype, pdata);
 }
@@ -478,6 +535,8 @@ int hfi_session_process_buf(struct venus_inst *inst, struct hfi_frame_data *fd)
 		 fd->buffer_type == HFI_BUFFER_OUTPUT2)
 		return ops->session_ftb(inst, fd);
 
+	dprintk(ERR, "%s: invalid qbuf type %d:\n", __func__,
+		fd->buffer_type);
 	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(hfi_session_process_buf);

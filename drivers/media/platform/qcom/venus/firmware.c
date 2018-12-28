@@ -142,7 +142,8 @@ static int venus_boot_no_tz(struct venus_core *core, phys_addr_t mem_phys,
 		dev_err(dev, "could not map video firmware region\n");
 		return ret;
 	}
-
+	dprintk(DBG, "%s: Successfully mapped and performed test translation\n",
+		dev_name(dev));
 	venus_reset_cpu(core);
 
 	return 0;
@@ -258,7 +259,8 @@ int venus_firmware_init(struct venus_core *core)
 		dev_err(core->fw.dev, "could not attach device\n");
 		goto err_iommu_free;
 	}
-
+	dprintk(DBG, "Attached and created mapping for %s\n",
+		dev_name(core->fw.dev));
 	core->fw.iommu_domain = iommu_dom;
 
 	of_node_put(np);

@@ -203,6 +203,7 @@ static int venc_op_s_ctrl(struct v4l2_ctrl *ctrl)
 		mutex_unlock(&inst->lock);
 		break;
 	default:
+		dprintk(ERR, "Unsupported ctrl: %x\n", ctrl->id);
 		return -EINVAL;
 	}
 
@@ -218,9 +219,11 @@ int venc_ctrl_init(struct venus_inst *inst)
 	int ret;
 
 	ret = v4l2_ctrl_handler_init(&inst->ctrl_handler, 28);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "CTRL ERR: Control handler init failed, %d\n",
+			inst->ctrl_handler.error);
 		return ret;
-
+	}
 	v4l2_ctrl_new_std_menu(&inst->ctrl_handler, &venc_ctrl_ops,
 		V4L2_CID_MPEG_VIDEO_BITRATE_MODE,
 		V4L2_MPEG_VIDEO_BITRATE_MODE_CBR,
@@ -351,6 +354,8 @@ int venc_ctrl_init(struct venus_inst *inst)
 
 	return 0;
 err:
+	dprintk(ERR, "Error adding ctrl to ctrl handle, %d\n",
+		inst->ctrl_handler.error);
 	v4l2_ctrl_handler_free(&inst->ctrl_handler);
 	return ret;
 }
