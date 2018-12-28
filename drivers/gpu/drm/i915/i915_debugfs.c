@@ -3258,6 +3258,15 @@ static int i915_display_info(struct seq_file *m, void *unused)
 			intel_plane_info(m, crtc);
 		}
 
+		if (INTEL_GEN(dev_priv) >= 9 && pipe_config->base.active) {
+			uint64_t background = pipe_config->base.bgcolor;
+
+			seq_printf(m, "\tbackground color (10bpc): r=%x g=%x b=%x\n",
+				   DRM_ARGB_RED(background, 10),
+				   DRM_ARGB_GREEN(background, 10),
+				   DRM_ARGB_BLUE(background, 10));
+		}
+
 		seq_printf(m, "\tunderrun reporting: cpu=%s pch=%s \n",
 			   yesno(!crtc->cpu_fifo_underrun_disabled),
 			   yesno(!crtc->pch_fifo_underrun_disabled));

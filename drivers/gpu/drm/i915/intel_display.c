@@ -3860,6 +3860,28 @@ unlock:
 	clear_bit(I915_RESET_MODESET, &dev_priv->gpu_error.flags);
 }
 
+static void
+skl_update_background_color(const struct intel_crtc_state *crtc_state)
+{
+	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	uint64_t propval = crtc_state->base.bgcolor;
+	uint32_t tmp;
+
+	/* Hardware is programmed with 10 bits of precision */
+	tmp = DRM_ARGB_RED(propval, 10) << 20
+	    | DRM_ARGB_GREEN(propval, 10) << 10
+	    | DRM_ARGB_BLUE(propval, 10);
+
+	/*
+	 * Set CSC and gamma for bottom color to ensure background pixels
+	 * receive the same color transformations as plane content.
+	 */
+	tmp |= SKL_BOTTOM_COLOR_CSC_ENABLE | SKL_BOTTOM_COLOR_GAMMA_ENABLE;
+
+	I915_WRITE(SKL_BOTTOM_COLOR(crtc->pipe), tmp);
+}
+
 static void intel_update_pipe_config(const struct intel_crtc_state *old_crtc_state,
 				     const struct intel_crtc_state *new_crtc_state)
 {
@@ -3895,15 +3917,8 @@ static void intel_update_pipe_config(const struct intel_crtc_state *old_crtc_sta
 			ironlake_pfit_disable(old_crtc_state);
 	}
 
-	/*
-	 * We don't (yet) allow userspace to control the pipe background color,
-	 * so force it to black, but apply pipe gamma and CSC so that its
-	 * handling will match how we program our planes.
-	 */
 	if (INTEL_GEN(dev_priv) >= 9)
-		I915_WRITE(SKL_BOTTOM_COLOR(crtc->pipe),
-			   SKL_BOTTOM_COLOR_GAMMA_ENABLE |
-			   SKL_BOTTOM_COLOR_CSC_ENABLE);
+		skl_update_background_color(new_crtc_state);
 }
 
 static void intel_fdi_normal_train(struct intel_crtc *crtc)
@@ -10969,6 +10984,8 @@ static int intel_crtc_atomic_check(struct drm_crtc *crtc,
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_crtc_state *pipe_config =
 		to_intel_crtc_state(crtc_state);
+	struct drm_crtc_state *old_crtc_state =
+		drm_atomic_get_old_crtc_state(crtc_state->state, crtc);
 	int ret;
 	bool mode_changed = needs_modeset(crtc_state);
 
@@ -10995,6 +11012,9 @@ static int intel_crtc_atomic_check(struct drm_crtc *crtc,
 		 */
 		crtc_state->planes_changed = true;
 	}
+
+	if (crtc_state->bgcolor != old_crtc_state->bgcolor)
+		pipe_config->update_pipe = true;
 
 	ret = 0;
 	if (dev_priv->display.compute_pipe_wm) {
@@ -14140,6 +14160,9 @@ static int intel_crtc_init(struct drm_i915_private *dev_priv, enum pipe pipe)
 
 	WARN_ON(drm_crtc_index(&intel_crtc->base) != intel_crtc->pipe);
 
+	if (INTEL_GEN(dev_priv) >= 9)
+		drm_crtc_add_bgcolor_property(&intel_crtc->base);
+
 	return 0;
 
 fail:
@@ -15369,6 +15392,9 @@ static void intel_sanitize_crtc(struct intel_crtc *crtc,
 	struct intel_crtc_state *crtc_state = to_intel_crtc_state(crtc->base.state);
 	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 
+	/* Always force bgcolor to solid black */
+	crtc_state->base.bgcolor = drm_argb(16, 0xFFFF, 0, 0, 0);
+
 	/* Clear any frame start delays used for debugging left by the BIOS */
 	if (crtc->active && !transcoder_is_dsi(cpu_transcoder)) {
 		i915_reg_t reg = PIPECONF(cpu_transcoder);
@@ -15395,9 +15421,7 @@ static void intel_sanitize_crtc(struct intel_crtc *crtc,
 		 * gamma and CSC to match how we program our planes.
 		 */
 		if (INTEL_GEN(dev_priv) >= 9)
-			I915_WRITE(SKL_BOTTOM_COLOR(crtc->pipe),
-				   SKL_BOTTOM_COLOR_GAMMA_ENABLE |
-				   SKL_BOTTOM_COLOR_CSC_ENABLE);
+			skl_update_background_color(crtc_state);
 	}
 
 	/* Adjust the state of the output pipe according to whether we
