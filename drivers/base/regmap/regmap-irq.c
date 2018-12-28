@@ -257,6 +257,9 @@ static int regmap_irq_set_type(struct irq_data *data, unsigned int type)
 	int reg;
 	const struct regmap_irq_type *t = &irq_data->type;
 
+	if (!t->types_supported)
+		return 0;
+
 	if ((t->types_supported & type) != type)
 		return -ENOTSUPP;
 
