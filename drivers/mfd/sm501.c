@@ -1729,7 +1729,11 @@ static struct platform_driver sm501_plat_driver = {
 
 static int __init sm501_base_init(void)
 {
-	platform_driver_register(&sm501_plat_driver);
+	int rc;
+
+	rc = platform_driver_register(&sm501_plat_driver);
+	if (rc)
+		return rc;
 	return pci_register_driver(&sm501_pci_driver);
 }
 
