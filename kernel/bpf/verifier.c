@@ -6380,6 +6380,9 @@ static int verifier_remove_insns(struct bpf_verifier_env *env, u32 off, u32 cnt)
 	if (!cnt)
 		return 0;
 
+	if (bpf_prog_is_dev_bound(env->prog->aux))
+		bpf_prog_offload_remove_insns(env, off, cnt);
+
 	err = bpf_remove_insns(env->prog, off, cnt);
 	if (err)
 		return err;
@@ -6453,6 +6456,9 @@ static void opt_hard_wire_dead_code_branches(struct bpf_verifier_env *env)
 			ja.off = 0;
 		else
 			continue;
+
+		if (bpf_prog_is_dev_bound(env->prog->aux))
+			bpf_prog_offload_replace_insn(env, i, &ja);
 
 		memcpy(insn, &ja, sizeof(ja));
 	}
