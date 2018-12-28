@@ -25,6 +25,9 @@ ISC supports a single port node with parallel bus. It should contain one
 'port' child node with child 'endpoint' node. Please refer to the bindings
 defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
 
+If all endpoint bus flags (i.e. hsync-active) are omitted, then CCIR656
+decoding (embedded sync) with CRC decoding is enabled.
+
 Example:
 isc: isc@f0008000 {
 	compatible = "atmel,sama5d2-isc";
