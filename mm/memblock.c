@@ -231,6 +231,12 @@ __memblock_find_range_top_down(phys_addr_t start, phys_addr_t end,
 	return 0;
 }
 
+static bool mem_hotmovable_parsed __initdata_memblock;
+void __init_memblock mark_mem_hotplug_parsed(void)
+{
+	mem_hotmovable_parsed = true;
+}
+
 /**
  * memblock_find_in_range_node - find free area in given range and node
  * @size: size of free area to find
@@ -259,7 +265,7 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 					phys_addr_t end, int nid,
 					enum memblock_flags flags)
 {
-	phys_addr_t kernel_end, ret;
+	phys_addr_t kernel_end, ret = 0;
 
 	/* pump up @end */
 	if (end == MEMBLOCK_ALLOC_ACCESSIBLE)
@@ -270,34 +276,40 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 	end = max(start, end);
 	kernel_end = __pa_symbol(_end);
 
-	/*
-	 * try bottom-up allocation only when bottom-up mode
-	 * is set and @end is above the kernel image.
-	 */
-	if (memblock_bottom_up() && end > kernel_end) {
-		phys_addr_t bottom_up_start;
+	if (memblock_bottom_up()) {
+		phys_addr_t bottom_up_start = start;
 
-		/* make sure we will allocate above the kernel */
-		bottom_up_start = max(start, kernel_end);
-
-		/* ok, try bottom-up allocation first */
-		ret = __memblock_find_range_bottom_up(bottom_up_start, end,
-						      size, align, nid, flags);
-		if (ret)
+		if (mem_hotmovable_parsed) {
+			ret = __memblock_find_range_bottom_up(
+				bottom_up_start, end, size, align, nid,
+				flags);
 			return ret;
 
 		/*
-		 * we always limit bottom-up allocation above the kernel,
-		 * but top-down allocation doesn't have the limit, so
-		 * retrying top-down allocation may succeed when bottom-up
-		 * allocation failed.
-		 *
-		 * bottom-up allocation is expected to be fail very rarely,
-		 * so we use WARN_ONCE() here to see the stack trace if
-		 * fail happens.
+		 * if mem hotplug info is not parsed yet, try bottom-up
+		 * allocation with @end above the kernel image.
 		 */
-		WARN_ONCE(IS_ENABLED(CONFIG_MEMORY_HOTREMOVE),
+		} else if (!mem_hotmovable_parsed && end > kernel_end) {
+			/* make sure we will allocate above the kernel */
+			bottom_up_start = max(start, kernel_end);
+			ret = __memblock_find_range_bottom_up(
+				bottom_up_start, end, size, align, nid,
+				flags);
+			if (ret)
+				return ret;
+			/*
+			 * we always limit bottom-up allocation above the
+			 * kernel, but top-down allocation doesn't have
+			 * the limit, so retrying top-down allocation may
+			 * succeed when bottom-up allocation failed.
+			 *
+			 * bottom-up allocation is expected to be fail
+			 * very rarely, so we use WARN_ONCE() here to see
+			 * the stack trace if fail happens.
+			 */
+			WARN_ONCE(IS_ENABLED(CONFIG_MEMORY_HOTREMOVE),
 			  "memblock: bottom-up allocation failed, memory hotremove may be affected\n");
+		}
 	}
 
 	return __memblock_find_range_top_down(start, end, size, align, nid,

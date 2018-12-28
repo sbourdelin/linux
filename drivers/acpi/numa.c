@@ -462,6 +462,10 @@ int __init acpi_numa_init(void)
 
 		cnt = acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
 					    acpi_parse_memory_affinity, 0);
+
+#if defined(CONFIG_X86) || defined(CONFIG_ARM64)
+		mark_mem_hotplug_parsed();
+#endif
 	}
 
 	/* SLIT: System Locality Information Table */
