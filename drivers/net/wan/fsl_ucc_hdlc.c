@@ -1057,6 +1057,26 @@ static const struct net_device_ops uhdlc_ops = {
 	.ndo_tx_timeout	= uhdlc_tx_timeout,
 };
 
+static struct resource *ucc_get_resource_by_nodename(char *name)
+{
+	struct device_node *np;
+	struct platform_device *pdev;
+
+	np = of_find_compatible_node(NULL, NULL, name);
+	if (!np)
+		return ERR_PTR(-EINVAL);
+
+	pdev = of_find_device_by_node(np);
+	if (!pdev) {
+		pr_err("%pOFn: failed to lookup pdev\n", np);
+		of_node_put(np);
+		return ERR_PTR(-EINVAL);
+	}
+
+	of_node_put(np);
+	return platform_get_resource(pdev, IORESOURCE_MEM, 0);
+}
+
 static int ucc_hdlc_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -1070,6 +1090,8 @@ static int ucc_hdlc_probe(struct platform_device *pdev)
 	const char *sprop;
 	int ret;
 	u32 val;
+	struct resource *r_mem;
+	static int siram_init_flag;
 
 	ret = of_property_read_u32_index(np, "cell-index", 0, &val);
 	if (ret) {
@@ -1151,6 +1173,31 @@ static int ucc_hdlc_probe(struct platform_device *pdev)
 		ret = ucc_of_parse_tdm(np, utdm, ut_info);
 		if (ret)
 			goto free_utdm;
+
+		r_mem = ucc_get_resource_by_nodename("fsl,t1040-qe-si");
+		if (IS_ERR_OR_NULL(r_mem)) {
+			ret = -EINVAL;
+			goto free_utdm;
+		}
+		utdm->si_regs = ioremap(r_mem->start, resource_size(r_mem));
+		if (!utdm->si_regs) {
+			ret = -ENOMEM;
+			goto free_utdm;
+		}
+		r_mem = ucc_get_resource_by_nodename("fsl,t1040-qe-siram");
+		if (IS_ERR_OR_NULL(r_mem)) {
+			ret = -EINVAL;
+			goto unmap_si_regs;
+		}
+		utdm->siram = ioremap(r_mem->start, resource_size(r_mem));
+		if (!utdm->siram) {
+			ret = -ENOMEM;
+			goto unmap_si_regs;
+		}
+		if (siram_init_flag == 0) {
+			memset_io(utdm->siram, 0,  resource_size(r_mem));
+			siram_init_flag = 1;
+		}
 	}
 
 	if (of_property_read_u16(np, "fsl,hmask", &uhdlc_priv->hmask))
@@ -1159,7 +1206,7 @@ static int ucc_hdlc_probe(struct platform_device *pdev)
 	ret = uhdlc_init(uhdlc_priv);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to init uhdlc\n");
-		goto free_utdm;
+		goto undo_uhdlc_init;
 	}
 
 	dev = alloc_hdlcdev(uhdlc_priv);
@@ -1189,6 +1236,9 @@ static int ucc_hdlc_probe(struct platform_device *pdev)
 free_dev:
 	free_netdev(dev);
 undo_uhdlc_init:
+	iounmap(utdm->siram);
+unmap_si_regs:
+	iounmap(utdm->si_regs);
 free_utdm:
 	if (uhdlc_priv->tsa)
 		kfree(utdm);
