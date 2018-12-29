@@ -2047,6 +2047,9 @@ int cgroup_do_get_tree(struct fs_context *fc)
 	ret = 0;
 	if (ctx->kfc.new_sb_created)
 		goto out_cgrp;
+	else
+		cgroup_put(&ctx->root->cgrp);
+
 	apply_cgroup_root_flags(ctx->flags);
 	return 0;
 
