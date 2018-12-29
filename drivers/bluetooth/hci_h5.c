@@ -1001,6 +1001,20 @@ static struct h5_vnd rtl_vnd = {
 };
 #endif
 
+#ifdef CONFIG_OF
+static const struct of_device_id h5_of_match[] = {
+       { .compatible = "realtek,rtl8723as-bluetoooth"},
+       { .compatible = "realtek,rtl8723bs-bluetoooth"},
+       { .compatible = "realtek,rtl8723ds-bluetoooth"},
+       { .compatible = "realtek,rtl8761atv"},
+       { .compatible = "realtek,rtl8821as-bluetoooth"},
+       { .compatible = "realtek,rtl8821cs-bluetoooth"},
+       { .compatible = "realtek,rtl8822bs-bluetoooth"},
+       { }
+};
+MODULE_DEVICE_TABLE(of, h5_of_match);
+#endif
+
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id h5_acpi_match[] = {
 #ifdef CONFIG_BT_HCIUART_RTL
