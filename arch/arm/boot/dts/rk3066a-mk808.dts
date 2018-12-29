@@ -91,6 +91,14 @@
 	};
 };
 
+&hdmi {
+	status = "okay";
+};
+
+&hdmi_in_vop1 {
+	status = "disabled";
+};
+
 &mmc0 {
 	bus-width = <4>;
 	cap-mmc-highspeed;
@@ -148,6 +156,10 @@
 };
 
 &usbphy {
+	status = "okay";
+};
+
+&vop0 {
 	status = "okay";
 };
 
