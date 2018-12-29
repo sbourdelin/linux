@@ -42,15 +42,15 @@
 #define VNSvOutPortD(dwIOAddress, dwData) \
 	iowrite32((u32)(dwData), dwIOAddress)
 
-#define PCAvDelayByIO(uDelayUnit)				\
+#define PCAvDelayByIO(u_delay_unit)				\
 do {								\
 	unsigned char byData;					\
 	unsigned long ii;					\
 								\
-	if (uDelayUnit <= 50) {					\
-		udelay(uDelayUnit);				\
+	if (u_delay_unit <= 50) {					\
+		udelay(u_delay_unit);				\
 	} else {						\
-		for (ii = 0; ii < (uDelayUnit); ii++)		\
+		for (ii = 0; ii < (u_delay_unit); ii++)		\
 			byData = inb(0x61);			\
 	}							\
 } while (0)
