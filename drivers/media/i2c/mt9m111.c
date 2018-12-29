@@ -528,6 +528,16 @@ static int mt9m111_get_fmt(struct v4l2_subdev *sd,
 	if (format->pad)
 		return -EINVAL;
 
+	if (format->which == V4L2_SUBDEV_FORMAT_TRY) {
+#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
+		mf = v4l2_subdev_get_try_format(sd, cfg, 0);
+		format->format = *mf;
+		return 0;
+#else
+		return -ENOTTY;
+#endif
+	}
+
 	mf->width	= mt9m111->width;
 	mf->height	= mt9m111->height;
 	mf->code	= mt9m111->fmt->code;
@@ -1090,6 +1100,26 @@ static int mt9m111_s_stream(struct v4l2_subdev *sd, int enable)
 	return 0;
 }
 
+static int mt9m111_init_cfg(struct v4l2_subdev *sd,
+			    struct v4l2_subdev_pad_config *cfg)
+{
+#ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
+	struct mt9m111 *mt9m111 = container_of(sd, struct mt9m111, subdev);
+	struct v4l2_mbus_framefmt *format =
+		v4l2_subdev_get_try_format(sd, cfg, 0);
+
+	format->width	= mt9m111->width;
+	format->height	= mt9m111->height;
+	format->code	= mt9m111->fmt->code;
+	format->colorspace	= mt9m111->fmt->colorspace;
+	format->field	= V4L2_FIELD_NONE;
+	format->ycbcr_enc	= V4L2_YCBCR_ENC_DEFAULT;
+	format->quantization	= V4L2_QUANTIZATION_DEFAULT;
+	format->xfer_func	= V4L2_XFER_FUNC_DEFAULT;
+#endif
+	return 0;
+}
+
 static int mt9m111_g_mbus_config(struct v4l2_subdev *sd,
 				struct v4l2_mbus_config *cfg)
 {
@@ -1115,6 +1145,7 @@ static const struct v4l2_subdev_video_ops mt9m111_subdev_video_ops = {
 };
 
 static const struct v4l2_subdev_pad_ops mt9m111_subdev_pad_ops = {
+	.init_cfg	= mt9m111_init_cfg,
 	.enum_mbus_code = mt9m111_enum_mbus_code,
 	.get_selection	= mt9m111_get_selection,
 	.set_selection	= mt9m111_set_selection,
