@@ -542,6 +542,7 @@ static int mt9m111_set_pixfmt(struct mt9m111 *mt9m111,
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&mt9m111->subdev);
 	u16 data_outfmt2, mask_outfmt2 = MT9M111_OUTFMT_PROCESSED_BAYER |
+		MT9M111_OUTFMT_INV_PIX_CLOCK |
 		MT9M111_OUTFMT_BYPASS_IFP | MT9M111_OUTFMT_RGB |
 		MT9M111_OUTFMT_RGB565 | MT9M111_OUTFMT_RGB555 |
 		MT9M111_OUTFMT_RGB444x | MT9M111_OUTFMT_RGBx444 |
