@@ -589,8 +589,6 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 		if (tty_hung_up_p(file))
 			break;
 
-		set_current_state(TASK_INTERRUPTIBLE);
-
 		rbuf = n_hdlc_buf_get(&n_hdlc->rx_buf_list);
 		if (rbuf) {
 			if (rbuf->count > nr) {
@@ -617,6 +615,7 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 			break;
 		}
 
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
 
 		if (signal_pending(current)) {
@@ -673,8 +672,6 @@ static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 	add_wait_queue(&tty->write_wait, &wait);
 
 	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
-	
 		tbuf = n_hdlc_buf_get(&n_hdlc->tx_free_buf_list);
 		if (tbuf)
 			break;
@@ -683,6 +680,8 @@ static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 			error = -EAGAIN;
 			break;
 		}
+
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
 			
 		n_hdlc = tty2n_hdlc (tty);
