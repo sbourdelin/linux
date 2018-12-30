@@ -9,7 +9,7 @@ This is the authoritative documentation on the design, interface and
 conventions of cgroup v2.  It describes all userland-visible aspects
 of cgroup including core and specific controller behaviors.  All
 future changes must be reflected in this document.  Documentation for
-v1 is available under Documentation/cgroup-v1/.
+v1 is available under :file:`Documentation/cgroup-v1/`.
 
 .. CONTENTS
 
@@ -216,7 +216,7 @@ considered empty and can be removed::
 
   # rmdir $CGROUP_NAME
 
-"/proc/$PID/cgroup" lists a process's cgroup membership.  If legacy
+:file:`/proc/{$PID}/cgroup` lists a process's cgroup membership.  If legacy
 cgroup is in use in the system, this file may contain multiple lines,
 one for each hierarchy.  The entry for cgroup v2 is always in the
 format "0::$PATH"::
@@ -545,7 +545,7 @@ all processes under C0 and C1 belong to U0:
   }
 
 Let's also say U0 wants to write the PID of a process which is
-currently in C10 into "C00/cgroup.procs".  U0 has write access to the
+currently in C10 into :file:`C00/cgroup.procs`.  U0 has write access to the
 file; however, the common ancestor of the source cgroup C10 and the
 destination cgroup C00 is above the points of delegation and U0 would
 not have write access to its "cgroup.procs" files and thus the write
@@ -1852,7 +1852,7 @@ If the program returns 0, the attempt fails with -EPERM, otherwise
 it succeeds.
 
 An example of BPF_CGROUP_DEVICE program may be found in the kernel
-source tree in the tools/testing/selftests/bpf/dev_cgroup.c file.
+source tree in the :file:`tools/testing/selftests/bpf/dev_cgroup.c` file.
 
 
 RDMA
@@ -1923,7 +1923,7 @@ root cgroup. This child cgroup weight is dependent on its thread nice
 level.
 
 For details of this mapping see sched_prio_to_weight array in
-kernel/sched/core.c file (values from this array should be scaled
+:file:`kernel/sched/core.c` file (values from this array should be scaled
 appropriately so the neutral - nice 0 - value is 100 instead of 1024).
 
 
@@ -1943,17 +1943,17 @@ Basics
 ------
 
 cgroup namespace provides a mechanism to virtualize the view of the
-"/proc/$PID/cgroup" file and cgroup mounts.  The CLONE_NEWCGROUP clone
+:file:`/proc/{$PID}/cgroup` file and cgroup mounts.  The CLONE_NEWCGROUP clone
 flag can be used with clone(2) and unshare(2) to create a new cgroup
 namespace.  The process running inside the cgroup namespace will have
-its "/proc/$PID/cgroup" output restricted to cgroupns root.  The
+its :file:`/proc/{$PID}/cgroup` output restricted to cgroupns root.  The
 cgroupns root is the cgroup of the process at the time of creation of
 the cgroup namespace.
 
-Without cgroup namespace, the "/proc/$PID/cgroup" file shows the
+Without cgroup namespace, the :file:`/proc/{$PID}/cgroup` file shows the
 complete path of the cgroup of a process.  In a container setup where
 a set of cgroups and namespaces are intended to isolate processes the
-"/proc/$PID/cgroup" file may leak potential system level information
+:file:`/proc/{$PID}/cgroup` file may leak potential system level information
 to the isolated processes.  For Example::
 
   # cat /proc/self/cgroup
@@ -2007,10 +2007,10 @@ process later moves to a different cgroup::
   # cat /proc/self/cgroup
   0::/sub_cgrp_1
 
-Each process gets its namespace-specific view of "/proc/$PID/cgroup"
+Each process gets its namespace-specific view of :file:`/proc/{$PID}/cgroup`.
 
 Processes running inside the cgroup namespace will be able to see
-cgroup paths (in /proc/self/cgroup) only inside their root cgroup.
+cgroup paths (in :file:`/proc/self/cgroup`) only inside their root cgroup.
 From within an unshared cgroupns::
 
   # sleep 100000 &
@@ -2078,7 +2078,7 @@ This will mount the unified cgroup hierarchy with cgroupns root as the
 filesystem root.  The process needs CAP_SYS_ADMIN against its user and
 mount namespaces.
 
-The virtualization of /proc/self/cgroup file combined with restricting
+The virtualization of :file:`/proc/self/cgroup` file combined with restricting
 the view of cgroup hierarchy by namespace-private cgroupfs mount
 provides a properly isolated cgroup view inside the container.
 
@@ -2137,7 +2137,7 @@ Deprecated v1 Core Features
 
 - "cgroup.clone_children" is removed.
 
-- /proc/cgroups is meaningless for v2.  Use "cgroup.controllers" file
+- :file:`/proc/cgroups` is meaningless for v2.  Use :file:`cgroup.controllers` file
   at the root instead.
 
 
@@ -2220,7 +2220,7 @@ to lay programs.
 
 First of all, cgroup has a fundamentally inadequate interface to be
 exposed this way.  For a process to access its own knobs, it has to
-extract the path on the target hierarchy from /proc/self/cgroup,
+extract the path on the target hierarchy from :file:`/proc/self/cgroup`,
 construct the path by appending the name of the knob to the path, open
 and then read and/or write to it.  This is not only extremely clunky
 and unusual but also inherently racy.  There is no conventional way to
