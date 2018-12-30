@@ -166,6 +166,8 @@ struct kobj_attribute {
 			char *buf);
 	ssize_t (*store)(struct kobject *kobj, struct kobj_attribute *attr,
 			 const char *buf, size_t count);
+	bool    (*show_file_capable)(const struct file *);
+	bool    (*store_file_capable)(const struct file *);
 };
 
 extern const struct sysfs_ops kobj_sysfs_ops;

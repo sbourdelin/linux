@@ -214,6 +214,8 @@ struct bin_attribute bin_attr_##_name = __BIN_ATTR_RW(_name, _size)
 struct sysfs_ops {
 	ssize_t	(*show)(struct kobject *, struct attribute *, char *);
 	ssize_t	(*store)(struct kobject *, struct attribute *, const char *, size_t);
+	bool	(*show_file_capable)(const struct file *, struct attribute *);
+	bool	(*store_file_capable)(const struct file *, struct attribute *);
 };
 
 #ifdef CONFIG_SYSFS

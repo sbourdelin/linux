@@ -58,6 +58,10 @@ static int sysfs_kf_seq_show(struct seq_file *sf, void *v)
 	 * if @ops->show() isn't implemented.
 	 */
 	if (ops->show) {
+		if (ops->show_file_capable &&
+		    !ops->show_file_capable(of->file, of->kn->priv))
+			return -EPERM;
+
 		count = ops->show(kobj, of->kn->priv, buf);
 		if (count < 0)
 			return count;
@@ -135,6 +139,10 @@ static ssize_t sysfs_kf_write(struct kernfs_open_file *of, char *buf,
 
 	if (!count)
 		return 0;
+
+	if (ops->store_file_capable &&
+	    !ops->store_file_capable(of->file, of->kn->priv))
+		return -EPERM;
 
 	return ops->store(kobj, of->kn->priv, buf, count);
 }

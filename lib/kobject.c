@@ -800,6 +800,18 @@ static ssize_t kobj_attr_show(struct kobject *kobj, struct attribute *attr,
 	return ret;
 }
 
+static bool kobj_attr_show_file_capable(const struct file *file,
+					struct attribute *attr)
+{
+	struct kobj_attribute *kattr;
+
+	kattr = container_of(attr, struct kobj_attribute, attr);
+	if (kattr->show_file_capable)
+		return kattr->show_file_capable(file);
+
+	return true;
+}
+
 static ssize_t kobj_attr_store(struct kobject *kobj, struct attribute *attr,
 			       const char *buf, size_t count)
 {
@@ -812,9 +824,23 @@ static ssize_t kobj_attr_store(struct kobject *kobj, struct attribute *attr,
 	return ret;
 }
 
+static bool kobj_attr_store_file_capable(const struct file *file,
+					struct attribute *attr)
+{
+	struct kobj_attribute *kattr;
+
+	kattr = container_of(attr, struct kobj_attribute, attr);
+	if (kattr->store_file_capable)
+		return kattr->store_file_capable(file);
+
+	return true;
+}
+
 const struct sysfs_ops kobj_sysfs_ops = {
 	.show	= kobj_attr_show,
 	.store	= kobj_attr_store,
+	.show_file_capable = kobj_attr_show_file_capable,
+	.store_file_capable = kobj_attr_store_file_capable,
 };
 EXPORT_SYMBOL_GPL(kobj_sysfs_ops);
 
