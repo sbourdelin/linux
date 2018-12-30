@@ -47,6 +47,8 @@ struct umh_info {
 	const char *cmdline;
 	struct file *pipe_to_umh;
 	struct file *pipe_from_umh;
+	struct list_head list;
+	void (*cleanup)(struct umh_info *info);
 	pid_t pid;
 };
 int fork_usermode_blob(void *data, size_t len, struct umh_info *info);
@@ -74,6 +76,8 @@ static inline void usermodehelper_enable(void)
 {
 	__usermodehelper_set_disable_depth(UMH_ENABLED);
 }
+
+void exit_umh(struct task_struct *tsk);
 
 extern int usermodehelper_read_trylock(void);
 extern long usermodehelper_read_lock_wait(long timeout);
