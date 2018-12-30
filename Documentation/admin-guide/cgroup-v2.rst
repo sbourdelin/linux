@@ -344,10 +344,21 @@ example, to start a clean-up operation after all processes of a given
 sub-hierarchy have exited.  The populated state updates and
 notifications are recursive.  Consider the following sub-hierarchy
 where the numbers in the parentheses represent the numbers of processes
-in each cgroup::
+in each cgroup:
 
-  A(4) - B(0) - C(1)
-              \ D(0)
+.. kernel-render:: DOT
+  :alt: hierarchy
+
+  digraph subhierarchy {
+    edge [
+      arrowhead="none"
+    ];
+    rankdir=LR;
+
+    "A(4)" -> "B(0)";
+    "B(0)" -> "C(1)";
+    "B(0)" -> "D(0)";
+  }
 
 A, B and C's "populated" fields would be 1 while D's 0.  After the one
 process in C exits, B and C's "populated" fields would flip to "0" and
@@ -380,10 +391,21 @@ are specified, the last one is effective.
 Enabling a controller in a cgroup indicates that the distribution of
 the target resource across its immediate children will be controlled.
 Consider the following sub-hierarchy.  The enabled controllers are
-listed in parentheses::
+listed in parentheses:
 
-  A(cpu,memory) - B(memory) - C()
-                            \ D()
+.. kernel-render:: DOT
+  :alt: hierarchy
+
+  digraph subhierarchy {
+    edge [
+      arrowhead="none"
+    ];
+    rankdir=LR;
+
+    "A(cpu,memory)" -> "B(memory)";
+    "B(memory)" -> "C()";
+    "B(memory)" -> "D()";
+  }
 
 As A has "cpu" and "memory" enabled, A will control the distribution
 of CPU cycles and memory to its children, in this case, B.  As B has
@@ -497,12 +519,30 @@ in from or push out to outside the sub-hierarchy.
 
 For an example, let's assume cgroups C0 and C1 have been delegated to
 user U0 who created C00, C01 under C0 and C10 under C1 as follows and
-all processes under C0 and C1 belong to U0::
+all processes under C0 and C1 belong to U0:
 
-  ~~~~~~~~~~~~~ - C0 - C00
-  ~ cgroup    ~      \ C01
-  ~ hierarchy ~
-  ~~~~~~~~~~~~~ - C1 - C10
+.. kernel-render:: DOT
+  :alt: cgroup hierarchy
+
+  digraph hierarchyc0 {
+    edge [
+      arrowhead="none"
+    ];
+
+    "C0" -> "C00";
+    "C0" -> "C01";
+  }
+
+.. kernel-render:: DOT
+  :alt: cgroup hierarchy
+
+  digraph hierarchyc1 {
+    edge [
+      arrowhead="none"
+    ];
+
+    "C1" -> "C10";
+  }
 
 Let's also say U0 wants to write the PID of a process which is
 currently in C10 into "C00/cgroup.procs".  U0 has write access to the
@@ -1505,12 +1545,21 @@ The limits are only applied at the peer level in the hierarchy.  This means that
 in the diagram below, only groups A, B, and C will influence each other, and
 groups D and F will influence each other.  Group G will influence nobody.
 
-			[root]
-		/	   |		\
-		A	   B		C
-	       /  \        |
-	      D    F	   G
+.. kernel-render:: DOT
+  :alt: Peer hierarchy
 
+  digraph hierarchy {
+    edge [
+      arrowhead="none"
+    ];
+
+    "[root]" -> "A";
+    "[root]" -> "B";
+    "[root]" -> "C";
+    "A" -> "D";
+    "A" -> "F";
+    "B" -> "G";
+  }
 
 So the ideal way to configure this is to set io.latency in groups A, B, and C.
 Generally you do not want to set a value lower than the latency your device
