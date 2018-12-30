@@ -2245,6 +2245,15 @@ static int netlink_dump(struct sock *sk)
 		cb->extack = NULL;
 	}
 
+	/* Should the dump method run out of space, we have to
+	 * keep the dumper running until completion.
+	 * Just ignore the error, userspace should call back with a
+	 * new skb until dump is complete
+	 */
+	if (nlk->dump_done_errno == -EMSGSIZE) {
+		nlk->dump_done_errno = skb->len;
+	}
+
 	if (nlk->dump_done_errno > 0 ||
 	    skb_tailroom(skb) < nlmsg_total_size(sizeof(nlk->dump_done_errno))) {
 		mutex_unlock(nlk->cb_mutex);
