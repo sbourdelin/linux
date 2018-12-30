@@ -661,6 +661,11 @@ static ssize_t wake_lock_store(struct kobject *kobj,
 	return error ? error : n;
 }
 
+static bool wake_lock_store_file_capable(const struct file *file)
+{
+	return file_ns_capable(file, &init_user_ns, CAP_BLOCK_SUSPEND);
+}
+
 power_attr(wake_lock);
 
 static ssize_t wake_unlock_show(struct kobject *kobj,
@@ -676,6 +681,11 @@ static ssize_t wake_unlock_store(struct kobject *kobj,
 {
 	int error = pm_wake_unlock(buf);
 	return error ? error : n;
+}
+
+static bool wake_unlock_store_file_capable(const struct file *file)
+{
+	return file_ns_capable(file, &init_user_ns, CAP_BLOCK_SUSPEND);
 }
 
 power_attr(wake_unlock);
@@ -803,6 +813,10 @@ static int __init pm_init(void)
 	power_kobj = kobject_create_and_add("power", NULL);
 	if (!power_kobj)
 		return -ENOMEM;
+#ifdef CONFIG_PM_WAKELOCKS
+	wake_lock_attr.store_file_capable = wake_lock_store_file_capable;
+	wake_unlock_attr.store_file_capable = wake_unlock_store_file_capable;
+#endif
 	error = sysfs_create_group(power_kobj, &attr_group);
 	if (error)
 		return error;
