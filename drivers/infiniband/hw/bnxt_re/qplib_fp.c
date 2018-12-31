@@ -44,6 +44,7 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/prefetch.h>
+#include <linux/if_ether.h>
 
 #include "roce_hsi.h"
 
@@ -1626,7 +1627,8 @@ int bnxt_qplib_post_send(struct bnxt_qplib_qp *qp,
 				((offsetof(typeof(*sqe), data) + 15) >> 4);
 		sqe->inv_key_or_imm_data = cpu_to_le32(
 						wqe->send.inv_key);
-		if (qp->type == CMDQ_CREATE_QP_TYPE_UD) {
+		if (qp->type == CMDQ_CREATE_QP_TYPE_UD ||
+		    qp->type == CMDQ_CREATE_QP_TYPE_GSI) {
 			sqe->q_key = cpu_to_le32(wqe->send.q_key);
 			sqe->dst_qp = cpu_to_le32(
 					wqe->send.dst_qp & SQ_SEND_DST_QP_MASK);
@@ -2404,6 +2406,8 @@ static int bnxt_qplib_cq_process_res_ud(struct bnxt_qplib_cq *cq,
 	struct bnxt_qplib_cqe *cqe;
 	u32 wr_id_idx;
 	int rc = 0;
+	u8 *smac;
+	int i, j;
 
 	qp = (struct bnxt_qplib_qp *)((unsigned long)
 				      le64_to_cpu(hwcqe->qp_handle));
@@ -2418,12 +2422,15 @@ static int bnxt_qplib_cq_process_res_ud(struct bnxt_qplib_cq *cq,
 	}
 	cqe = *pcqe;
 	cqe->opcode = hwcqe->cqe_type_toggle & CQ_BASE_CQE_TYPE_MASK;
-	cqe->length = le32_to_cpu(hwcqe->length);
+	cqe->length = (u32)le16_to_cpu(hwcqe->length);
+	cqe->cfa_meta = le16_to_cpu(hwcqe->cfa_metadata);
 	cqe->invrkey = le32_to_cpu(hwcqe->imm_data);
 	cqe->flags = le16_to_cpu(hwcqe->flags);
 	cqe->status = hwcqe->status;
 	cqe->qp_handle = (u64)(unsigned long)qp;
-	memcpy(cqe->smac, hwcqe->src_mac, 6);
+	smac = (u8 *)hwcqe->src_mac;
+	for (i = 0, j = (ETH_ALEN - 1); i < ETH_ALEN; i++, j--)
+		cqe->smac[i] = smac[j];
 	wr_id_idx = le32_to_cpu(hwcqe->src_qp_high_srq_or_rq_wr_id)
 				& CQ_RES_UD_SRQ_OR_RQ_WR_ID_MASK;
 	cqe->src_qp = le16_to_cpu(hwcqe->src_qp_low) |
