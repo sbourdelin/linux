@@ -786,6 +786,37 @@ static void mlx5_fw_tracer_ownership_change(struct work_struct *work)
 	mlx5_fw_tracer_start(tracer);
 }
 
+static int mlx5_fw_tracer_set_core_dump_reg(struct mlx5_core_dev *dev, u32 *in, int size_in)
+{
+	u32 out[MLX5_ST_SZ_DW(core_dump_reg)] = {0};
+
+	if (!MLX5_CAP_DEBUG(dev, core_dump_general) &&
+	    !MLX5_CAP_DEBUG(dev, core_dump_qp))
+		return -EOPNOTSUPP;
+
+	return mlx5_core_access_reg(dev, in, size_in, out, sizeof(out),
+				    MLX5_REG_CORE_DUMP, 0, 1);
+}
+
+int mlx5_fw_tracer_trigger_core_dump_general(struct mlx5_core_dev *dev)
+{
+	struct mlx5_fw_tracer *tracer = dev->tracer;
+	u32 in[MLX5_ST_SZ_DW(core_dump_reg)] = {0};
+	int err;
+
+	if (!MLX5_CAP_DEBUG(dev, core_dump_general) || !tracer)
+		return -EOPNOTSUPP;
+
+	MLX5_SET(core_dump_reg, in, core_dump_type, 0x0);
+
+	err =  mlx5_fw_tracer_set_core_dump_reg(dev, in, sizeof(in));
+	if (err)
+		return err;
+	queue_work(tracer->work_queue, &tracer->handle_traces_work);
+	flush_workqueue(tracer->work_queue);
+	return 0;
+}
+
 /* Create software resources (Buffers, etc ..) */
 struct mlx5_fw_tracer *mlx5_fw_tracer_create(struct mlx5_core_dev *dev)
 {
