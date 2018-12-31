@@ -42,11 +42,14 @@
 
 #include <linux/types.h>
 
-#define BNXT_RE_ABI_VERSION	1
+#define BNXT_RE_ABI_VERSION	2
 
+#define BNXT_RE_CHIP_ID0_CHIP_NUM_SFT		0x00
+#define BNXT_RE_CHIP_ID0_CHIP_REV_SFT		0x10
+#define BNXT_RE_CHIP_ID0_CHIP_MET_SFT		0x18
 struct bnxt_re_uctx_resp {
-	__u32 dev_id;
-	__u32 max_qp;
+	__u32 chip_id0;
+	__u32 chip_id1;
 	__u32 pg_size;
 	__u32 cqe_sz;
 	__u32 max_cqd;
