@@ -981,9 +981,9 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto err_fw_tracer;
 	}
 
-	err = mlx5_fw_reporter_create(dev);
+	err = mlx5_fw_reporters_create(dev);
 	if (err)
-		dev_warn(&pdev->dev, "Failed to create FW reporter\n");
+		dev_warn(&pdev->dev, "Failed to create FW reporters\n");
 
 	err = mlx5_fpga_device_start(dev);
 	if (err) {
@@ -1117,7 +1117,7 @@ static int mlx5_unload_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 	mlx5_accel_ipsec_cleanup(dev);
 	mlx5_accel_tls_cleanup(dev);
 	mlx5_fpga_device_stop(dev);
-	mlx5_fw_reporter_destroy(dev);
+	mlx5_fw_reporters_destroy(dev);
 	mlx5_fw_tracer_cleanup(dev->tracer);
 	mlx5_eq_table_destroy(dev);
 	mlx5_pagealloc_stop(dev);

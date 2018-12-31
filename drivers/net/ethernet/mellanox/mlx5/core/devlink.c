@@ -234,21 +234,54 @@ static const struct devlink_health_reporter_ops mlx5_fw_reporter_ops = {
 		.diagnose = mlx5_fw_reporter_diagnose,
 };
 
-int mlx5_fw_reporter_create(struct mlx5_core_dev *dev)
+static int
+mlx5_fw_fatal_reporter_recover(struct devlink_health_reporter *reporter,
+			       void *priv_ctx)
+{
+	struct mlx5_core_dev *dev = devlink_health_reporter_priv(reporter);
+	u8 nic_state;
+
+	nic_state = mlx5_get_nic_state(dev);
+	if (nic_state == MLX5_NIC_IFC_INVALID) {
+		dev_err(&dev->pdev->dev, "health recovery flow aborted since the nic state is invalid\n");
+		return -ECANCELED;
+	}
+	dev_err(&dev->pdev->dev, "starting health recovery flow\n");
+
+	mlx5_recover_device(dev);
+
+	return 0;
+}
+
+static const struct devlink_health_reporter_ops mlx5_fw_fatal_reporter_ops = {
+		.name = "FW_fatal",
+		.recover = mlx5_fw_fatal_reporter_recover,
+};
+
+#define MLX5_REPORTER_FW_GRACEFUL_PERIOD 120000
+int mlx5_fw_reporters_create(struct mlx5_core_dev *dev)
 {
 	struct devlink *devlink = priv_to_devlink(dev);
 
-	dev->fw_reporter = devlink_health_reporter_create(devlink, &mlx5_fw_reporter_ops,
-							  0, false, dev);
-	return PTR_ERR_OR_ZERO(dev->fw_reporter);
+	dev->fw_reporter =
+		devlink_health_reporter_create(devlink, &mlx5_fw_reporter_ops,
+					       0, false, dev);
+	if (IS_ERR(dev->fw_reporter))
+		return PTR_ERR(dev->fw_reporter);
+
+	dev->fw_fatal_reporter =
+		devlink_health_reporter_create(devlink, &mlx5_fw_fatal_reporter_ops,
+					       MLX5_REPORTER_FW_GRACEFUL_PERIOD,
+					       true, dev);
+	return PTR_ERR_OR_ZERO(dev->fw_fatal_reporter);
 }
 
-void mlx5_fw_reporter_destroy(struct mlx5_core_dev *dev)
+void mlx5_fw_reporters_destroy(struct mlx5_core_dev *dev)
 {
-	if (!dev->fw_reporter)
-		return;
-
-	devlink_health_reporter_destroy(dev->fw_reporter);
+	if (dev->fw_reporter)
+		devlink_health_reporter_destroy(dev->fw_reporter);
+	if (dev->fw_fatal_reporter)
+		devlink_health_reporter_destroy(dev->fw_fatal_reporter);
 }
 
 int mlx5_devlink_register(struct devlink *devlink, struct device *dev)
