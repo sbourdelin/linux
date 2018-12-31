@@ -1656,6 +1656,9 @@ int bnxt_re_modify_qp(struct ib_qp *ib_qp, struct ib_qp_attr *qp_attr,
 			__from_ib_access_flags(qp_attr->qp_access_flags);
 		/* LOCAL_WRITE access must be set to allow RC receive */
 		qp->qplib_qp.access |= BNXT_QPLIB_ACCESS_LOCAL_WRITE;
+		/* Temp: Set all params on QP as of now */
+		qp->qplib_qp.access |= CMDQ_MODIFY_QP_ACCESS_REMOTE_WRITE;
+		qp->qplib_qp.access |= CMDQ_MODIFY_QP_ACCESS_REMOTE_READ;
 	}
 	if (qp_attr_mask & IB_QP_PKEY_INDEX) {
 		qp->qplib_qp.modify_flags |= CMDQ_MODIFY_QP_MODIFY_MASK_PKEY;
