@@ -46,6 +46,10 @@
 #define TRACER_BLOCK_SIZE_BYTE 256
 #define TRACES_PER_BLOCK 32
 
+#define TRACE_STR_LINE 256
+#define SAVED_TRACES_NUM 1024
+#define SAVED_TRACES_BUFFER_SIZE_BYTE (SAVED_TRACES_NUM * TRACE_STR_LINE)
+
 #define TRACER_MAX_PARAMS 7
 #define MESSAGE_HASH_BITS 6
 #define MESSAGE_HASH_SIZE BIT(MESSAGE_HASH_BITS)
@@ -82,6 +86,12 @@ struct mlx5_fw_tracer {
 		struct mlx5_core_mkey mkey;
 		u32 consumer_index;
 	} buff;
+
+	/* Saved Tarces Buffer */
+	struct {
+		void *traces_buff;
+		u32 saved_traces_index;
+	} sbuff;
 
 	u64 last_timestamp;
 	struct work_struct handle_traces_work;
@@ -171,5 +181,8 @@ struct mlx5_fw_tracer *mlx5_fw_tracer_create(struct mlx5_core_dev *dev);
 int mlx5_fw_tracer_init(struct mlx5_fw_tracer *tracer);
 void mlx5_fw_tracer_cleanup(struct mlx5_fw_tracer *tracer);
 void mlx5_fw_tracer_destroy(struct mlx5_fw_tracer *tracer);
+int mlx5_fw_tracer_trigger_core_dump_general(struct mlx5_core_dev *dev);
+int mlx5_fw_tracer_get_saved_traces(struct mlx5_fw_tracer *tracer,
+				    char *buff, unsigned int buff_size);
 
 #endif

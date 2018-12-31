@@ -3,6 +3,7 @@
 
 #include <devlink.h>
 #include "mlx5_core.h"
+#include "diag/fw_tracer.h"
 
 static int
 mlx5_devlink_health_buffer_fill_syndrom(struct devlink_health_buffer *dh_buffer,
@@ -33,6 +34,115 @@ mlx5_devlink_health_buffer_fill_syndrom(struct devlink_health_buffer *dh_buffer,
 	devlink_health_buffer_nest_end(dh_buffer);
 
 	return 0;
+}
+
+int mlx5_devlink_health_buffer_fill_trace(struct devlink_health_buffer *dh_buffer,
+					  char *trace)
+{
+	int nest = 0;
+	int err = 0;
+	int i;
+
+	err = devlink_health_buffer_nest_start(dh_buffer,
+					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT);
+	if (err)
+		goto nest_cancel;
+	nest++;
+
+	err = devlink_health_buffer_nest_start(dh_buffer,
+					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_PAIR);
+	if (err)
+		goto nest_cancel;
+	nest++;
+
+	err = devlink_health_buffer_put_object_name(dh_buffer, "trace");
+	if (err)
+		goto nest_cancel;
+
+	err = devlink_health_buffer_nest_start(dh_buffer,
+					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_VALUE);
+	if (err)
+		goto nest_cancel;
+	nest++;
+
+	err = devlink_health_buffer_put_value_string(dh_buffer, trace);
+	if (err)
+		goto nest_cancel;
+
+	for (i = 0; i < nest; i++)
+		devlink_health_buffer_nest_end(dh_buffer);
+	return 0;
+nest_cancel:
+	for (i = 0; i < nest; i++)
+		devlink_health_buffer_nest_cancel(dh_buffer);
+
+	return err;
+}
+
+int mlx5_fw_tracer_get_saved_traces_objects(struct mlx5_fw_tracer *tracer,
+					    struct devlink_health_buffer **buffers_array,
+					    unsigned int num_buffers)
+{
+	u32 saved_traces_index = tracer->sbuff.saved_traces_index;
+	char *saved_traces = tracer->sbuff.traces_buff;
+	u32 index, start_index, end_index;
+	u32 dh_buffer_index = 0;
+	int err = 0;
+
+	if (!saved_traces[0])
+		return -ENOMSG;
+
+	if (saved_traces[saved_traces_index * TRACE_STR_LINE])
+		start_index = saved_traces_index;
+	else
+		start_index = 0;
+	end_index = (saved_traces_index - 1) & (SAVED_TRACES_NUM - 1);
+
+	index = start_index;
+	while (index <= end_index) {
+		err = mlx5_devlink_health_buffer_fill_trace(buffers_array[dh_buffer_index],
+							    saved_traces + index * TRACE_STR_LINE);
+		if (err) {
+			dh_buffer_index++;
+			if (dh_buffer_index == num_buffers)
+				break;
+		} else {
+			index++;
+		}
+	}
+
+	return err;
+}
+
+static int
+mlx5_fw_reporter_objdump(struct devlink_health_reporter *reporter,
+			 struct devlink_health_buffer **buffers_array,
+			 unsigned int buff_size, unsigned int num_buffers,
+			 void *priv_ctx)
+{
+	struct mlx5_core_dev *dev = devlink_health_reporter_priv(reporter);
+	struct devlink_health_buffer *buffer;
+	int err;
+
+	if (!buffers_array || buff_size < TRACE_STR_LINE || num_buffers < 1)
+		return -EINVAL;
+
+	err = mlx5_fw_tracer_trigger_core_dump_general(dev);
+	if (err)
+		return err;
+
+	buffer = buffers_array[0];
+	if (priv_ctx) {
+		struct mlx5_fw_reporter_ctx *fw_reporter_ctx = priv_ctx;
+
+		err = mlx5_devlink_health_buffer_fill_syndrom(buffer,
+							      fw_reporter_ctx->err_synd);
+		if (err)
+			return err;
+	}
+
+	return mlx5_fw_tracer_get_saved_traces_objects(dev->tracer, buffers_array,
+						       num_buffers);
 }
 
 static int
@@ -97,7 +207,9 @@ mlx5_fw_reporter_diagnose(struct devlink_health_reporter *reporter,
 
 static const struct devlink_health_reporter_ops mlx5_fw_reporter_ops = {
 		.name = "FW",
+		.objdump_size = SAVED_TRACES_BUFFER_SIZE_BYTE,
 		.diagnose_size = HEALTH_INFO_MAX_BUFF,
+		.objdump = mlx5_fw_reporter_objdump,
 		.diagnose = mlx5_fw_reporter_diagnose,
 };
 
