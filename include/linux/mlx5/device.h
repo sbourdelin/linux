@@ -61,6 +61,7 @@
 #define __mlx5_st_sz_bits(typ) sizeof(struct mlx5_ifc_##typ##_bits)
 
 #define MLX5_FLD_SZ_BYTES(typ, fld) (__mlx5_bit_sz(typ, fld) / 8)
+#define MLX5_FLD_SZ_DW(typ, fld) (__mlx5_bit_sz(typ, fld) / 32)
 #define MLX5_ST_SZ_BYTES(typ) (sizeof(struct mlx5_ifc_##typ##_bits) / 8)
 #define MLX5_ST_SZ_DW(typ) (sizeof(struct mlx5_ifc_##typ##_bits) / 32)
 #define MLX5_ST_SZ_QW(typ) (sizeof(struct mlx5_ifc_##typ##_bits) / 64)

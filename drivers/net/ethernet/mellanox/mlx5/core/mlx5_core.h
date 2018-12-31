@@ -199,4 +199,11 @@ enum {
 
 u8 mlx5_get_nic_state(struct mlx5_core_dev *dev);
 void mlx5_set_nic_state(struct mlx5_core_dev *dev, u8 state);
+
+#define HEALTH_INFO_MAX_LINE 80
+#define HEALTH_INFO_LINES (MLX5_FLD_SZ_DW(health_buffer, assert_var) + 8)
+#define HEALTH_INFO_MAX_BUFF (HEALTH_INFO_MAX_LINE * HEALTH_INFO_LINES)
+void mlx5_get_health_info(struct mlx5_core_dev *dev, u8 *synd,
+			  char (*lines_buf)[HEALTH_INFO_MAX_LINE]);
+
 #endif /* __MLX5_CORE_H__ */

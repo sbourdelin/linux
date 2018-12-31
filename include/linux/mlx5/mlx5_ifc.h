@@ -3360,7 +3360,9 @@ union mlx5_ifc_event_auto_bits {
 };
 
 struct mlx5_ifc_health_buffer_bits {
-	u8         reserved_at_0[0x100];
+	u8         assert_var[0xa0];
+
+	u8         reserved_at_a0[0x60];
 
 	u8         assert_existptr[0x20];
 

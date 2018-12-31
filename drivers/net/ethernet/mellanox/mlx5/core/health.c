@@ -215,7 +215,8 @@ static const char *hsynd_str(u8 synd)
 	}
 }
 
-static void print_health_info(struct mlx5_core_dev *dev)
+void mlx5_get_health_info(struct mlx5_core_dev *dev, u8 *synd,
+			  char (*lines_buf)[HEALTH_INFO_MAX_LINE])
 {
 	struct mlx5_core_health *health = &dev->priv.health;
 	struct health_buffer __iomem *h = health->health;
@@ -223,23 +224,40 @@ static void print_health_info(struct mlx5_core_dev *dev)
 	u32 fw;
 	int i;
 
+	*synd = ioread8(&h->synd);
 	/* If the syndrome is 0, the device is OK and no need to print buffer */
-	if (!ioread8(&h->synd))
+	if (!synd)
 		return;
 
 	for (i = 0; i < ARRAY_SIZE(h->assert_var); i++)
-		dev_err(&dev->pdev->dev, "assert_var[%d] 0x%08x\n", i, ioread32be(h->assert_var + i));
+		sprintf(lines_buf[i], "assert_var[%d] 0x%08x\n", i, ioread32be(h->assert_var + i));
 
-	dev_err(&dev->pdev->dev, "assert_exit_ptr 0x%08x\n", ioread32be(&h->assert_exit_ptr));
-	dev_err(&dev->pdev->dev, "assert_callra 0x%08x\n", ioread32be(&h->assert_callra));
+	sprintf(lines_buf[i++], "assert_exit_ptr 0x%08x\n", ioread32be(&h->assert_exit_ptr));
+	sprintf(lines_buf[i++], "assert_callra 0x%08x\n", ioread32be(&h->assert_callra));
 	sprintf(fw_str, "%d.%d.%d", fw_rev_maj(dev), fw_rev_min(dev), fw_rev_sub(dev));
-	dev_err(&dev->pdev->dev, "fw_ver %s\n", fw_str);
-	dev_err(&dev->pdev->dev, "hw_id 0x%08x\n", ioread32be(&h->hw_id));
-	dev_err(&dev->pdev->dev, "irisc_index %d\n", ioread8(&h->irisc_index));
-	dev_err(&dev->pdev->dev, "synd 0x%x: %s\n", ioread8(&h->synd), hsynd_str(ioread8(&h->synd)));
-	dev_err(&dev->pdev->dev, "ext_synd 0x%04x\n", ioread16be(&h->ext_synd));
+	sprintf(lines_buf[i++], "fw_ver %s\n", fw_str);
+	sprintf(lines_buf[i++], "hw_id 0x%08x\n", ioread32be(&h->hw_id));
+	sprintf(lines_buf[i++], "irisc_index %d\n", ioread8(&h->irisc_index));
+	sprintf(lines_buf[i++], "synd 0x%x: %s\n", ioread8(&h->synd), hsynd_str(ioread8(&h->synd)));
+	sprintf(lines_buf[i++], "ext_synd 0x%04x\n", ioread16be(&h->ext_synd));
 	fw = ioread32be(&h->fw_ver);
-	dev_err(&dev->pdev->dev, "raw fw_ver 0x%08x\n", fw);
+	sprintf(lines_buf[i], "raw fw_ver 0x%08x\n", fw);
+}
+
+static void mlx5_print_health_info(struct mlx5_core_dev *dev)
+{
+	char lines_buf[HEALTH_INFO_LINES][HEALTH_INFO_MAX_LINE] = {};
+	u8 synd;
+	int i;
+
+	mlx5_get_health_info(dev, &synd, lines_buf);
+
+	if (!synd)
+		return;
+
+	for (i = 0; i < HEALTH_INFO_LINES; i++)
+		dev_err(&dev->pdev->dev, lines_buf[i]);
+
 }
 
 static unsigned long get_next_poll_jiffies(void)
@@ -285,12 +303,12 @@ static void poll_health(struct timer_list *t)
 	health->prev = count;
 	if (health->miss_counter == MAX_MISSES) {
 		dev_err(&dev->pdev->dev, "device's health compromised - reached miss count\n");
-		print_health_info(dev);
+		mlx5_print_health_info(dev);
 	}
 
 	if (in_fatal(dev) && !health->sick) {
 		health->sick = true;
-		print_health_info(dev);
+		mlx5_print_health_info(dev);
 		mlx5_trigger_health_work(dev);
 	}
 
