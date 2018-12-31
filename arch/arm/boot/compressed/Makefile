@@ -169,8 +169,8 @@ $(obj)/bswapsdi2.S: $(srctree)/arch/$(SRCARCH)/lib/bswapsdi2.S
 check_for_bad_syms = \
 bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
 [ -z "$$bad_syms" ] || \
-  ( echo "following symbols must have non local/private scope:" >&2; \
-    echo "$$bad_syms" >&2; false )
+  { echo "following symbols must have non local/private scope:" >&2; \
+    echo "$$bad_syms" >&2; false; }
 
 check_for_multiple_zreladdr = \
 if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
