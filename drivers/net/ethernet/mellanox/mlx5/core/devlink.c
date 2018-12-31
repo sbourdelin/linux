@@ -205,6 +205,27 @@ mlx5_fw_reporter_diagnose(struct devlink_health_reporter *reporter,
 	return 0;
 }
 
+void mlx5_fw_reporter_err_work(struct work_struct *work)
+{
+	struct mlx5_fw_reporter_ctx fw_reporter_ctx;
+	struct mlx5_core_health *health;
+	struct mlx5_core_dev *dev;
+	struct mlx5_priv *priv;
+
+	health = container_of(work, struct mlx5_core_health, report_work);
+	priv = container_of(health, struct mlx5_priv, health);
+	dev = container_of(priv, struct mlx5_core_dev, priv);
+
+	fw_reporter_ctx.err_synd = health->synd;
+	fw_reporter_ctx.miss_counter = health->miss_counter;
+	if (fw_reporter_ctx.err_synd)
+		devlink_health_report(dev->fw_reporter, "FW syndrom reported",
+				      &fw_reporter_ctx);
+	else if (fw_reporter_ctx.miss_counter)
+		devlink_health_report(dev->fw_reporter, "FW miss counter reported",
+				      &fw_reporter_ctx);
+}
+
 static const struct devlink_health_reporter_ops mlx5_fw_reporter_ops = {
 		.name = "FW",
 		.objdump_size = SAVED_TRACES_BUFFER_SIZE_BYTE,

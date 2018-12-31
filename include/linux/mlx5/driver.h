@@ -432,12 +432,14 @@ struct mlx5_core_health {
 	struct timer_list		timer;
 	u32				prev;
 	int				miss_counter;
+	u8				synd;
 	bool				sick;
 	/* wq spinlock to synchronize draining */
 	spinlock_t			wq_lock;
 	struct workqueue_struct	       *wq;
 	unsigned long			flags;
 	struct work_struct		work;
+	struct work_struct		report_work;
 	struct delayed_work		recover_work;
 };
 

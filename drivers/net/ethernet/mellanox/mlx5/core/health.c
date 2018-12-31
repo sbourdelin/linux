@@ -38,6 +38,7 @@
 #include <linux/mlx5/driver.h>
 #include <linux/mlx5/cmd.h>
 #include "mlx5_core.h"
+#include "devlink.h"
 #include "lib/eq.h"
 #include "lib/mlx5.h"
 
@@ -289,7 +290,9 @@ static void poll_health(struct timer_list *t)
 {
 	struct mlx5_core_dev *dev = from_timer(dev, t, priv.health.timer);
 	struct mlx5_core_health *health = &dev->priv.health;
+	struct health_buffer __iomem *h = health->health;
 	u32 count;
+	u8 synd;
 
 	if (dev->state == MLX5_DEVICE_STATE_INTERNAL_ERROR)
 		goto out;
@@ -304,7 +307,12 @@ static void poll_health(struct timer_list *t)
 	if (health->miss_counter == MAX_MISSES) {
 		dev_err(&dev->pdev->dev, "device's health compromised - reached miss count\n");
 		mlx5_print_health_info(dev);
+		queue_work(health->wq, &health->report_work);
 	}
+
+	synd = ioread8(&h->synd);
+	if (synd && synd != health->synd)
+		queue_work(health->wq, &health->report_work);
 
 	if (in_fatal(dev) && !health->sick) {
 		health->sick = true;
@@ -356,6 +364,7 @@ void mlx5_drain_health_wq(struct mlx5_core_dev *dev)
 	set_bit(MLX5_DROP_NEW_RECOVERY_WORK, &health->flags);
 	spin_unlock_irqrestore(&health->wq_lock, flags);
 	cancel_delayed_work_sync(&health->recover_work);
+	cancel_work_sync(&health->report_work);
 	cancel_work_sync(&health->work);
 }
 
@@ -395,6 +404,7 @@ int mlx5_health_init(struct mlx5_core_dev *dev)
 		return -ENOMEM;
 	spin_lock_init(&health->wq_lock);
 	INIT_WORK(&health->work, health_care);
+	INIT_WORK(&health->report_work, mlx5_fw_reporter_err_work);
 	INIT_DELAYED_WORK(&health->recover_work, health_recover);
 
 	return 0;
