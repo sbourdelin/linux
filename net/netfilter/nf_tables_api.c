@@ -2304,7 +2304,6 @@ static int __nf_tables_dump_rules(struct sk_buff *skb,
 	struct net *net = sock_net(skb->sk);
 	unsigned int s_idx = cb->args[0];
 	const struct nft_rule *rule;
-	int rc = 1;
 
 	list_for_each_entry_rcu(rule, &chain->rules, list) {
 		if (!nft_is_active(net, rule))
@@ -2321,16 +2320,13 @@ static int __nf_tables_dump_rules(struct sk_buff *skb,
 					NLM_F_MULTI | NLM_F_APPEND,
 					table->family,
 					table, chain, rule) < 0)
-			goto out_unfinished;
+			return 1;
 
 		nl_dump_check_consistent(cb, nlmsg_hdr(skb));
 cont:
 		(*idx)++;
 	}
-	rc = 0;
-out_unfinished:
-	cb->args[0] = *idx;
-	return rc;
+	return 0;
 }
 
 static int nf_tables_dump_rules(struct sk_buff *skb,
@@ -2360,7 +2356,7 @@ static int nf_tables_dump_rules(struct sk_buff *skb,
 			list = rhltable_lookup(&table->chains_ht, ctx->chain,
 					       nft_chain_ht_params);
 			if (!list)
-				goto done;
+				goto next_table;
 
 			rhl_for_each_entry_rcu(chain, tmp, list, rhlhead) {
 				if (!nft_is_active(net, chain))
@@ -2376,12 +2372,14 @@ static int nf_tables_dump_rules(struct sk_buff *skb,
 			if (__nf_tables_dump_rules(skb, &idx, cb, table, chain))
 				goto done;
 		}
-
+next_table:
 		if (ctx && ctx->table)
 			break;
 	}
 done:
 	rcu_read_unlock();
+
+	cb->args[0] = idx;
 	return skb->len;
 }
 
