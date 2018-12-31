@@ -138,29 +138,6 @@ static void mlx5_handle_bad_state(struct mlx5_core_dev *dev)
 	mlx5_disable_device(dev);
 }
 
-static void health_recover(struct work_struct *work)
-{
-	struct mlx5_core_health *health;
-	struct delayed_work *dwork;
-	struct mlx5_core_dev *dev;
-	struct mlx5_priv *priv;
-	u8 nic_state;
-
-	dwork = container_of(work, struct delayed_work, work);
-	health = container_of(dwork, struct mlx5_core_health, recover_work);
-	priv = container_of(health, struct mlx5_priv, health);
-	dev = container_of(priv, struct mlx5_core_dev, priv);
-
-	nic_state = mlx5_get_nic_state(dev);
-	if (nic_state == MLX5_NIC_IFC_INVALID) {
-		dev_err(&dev->pdev->dev, "health recovery flow aborted since the nic state is invalid\n");
-		return;
-	}
-
-	dev_err(&dev->pdev->dev, "starting health recovery flow\n");
-	mlx5_recover_device(dev);
-}
-
 /* How much time to wait until health resetting the driver (in msecs) */
 #define MLX5_RECOVERY_DELAY_MSECS 60000
 static void health_care(struct work_struct *work)
@@ -405,7 +382,7 @@ int mlx5_health_init(struct mlx5_core_dev *dev)
 	spin_lock_init(&health->wq_lock);
 	INIT_WORK(&health->work, health_care);
 	INIT_WORK(&health->report_work, mlx5_fw_reporter_err_work);
-	INIT_DELAYED_WORK(&health->recover_work, health_recover);
+	INIT_DELAYED_WORK(&health->recover_work, mlx5_fw_fatal_reporter_work);
 
 	return 0;
 }

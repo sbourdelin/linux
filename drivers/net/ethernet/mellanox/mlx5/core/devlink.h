@@ -17,5 +17,6 @@ void mlx5_devlink_unregister(struct devlink *devlink);
 int mlx5_fw_reporters_create(struct mlx5_core_dev *dev);
 void mlx5_fw_reporters_destroy(struct mlx5_core_dev *dev);
 void mlx5_fw_reporter_err_work(struct work_struct *work);
+void mlx5_fw_fatal_reporter_work(struct work_struct *work);
 
 #endif /* __MLX5_DEVLINK_H__ */

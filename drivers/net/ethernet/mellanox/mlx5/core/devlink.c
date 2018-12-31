@@ -234,6 +234,21 @@ static const struct devlink_health_reporter_ops mlx5_fw_reporter_ops = {
 		.diagnose = mlx5_fw_reporter_diagnose,
 };
 
+void mlx5_fw_fatal_reporter_work(struct work_struct *work)
+{
+	struct mlx5_core_health *health;
+	struct delayed_work *dwork;
+	struct mlx5_core_dev *dev;
+	struct mlx5_priv *priv;
+
+	dwork = container_of(work, struct delayed_work, work);
+	health = container_of(dwork, struct mlx5_core_health, recover_work);
+	priv = container_of(health, struct mlx5_priv, health);
+	dev = container_of(priv, struct mlx5_core_dev, priv);
+
+	devlink_health_report(dev->fw_fatal_reporter, "FW recovery", NULL);
+}
+
 static int
 mlx5_fw_fatal_reporter_recover(struct devlink_health_reporter *reporter,
 			       void *priv_ctx)
