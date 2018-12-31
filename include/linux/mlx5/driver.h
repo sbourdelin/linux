@@ -677,6 +677,7 @@ struct mlx5_core_dev {
 	struct mlx5_ib_clock_info  *clock_info;
 	struct page             *clock_info_page;
 	struct mlx5_fw_tracer   *tracer;
+	struct devlink_health_reporter *fw_reporter;
 };
 
 struct mlx5_db {

@@ -5,8 +5,16 @@
 #define __MLX5_DEVLINK_H__
 
 #include <net/devlink.h>
+#include "mlx5_core.h"
+
+struct mlx5_fw_reporter_ctx {
+	u8 err_synd;
+	int miss_counter;
+};
 
 int mlx5_devlink_register(struct devlink *devlink, struct device *dev);
 void mlx5_devlink_unregister(struct devlink *devlink);
+int mlx5_fw_reporter_create(struct mlx5_core_dev *dev);
+void mlx5_fw_reporter_destroy(struct mlx5_core_dev *dev);
 
 #endif /* __MLX5_DEVLINK_H__ */
