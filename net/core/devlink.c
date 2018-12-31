@@ -4528,6 +4528,65 @@ out:
 	return err;
 }
 
+static void
+devlink_health_objdump_clear(struct devlink_health_reporter *reporter)
+{
+	reporter->objdump_avail = false;
+	reporter->objdump_ts = 0;
+	devlink_health_buffers_reset(reporter->objdump_buffers_array,
+				     DEVLINK_HEALTH_SIZE_TO_BUFFERS(reporter->ops->objdump_size));
+}
+
+static int devlink_nl_cmd_health_reporter_objdump_get_doit(struct sk_buff *skb,
+							   struct genl_info *info)
+{
+	struct devlink *devlink = info->user_ptr[0];
+	struct devlink_health_reporter *reporter;
+	u64 num_of_buffers;
+	int err;
+
+	reporter = devlink_health_reporter_get_from_info(devlink, info);
+	if (!reporter)
+		return -EINVAL;
+
+	if (!reporter->ops->objdump)
+		return -EOPNOTSUPP;
+
+	num_of_buffers =
+		DEVLINK_HEALTH_SIZE_TO_BUFFERS(reporter->ops->objdump_size);
+
+	mutex_lock(&reporter->objdump_lock);
+	err = devlink_health_do_objdump(reporter, NULL);
+	if (err)
+		goto out;
+
+	err = devlink_health_buffer_snd(info,
+					DEVLINK_CMD_HEALTH_REPORTER_OBJDUMP_GET,
+					0, reporter->objdump_buffers_array,
+					num_of_buffers);
+
+out:
+	mutex_unlock(&reporter->objdump_lock);
+	return err;
+}
+
+static int
+devlink_nl_cmd_health_reporter_objdump_clear_doit(struct sk_buff *skb,
+						  struct genl_info *info)
+{
+	struct devlink *devlink = info->user_ptr[0];
+	struct devlink_health_reporter *reporter;
+
+	reporter = devlink_health_reporter_get_from_info(devlink, info);
+	if (!reporter)
+		return -EINVAL;
+
+	mutex_lock(&reporter->objdump_lock);
+	devlink_health_objdump_clear(reporter);
+	mutex_unlock(&reporter->objdump_lock);
+	return 0;
+}
+
 static const struct nla_policy devlink_nl_policy[DEVLINK_ATTR_MAX + 1] = {
 	[DEVLINK_ATTR_BUS_NAME] = { .type = NLA_NUL_STRING },
 	[DEVLINK_ATTR_DEV_NAME] = { .type = NLA_NUL_STRING },
@@ -4801,6 +4860,20 @@ static const struct genl_ops devlink_nl_ops[] = {
 	{
 		.cmd = DEVLINK_CMD_HEALTH_REPORTER_DIAGNOSE,
 		.doit = devlink_nl_cmd_health_reporter_diagnose_doit,
+		.policy = devlink_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK,
+	},
+	{
+		.cmd = DEVLINK_CMD_HEALTH_REPORTER_OBJDUMP_GET,
+		.doit = devlink_nl_cmd_health_reporter_objdump_get_doit,
+		.policy = devlink_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK,
+	},
+	{
+		.cmd = DEVLINK_CMD_HEALTH_REPORTER_OBJDUMP_CLEAR,
+		.doit = devlink_nl_cmd_health_reporter_objdump_clear_doit,
 		.policy = devlink_nl_policy,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK,
