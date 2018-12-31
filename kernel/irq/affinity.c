@@ -240,13 +240,6 @@ irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 	struct irq_affinity_desc *masks = NULL;
 	int i, nr_sets;
 
-	/*
-	 * If there aren't any vectors left after applying the pre/post
-	 * vectors don't bother with assigning affinity.
-	 */
-	if (nvecs == affd->pre_vectors + affd->post_vectors)
-		return NULL;
-
 	node_to_cpumask = alloc_node_to_cpumask();
 	if (!node_to_cpumask)
 		return NULL;
@@ -254,6 +247,17 @@ irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 	masks = kcalloc(nvecs, sizeof(*masks), GFP_KERNEL);
 	if (!masks)
 		goto outnodemsk;
+
+	/*
+	 * If there aren't any vectors left after applying the pre/post
+	 * vectors then just assign the default affinity to all vectors.
+	 */
+	if (nvecs == affd->pre_vectors + affd->post_vectors) {
+		/* Fill all vectors that don't need affinity */
+		for (curvec = 0; curvec < nvecs; curvec++)
+			cpumask_copy(&masks[curvec].mask, irq_default_affinity);
+		goto outnodemsk;
+	}
 
 	/* Fill out vectors at the beginning that don't need affinity */
 	for (curvec = 0; curvec < affd->pre_vectors; curvec++)
