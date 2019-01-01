@@ -4,6 +4,12 @@
 #include <scsi/scsi_dbg.h>
 #include "scsi_debugfs.h"
 
+#ifdef CONFIG_DEBUG_FS
+struct dentry *scsi_debugfs_root;
+struct dentry *scsi_debugfs_uld;
+struct dentry *scsi_debugfs_lld;
+#endif
+
 #define SCSI_CMD_FLAG_NAME(name)[const_ilog2(SCMD_##name)] = #name
 static const char *const scsi_cmd_flags[] = {
 	SCSI_CMD_FLAG_NAME(TAGGED),
