@@ -155,20 +155,19 @@ torture_type	The type of RCU to test, with string values as follows:
 			along with expedited, synchronous, and polling
 			variants.
 
-		"rcu_bh": rcu_read_lock_bh(), rcu_read_unlock_bh(), and
-			call_rcu_bh(), along with expedited and synchronous
-			variants.
-
-		"rcu_busted": This tests an intentionally incorrect version
+		"busted": This tests an intentionally incorrect version
 			of RCU in order to help test rcutorture itself.
 
 		"srcu": srcu_read_lock(), srcu_read_unlock() and
 			call_srcu(), along with expedited and
 			synchronous variants.
 
-		"sched": preempt_disable(), preempt_enable(), and
-			call_rcu_sched(), along with expedited,
-			synchronous, and polling variants.
+		"srcud": A second form of srcu that dynamically allocates
+			and frees srcu_struct to test srcu cleanup code path.
+
+		"busted_srcud": This torture type verifies rcutorture's ability
+			to detect extensions of RCU read-side critical sections
+			that are not handled.
 
 		"tasks": voluntary context switch and call_rcu_tasks(),
 			along with expedited and synchronous variants.
