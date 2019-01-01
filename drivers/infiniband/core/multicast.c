@@ -823,6 +823,9 @@ static void mcast_add_one(struct ib_device *device)
 	int i;
 	int count = 0;
 
+	if (!device->kverbs_provider)
+		return;
+
 	dev = kmalloc(struct_size(dev, port, device->phys_port_cnt),
 		      GFP_KERNEL);
 	if (!dev)

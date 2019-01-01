@@ -643,6 +643,7 @@ int rvt_register_device(struct rvt_dev_info *rdi, u32 driver_id)
 		rdi->ibdev.num_comp_vectors = 1;
 
 	rdi->ibdev.driver_id = driver_id;
+	rdi->ibdev.kverbs_provider = 1;
 	/* We are now good to announce we exist */
 	ret = ib_register_device(&rdi->ibdev, dev_name(&rdi->ibdev.dev),
 				 rdi->driver_f.port_callback);

@@ -515,7 +515,7 @@ static void smc_ib_add_dev(struct ib_device *ibdev)
 	u8 port_cnt;
 	int i;
 
-	if (ibdev->node_type != RDMA_NODE_IB_CA)
+	if (ibdev->node_type != RDMA_NODE_IB_CA || !ibdev->kverbs_provider)
 		return;
 
 	smcibdev = kzalloc(sizeof(*smcibdev), GFP_KERNEL);

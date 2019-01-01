@@ -275,6 +275,7 @@ static int pvrdma_register_device(struct pvrdma_dev *dev)
 			goto err_qp_free;
 	}
 	dev->ib_dev.driver_id = RDMA_DRIVER_VMW_PVRDMA;
+	dev->ib_dev.kverbs_provider = 1;
 	spin_lock_init(&dev->srq_tbl_lock);
 	rdma_set_device_sysfs_group(&dev->ib_dev, &pvrdma_attr_group);
 

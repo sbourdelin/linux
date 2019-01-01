@@ -1407,6 +1407,7 @@ int iwch_register_device(struct iwch_dev *dev)
 	       sizeof(dev->ibdev.iwcm->ifname));
 
 	dev->ibdev.driver_id = RDMA_DRIVER_CXGB3;
+	dev->ibdev.kverbs_provider = 1;
 	rdma_set_device_sysfs_group(&dev->ibdev, &iwch_attr_group);
 	ib_set_device_ops(&dev->ibdev, &iwch_dev_ops);
 	ret = ib_register_device(&dev->ibdev, "cxgb3_%d", NULL);

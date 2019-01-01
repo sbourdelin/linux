@@ -420,6 +420,7 @@ static void *usnic_ib_device_add(struct pci_dev *dev)
 	ib_set_device_ops(&us_ibdev->ib_dev, &usnic_dev_ops);
 
 	us_ibdev->ib_dev.driver_id = RDMA_DRIVER_USNIC;
+	us_ibdev->ib_dev.kverbs_provider = 1;
 	rdma_set_device_sysfs_group(&us_ibdev->ib_dev, &usnic_attr_group);
 
 	if (ib_register_device(&us_ibdev->ib_dev, "usnic_%d", NULL))

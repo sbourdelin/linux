@@ -2339,6 +2339,9 @@ static void ib_sa_add_one(struct ib_device *device)
 	int s, e, i;
 	int count = 0;
 
+	if (!device->kverbs_provider)
+		return;
+
 	s = rdma_start_port(device);
 	e = rdma_end_port(device);
 

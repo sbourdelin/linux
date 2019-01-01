@@ -3289,6 +3289,9 @@ static void ib_mad_init_device(struct ib_device *device)
 {
 	int start, i;
 
+	if (!device->kverbs_provider)
+		return;
+
 	start = rdma_start_port(device);
 
 	for (i = start; i <= rdma_end_port(device); i++) {

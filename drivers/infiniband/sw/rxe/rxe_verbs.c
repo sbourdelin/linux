@@ -1258,6 +1258,7 @@ int rxe_register_device(struct rxe_dev *rxe)
 
 	rdma_set_device_sysfs_group(dev, &rxe_attr_group);
 	dev->driver_id = RDMA_DRIVER_RXE;
+	dev->kverbs_provider = 1;
 	err = ib_register_device(dev, "rxe%d", NULL);
 	if (err) {
 		pr_warn("%s failed with error %d\n", __func__, err);

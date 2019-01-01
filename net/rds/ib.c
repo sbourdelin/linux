@@ -130,8 +130,8 @@ static void rds_ib_add_one(struct ib_device *device)
 	struct rds_ib_device *rds_ibdev;
 	bool has_fr, has_fmr;
 
-	/* Only handle IB (no iWARP) devices */
-	if (device->node_type != RDMA_NODE_IB_CA)
+	/* Only handle IB (no iWARP) and kernel verbs providers devices */
+	if (device->node_type != RDMA_NODE_IB_CA || !device->kverbs_provider)
 		return;
 
 	rds_ibdev = kzalloc_node(sizeof(struct rds_ib_device), GFP_KERNEL,

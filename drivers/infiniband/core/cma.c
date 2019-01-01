@@ -4481,6 +4481,9 @@ static void cma_add_one(struct ib_device *device)
 	unsigned int i;
 	unsigned long supported_gids = 0;
 
+	if (!device->kverbs_provider)
+		return;
+
 	cma_dev = kmalloc(sizeof *cma_dev, GFP_KERNEL);
 	if (!cma_dev)
 		return;

@@ -290,6 +290,7 @@ static int qedr_register_device(struct qedr_dev *dev)
 	ib_set_device_ops(&dev->ibdev, &qedr_dev_ops);
 
 	dev->ibdev.driver_id = RDMA_DRIVER_QEDR;
+	dev->ibdev.kverbs_provider = 1;
 	return ib_register_device(&dev->ibdev, "qedr%d", NULL);
 }
 

@@ -633,6 +633,7 @@ void c4iw_register_device(struct work_struct *work)
 
 	rdma_set_device_sysfs_group(&dev->ibdev, &c4iw_attr_group);
 	dev->ibdev.driver_id = RDMA_DRIVER_CXGB4;
+	dev->ibdev.kverbs_provider = 1;
 	ib_set_device_ops(&dev->ibdev, &c4iw_dev_ops);
 	ret = ib_register_device(&dev->ibdev, "cxgb4_%d", NULL);
 	if (ret)

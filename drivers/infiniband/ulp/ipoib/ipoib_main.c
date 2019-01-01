@@ -2498,6 +2498,9 @@ static void ipoib_add_one(struct ib_device *device)
 	int p;
 	int count = 0;
 
+	if (!device->kverbs_provider)
+		return;
+
 	dev_list = kmalloc(sizeof(*dev_list), GFP_KERNEL);
 	if (!dev_list)
 		return;

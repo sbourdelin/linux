@@ -1010,7 +1010,7 @@ static void opa_vnic_vema_add_one(struct ib_device *device)
 	struct opa_vnic_ctrl_port *cport;
 	int rc, size = sizeof(*cport);
 
-	if (!rdma_cap_opa_vnic(device))
+	if (!rdma_cap_opa_vnic(device) || !device->kverbs_provider)
 		return;
 
 	size += device->phys_port_cnt * sizeof(struct opa_vnic_vema_port);

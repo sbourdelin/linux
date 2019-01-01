@@ -243,6 +243,7 @@ static int ocrdma_register_device(struct ocrdma_dev *dev)
 	}
 	rdma_set_device_sysfs_group(&dev->ibdev, &ocrdma_attr_group);
 	dev->ibdev.driver_id = RDMA_DRIVER_OCRDMA;
+	dev->ibdev.kverbs_provider = 1;
 	return ib_register_device(&dev->ibdev, "ocrdma%d", NULL);
 }
 

@@ -5992,6 +5992,7 @@ int mlx5_ib_stage_caps_init(struct mlx5_ib_dev *dev)
 	    MLX5_ACCEL_IPSEC_CAP_DEVICE)
 		ib_set_device_ops(&dev->ib_dev, &mlx5_ib_dev_flow_ipsec_ops);
 	dev->ib_dev.driver_id = RDMA_DRIVER_MLX5;
+	dev->ib_dev.kverbs_provider = 1;
 	ib_set_device_ops(&dev->ib_dev, &mlx5_ib_dev_ops);
 
 	if (IS_ENABLED(CONFIG_INFINIBAND_USER_ACCESS))
