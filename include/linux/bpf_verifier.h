@@ -176,6 +176,7 @@ struct bpf_insn_aux_data {
 	int ctx_field_size; /* the ctx field size for load insn, maybe 0 */
 	int sanitize_stack_off; /* stack slot to be cleared */
 	bool seen; /* this insn was processed by the verifier */
+	unsigned int orig_idx; /* original instruction index */
 };
 
 #define MAX_USED_MAPS 64 /* max number of maps accessed by one eBPF program */
