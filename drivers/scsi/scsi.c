@@ -68,6 +68,7 @@
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
+#include "scsi_debugfs.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/scsi.h>
@@ -812,9 +813,27 @@ static int __init init_scsi(void)
 
 	scsi_netlink_init();
 
+#ifdef CONFIG_DEBUG_FS
+	scsi_debugfs_root = debugfs_create_dir("scsi", NULL);
+	if (!scsi_debugfs_root)
+		goto cleanup_netlink;
+	scsi_debugfs_uld = debugfs_create_dir("uld", scsi_debugfs_root);
+	if (!scsi_debugfs_uld)
+		goto cleanup_debugfs;
+	scsi_debugfs_lld = debugfs_create_dir("lld", scsi_debugfs_root);
+	if (!scsi_debugfs_lld)
+		goto cleanup_debugfs;
+#endif
+
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
 
+#ifdef CONFIG_DEBUG_FS
+cleanup_debugfs:
+	debugfs_remove_recursive(scsi_debugfs_root);
+cleanup_netlink:
+	scsi_netlink_exit();
+#endif
 cleanup_sysctl:
 	scsi_exit_sysctl();
 cleanup_hosts:
@@ -832,6 +851,10 @@ cleanup_queue:
 
 static void __exit exit_scsi(void)
 {
+
+#ifdef CONFIG_DEBUG_FS
+	debugfs_remove_recursive(scsi_debugfs_root);
+#endif
 	scsi_netlink_exit();
 	scsi_sysfs_unregister();
 	scsi_exit_sysctl();
