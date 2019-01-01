@@ -488,6 +488,8 @@ probe_wakeup_sched_switch(void *ignore, bool preempt,
 	data = per_cpu_ptr(wakeup_trace->trace_buffer.data, wakeup_cpu);
 
 	__trace_function(wakeup_trace, CALLER_ADDR0, CALLER_ADDR1, flags, pc);
+	/* Skip 2 functions to get to the task switch function */
+	__trace_stack(wakeup_trace, flags, 2, pc);
 	tracing_sched_switch_trace(wakeup_trace, prev, next, flags, pc);
 
 	T0 = data->preempt_timestamp;
@@ -607,6 +609,8 @@ probe_wakeup(void *ignore, struct task_struct *p)
 	 * it should be safe to use it here.
 	 */
 	__trace_function(wakeup_trace, CALLER_ADDR1, CALLER_ADDR2, flags, pc);
+	/* Skip 2 functions to get to the task wakeup function */
+	__trace_stack(wakeup_trace, flags, 2, pc);
 
 out_locked:
 	arch_spin_unlock(&wakeup_lock);
