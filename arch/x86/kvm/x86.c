@@ -2287,9 +2287,21 @@ static int set_msr_mce(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (!(mcg_cap & MCG_CTL_P) &&
 		    (data || !msr_info->host_initiated))
 			return 1;
-		if (data != 0 && data != ~(u64)0)
-			return 1;
-		vcpu->arch.mcg_ctl = data;
+		/*
+		 * Only 0 or all 1s can be written to IA32_MCG_CTL.
+		 * SDM specifies other values as undefined and/or
+		 * implementation specific.
+		 *
+		 * However, some guest kernels write different values.
+		 * One such example is WinNT 4 SP6 which uses a value
+		 * of 0xffffffff.
+		 *
+		 * Prefer to silently accept these writes to avoid an
+		 * uncatched #GP in the guest. We will define our
+		 * implementation specific behaviour as any value
+		 * other than 0 to be treated as all 1s.
+		 */
+		vcpu->arch.mcg_ctl = data ? ~(u64)0 : 0;
 		break;
 	default:
 		if (msr >= MSR_IA32_MC0_CTL &&
