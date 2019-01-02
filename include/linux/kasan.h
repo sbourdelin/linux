@@ -57,9 +57,8 @@ void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
 void kasan_kfree_large(void *ptr, unsigned long ip);
 void kasan_poison_kfree(void *ptr, unsigned long ip);
 void * __must_check kasan_kmalloc(struct kmem_cache *s, const void *object,
-					size_t size, gfp_t flags);
-void * __must_check kasan_krealloc(const void *object, size_t new_size,
-					gfp_t flags);
+				size_t size, gfp_t flags, bool krealloc);
+void kasan_krealloc(const void *object, size_t new_size, gfp_t flags);
 
 void * __must_check kasan_slab_alloc(struct kmem_cache *s, void *object,
 					gfp_t flags);
@@ -118,15 +117,12 @@ static inline void *kasan_kmalloc_large(void *ptr, size_t size, gfp_t flags)
 static inline void kasan_kfree_large(void *ptr, unsigned long ip) {}
 static inline void kasan_poison_kfree(void *ptr, unsigned long ip) {}
 static inline void *kasan_kmalloc(struct kmem_cache *s, const void *object,
-				size_t size, gfp_t flags)
+				size_t size, gfp_t flags, bool krealloc)
 {
 	return (void *)object;
 }
-static inline void *kasan_krealloc(const void *object, size_t new_size,
-				 gfp_t flags)
-{
-	return (void *)object;
-}
+static inline void kasan_krealloc(const void *object, size_t new_size,
+				 gfp_t flags) {}
 
 static inline void *kasan_slab_alloc(struct kmem_cache *s, void *object,
 				   gfp_t flags)

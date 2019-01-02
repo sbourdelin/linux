@@ -392,7 +392,7 @@ void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
 void * __must_check kasan_slab_alloc(struct kmem_cache *cache, void *object,
 					gfp_t flags)
 {
-	return kasan_kmalloc(cache, object, cache->object_size, flags);
+	return kasan_kmalloc(cache, object, cache->object_size, flags, false);
 }
 
 static inline bool shadow_invalid(u8 tag, s8 shadow_byte)
@@ -451,7 +451,7 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
 }
 
 void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
-					size_t size, gfp_t flags)
+				size_t size, gfp_t flags, bool krealloc)
 {
 	unsigned long redzone_start;
 	unsigned long redzone_end;
@@ -468,8 +468,12 @@ void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
 	redzone_end = round_up((unsigned long)object + cache->object_size,
 				KASAN_SHADOW_SCALE_SIZE);
 
-	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
-		tag = assign_tag(cache, object, false);
+	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS)) {
+		if (krealloc)
+			tag = get_tag(object);
+		else
+			tag = assign_tag(cache, object, false);
+	}
 
 	/* Tag is ignored in set_tag without CONFIG_KASAN_SW_TAGS */
 	kasan_unpoison_shadow(set_tag(object, tag), size);
@@ -508,19 +512,19 @@ void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
 	return (void *)ptr;
 }
 
-void * __must_check kasan_krealloc(const void *object, size_t size, gfp_t flags)
+void kasan_krealloc(const void *object, size_t size, gfp_t flags)
 {
 	struct page *page;
 
 	if (unlikely(object == ZERO_SIZE_PTR))
-		return (void *)object;
+		return;
 
 	page = virt_to_head_page(object);
 
 	if (unlikely(!PageSlab(page)))
-		return kasan_kmalloc_large(object, size, flags);
+		kasan_kmalloc_large(object, size, flags);
 	else
-		return kasan_kmalloc(page->slab_cache, object, size, flags);
+		kasan_kmalloc(page->slab_cache, object, size, flags, true);
 }
 
 void kasan_poison_kfree(void *ptr, unsigned long ip)

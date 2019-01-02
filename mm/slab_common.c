@@ -1507,7 +1507,7 @@ static __always_inline void *__do_krealloc(const void *p, size_t new_size,
 		ks = ksize(p);
 
 	if (ks >= new_size) {
-		p = kasan_krealloc((void *)p, new_size, flags);
+		kasan_krealloc((void *)p, new_size, flags);
 		return (void *)p;
 	}
 
