@@ -5,6 +5,7 @@
 #include <linux/bcma/bcma.h>
 
 struct bcma_soc {
+	struct device *dev;
 	struct bcma_bus bus;
 };
 
