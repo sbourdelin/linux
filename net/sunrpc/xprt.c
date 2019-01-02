@@ -1322,6 +1322,12 @@ xprt_request_transmit(struct rpc_rqst *req, struct rpc_task *snd_task)
 		}
 		/* Verify that our message lies in the RPCSEC_GSS window */
 		if (rpcauth_xmit_need_reencode(task)) {
+			if (xprt->ops->release_request &&
+			    xprt_request_retransmit_after_disconnect(task)) {
+				spin_lock_bh(&xprt->transport_lock);
+				xprt->ops->release_request(task);
+				spin_unlock_bh(&xprt->transport_lock);
+			}
 			status = -EBADMSG;
 			goto out_dequeue;
 		}
