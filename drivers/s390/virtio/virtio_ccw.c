@@ -271,6 +271,8 @@ static void virtio_ccw_drop_indicators(struct virtio_ccw_device *vcdev)
 {
 	struct virtio_ccw_vq_info *info;
 
+	if (!vcdev->airq_info)
+		return;
 	list_for_each_entry(info, &vcdev->virtqueues, node)
 		drop_airq_indicator(info->vq, vcdev->airq_info);
 }
@@ -508,6 +510,10 @@ static struct virtqueue *virtio_ccw_setup_vq(struct virtio_device *vdev,
 	info->num = virtio_ccw_read_vq_conf(vcdev, ccw, i);
 	if (info->num < 0) {
 		err = info->num;
+		goto out_err;
+	}
+	if (info->num == 0) {
+		err = -EINVAL;
 		goto out_err;
 	}
 	size = PAGE_ALIGN(vring_size(info->num, KVM_VIRTIO_CCW_RING_ALIGN));
