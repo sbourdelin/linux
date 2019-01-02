@@ -2911,10 +2911,25 @@ static ssize_t mem_cgroup_force_empty_write(struct kernfs_open_file *of,
 					    char *buf, size_t nbytes,
 					    loff_t off)
 {
+	unsigned long val;
+	ssize_t ret;
 	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
 
 	if (mem_cgroup_is_root(memcg))
 		return -EINVAL;
+
+	buf = strstrip(buf);
+
+	ret = kstrtoul(buf, 10, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val != 0 && val != 1) {
+		memcg->delayed_force_empty = true;
+		return nbytes;
+	}
+
+	memcg->delayed_force_empty = false;
 	return mem_cgroup_force_empty(memcg) ?: nbytes;
 }
 
@@ -4553,6 +4568,9 @@ static void mem_cgroup_css_offline(struct cgroup_subsys_state *css)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
 	struct mem_cgroup_event *event, *tmp;
+
+	if (memcg->delayed_force_empty)
+		mem_cgroup_force_empty(memcg);
 
 	/*
 	 * Unregister events and notify userspace.
