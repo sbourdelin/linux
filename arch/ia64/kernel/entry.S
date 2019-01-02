@@ -1426,7 +1426,7 @@ END(ftrace_stub)
 
 #endif /* CONFIG_FUNCTION_TRACER */
 
-#define __SYSCALL(nr, entry, nargs) data8 entry
+#define __SYSCALL(nr, entry)	data8 entry
 	.rodata
 	.align 8
 	.globl sys_call_table
