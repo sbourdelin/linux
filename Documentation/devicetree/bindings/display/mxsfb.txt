@@ -14,6 +14,11 @@ Required properties:
     - "pix" for the LCDIF block clock
     - (MX6SX-only) "axi", "disp_axi" for the bus interface clock
 
+optional properties:
+- interface-pix-fmt:	overrides the bus format in use for the display
+			interface. This is to account for swapped signal lanes.
+			supported types: "rgb24", "bgr24", "rbg24", "gbr24"
+
 Required sub-nodes:
   - port: The connection to an encoder chip.
 
