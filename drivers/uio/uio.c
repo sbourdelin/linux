@@ -413,11 +413,16 @@ static int uio_get_minor(struct uio_device *idev)
 	return retval;
 }
 
-static void uio_free_minor(struct uio_device *idev)
+static void __uio_free_minor(int id)
 {
 	mutex_lock(&minor_lock);
-	idr_remove(&uio_idr, idev->minor);
+	idr_remove(&uio_idr, id);
 	mutex_unlock(&minor_lock);
+}
+
+static void uio_free_minor(struct uio_device *idev)
+{
+	__uio_free_minor(idev->minor);
 }
 
 /**
@@ -919,6 +924,7 @@ int __uio_register_device(struct module *owner,
 {
 	struct uio_device *idev;
 	int ret = 0;
+	int uio_minor;
 
 	if (!uio_class_registered)
 		return -EPROBE_DEFER;
@@ -940,8 +946,12 @@ int __uio_register_device(struct module *owner,
 	atomic_set(&idev->event, 0);
 
 	ret = uio_get_minor(idev);
-	if (ret)
+	if (ret) {
+		kfree(idev);
 		return ret;
+	}
+
+	uio_minor = idev->minor;
 
 	idev->dev.devt = MKDEV(uio_major, idev->minor);
 	idev->dev.class = &uio_class;
@@ -950,8 +960,11 @@ int __uio_register_device(struct module *owner,
 	dev_set_drvdata(&idev->dev, idev);
 
 	ret = dev_set_name(&idev->dev, "uio%d", idev->minor);
-	if (ret)
-		goto err_device_create;
+	if (ret) {
+		__uio_free_minor(uio_minor);
+		kfree(idev);
+		return ret;
+	}
 
 	ret = device_register(&idev->dev);
 	if (ret)
@@ -987,7 +1000,7 @@ err_request_irq:
 err_uio_dev_add_attributes:
 	device_unregister(&idev->dev);
 err_device_create:
-	uio_free_minor(idev);
+	__uio_free_minor(uio_minor);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(__uio_register_device);
