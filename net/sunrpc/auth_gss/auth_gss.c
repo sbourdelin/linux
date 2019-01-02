@@ -2029,9 +2029,6 @@ gss_xmit_need_reencode(struct rpc_task *task)
 	if (!ctx)
 		return true;
 
-	if (gss_seq_is_newer(req->rq_seqno, READ_ONCE(ctx->gc_seq)))
-		goto out;
-
 	seq_xmit = READ_ONCE(ctx->gc_seq_xmit);
 	while (gss_seq_is_newer(req->rq_seqno, seq_xmit)) {
 		u32 tmp = seq_xmit;
@@ -2043,7 +2040,12 @@ gss_xmit_need_reencode(struct rpc_task *task)
 		}
 	}
 
-	win = ctx->gc_win;
+	/*
+	 * Ensure the request is within 3/4 of the RPCSEC_GSS sequence
+	 * window so that we allow for some re-ordering of the requests
+	 * by the server.
+	 */
+	win = 3 * ((ctx->gc_win + 3) >> 2);
 	if (win > 0)
 		ret = !gss_seq_is_newer(req->rq_seqno, seq_xmit - win);
 out:
