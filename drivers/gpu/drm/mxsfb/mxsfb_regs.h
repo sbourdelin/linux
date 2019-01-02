@@ -22,6 +22,7 @@
 
 #define LCDC_CTRL			0x00
 #define LCDC_CTRL1			0x10
+#define LCDC_V4_CTRL2			0x20
 #define LCDC_V3_TRANSFER_COUNT		0x20
 #define LCDC_V4_TRANSFER_COUNT		0x30
 #define LCDC_V4_CUR_BUF			0x40
@@ -58,6 +59,15 @@
 #define CTRL1_GET_BYTE_PACKAGING(x)	(((x) >> 16) & 0xf)
 #define CTRL1_CUR_FRAME_DONE_IRQ_EN	(1 << 13)
 #define CTRL1_CUR_FRAME_DONE_IRQ	(1 << 9)
+
+#define CTRL2_EVEN_LINE_PATTERN_MASK	(0x7 << 12)
+#define CTRL2_ODD_LINE_PATTERN_MASK	(0x7 << 16)
+#define CTRL2_PATTERN_MASK		(CTRL2_ODD_LINE_PATTERN_MASK |\
+					 CTRL2_EVEN_LINE_PATTERN_MASK)
+#define CTRL2_SET_EVEN_LINE_PATTERN(x)	(((x) & 0x7) << 12)
+#define CTRL2_SET_ODD_LINE_PATTERN(x)	(((x) & 0x7) << 16)
+#define CTRL2_SET_PATTERN(x)		(CTRL2_SET_EVEN_LINE_PATTERN(x) |\
+					 CTRL2_SET_ODD_LINE_PATTERN(x))
 
 #define TRANSFER_COUNT_SET_VCOUNT(x)	(((x) & 0xffff) << 16)
 #define TRANSFER_COUNT_GET_VCOUNT(x)	(((x) >> 16) & 0xffff)
@@ -111,5 +121,12 @@
 
 #define MXSFB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
 #define MXSFB_SYNC_DOTCLK_FALLING_ACT	(1 << 7) /* negative edge sampling */
+
+#define CTRL2_PATTERN_RGB		0x0
+#define CTRL2_PATTERN_RBG		0x1
+#define CTRL2_PATTERN_GBR		0x2
+#define CTRL2_PATTERN_GRB		0x3
+#define CTRL2_PATTERN_BRG		0x4
+#define CTRL2_PATTERN_BGR		0x5
 
 #endif /* __MXSFB_REGS_H__ */

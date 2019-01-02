@@ -97,29 +97,56 @@ static void mxsfb_set_bus_fmt(struct mxsfb_drm_private *mxsfb)
 	struct drm_crtc *crtc = &mxsfb->pipe.crtc;
 	struct drm_device *drm = crtc->dev;
 	u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
-	u32 reg;
+	u32 ctrl, pattern;
 
-	reg = readl(mxsfb->base + LCDC_CTRL);
+	ctrl = readl(mxsfb->base + LCDC_CTRL);
 
 	if (mxsfb->connector.display_info.num_bus_formats)
 		bus_format = mxsfb->connector.display_info.bus_formats[0];
 
-	reg &= ~CTRL_BUS_WIDTH_MASK;
+	ctrl &= ~CTRL_BUS_WIDTH_MASK;
 	switch (bus_format) {
 	case MEDIA_BUS_FMT_RGB565_1X16:
-		reg |= CTRL_SET_BUS_WIDTH(STMLCDIF_16BIT);
+		ctrl |= CTRL_SET_BUS_WIDTH(STMLCDIF_16BIT);
+		pattern = CTRL2_PATTERN_RGB;
 		break;
 	case MEDIA_BUS_FMT_RGB666_1X18:
-		reg |= CTRL_SET_BUS_WIDTH(STMLCDIF_18BIT);
+		ctrl |= CTRL_SET_BUS_WIDTH(STMLCDIF_18BIT);
+		pattern = CTRL2_PATTERN_RGB;
 		break;
 	case MEDIA_BUS_FMT_RGB888_1X24:
-		reg |= CTRL_SET_BUS_WIDTH(STMLCDIF_24BIT);
+		ctrl |= CTRL_SET_BUS_WIDTH(STMLCDIF_24BIT);
+		pattern = CTRL2_PATTERN_RGB;
+		break;
+	case MEDIA_BUS_FMT_BGR888_1X24:
+		ctrl |= CTRL_SET_BUS_WIDTH(STMLCDIF_24BIT);
+		pattern = CTRL2_PATTERN_BGR;
+		break;
+	case MEDIA_BUS_FMT_RBG888_1X24:
+		ctrl |= CTRL_SET_BUS_WIDTH(STMLCDIF_24BIT);
+		pattern = CTRL2_PATTERN_RBG;
+		break;
+	case MEDIA_BUS_FMT_GBR888_1X24:
+		ctrl |= CTRL_SET_BUS_WIDTH(STMLCDIF_24BIT);
+		pattern = CTRL2_PATTERN_GBR;
 		break;
 	default:
+		pattern = CTRL2_PATTERN_RGB;
 		dev_err(drm->dev, "Unknown media bus format %d\n", bus_format);
 		break;
 	}
-	writel(reg, mxsfb->base + LCDC_CTRL);
+	writel(ctrl, mxsfb->base + LCDC_CTRL);
+
+	if (mxsfb_is_v4(mxsfb)) {
+		u32 ctrl2 = readl(mxsfb->base + LCDC_V4_CTRL2);
+		ctrl2 &= ~CTRL2_PATTERN_MASK;
+		ctrl2 |= CTRL2_SET_PATTERN(pattern);
+		writel(ctrl2, mxsfb->base + LCDC_V4_CTRL2);
+	} else if (pattern != CTRL2_PATTERN_RGB) {
+		/* RGB is default, so only warn for other patterns */
+		dev_err(drm->dev, "Unsupported media bus format %d\n",
+			bus_format);
+	}
 }
 
 static void mxsfb_enable_controller(struct mxsfb_drm_private *mxsfb)

@@ -16,6 +16,8 @@
 #ifndef __MXSFB_DRV_H__
 #define __MXSFB_DRV_H__
 
+#include <linux/types.h>
+
 struct mxsfb_devdata {
 	unsigned int	 transfer_count;
 	unsigned int	 cur_buf;
@@ -50,5 +52,9 @@ void mxsfb_crtc_enable(struct mxsfb_drm_private *mxsfb);
 void mxsfb_crtc_disable(struct mxsfb_drm_private *mxsfb);
 void mxsfb_plane_atomic_update(struct mxsfb_drm_private *mxsfb,
 			       struct drm_plane_state *state);
+static inline bool mxsfb_is_v4(const struct mxsfb_drm_private *mxsfb)
+{
+	return mxsfb->devdata->ipversion == 4;
+}
 
 #endif /* __MXSFB_DRV_H__ */
