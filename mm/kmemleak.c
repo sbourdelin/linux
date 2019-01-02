@@ -576,6 +576,16 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 	struct rb_node **link, *rb_parent;
 
 	object = kmem_cache_alloc(object_cache, gfp_kmemleak_mask(gfp));
+#ifdef CONFIG_PREEMPT_COUNT
+	if (!object) {
+		/* last-ditch effort in a low-memory situation */
+		if (irqs_disabled() || is_idle_task(current) || in_atomic())
+			gfp = GFP_ATOMIC;
+		else
+			gfp = gfp_kmemleak_mask(gfp) | __GFP_DIRECT_RECLAIM;
+		object = kmem_cache_alloc(object_cache, gfp);
+	}
+#endif
 	if (!object) {
 		pr_warn("Cannot allocate a kmemleak_object structure\n");
 		kmemleak_disable();

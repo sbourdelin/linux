@@ -435,15 +435,16 @@ static inline void slab_post_alloc_hook(struct kmem_cache *s, gfp_t flags,
 {
 	size_t i;
 
-	flags &= gfp_allowed_mask;
-	for (i = 0; i < size; i++) {
-		void *object = p[i];
+	if (*p) {
+		flags &= gfp_allowed_mask;
+		for (i = 0; i < size; i++) {
+			void *object = p[i];
 
-		kmemleak_alloc_recursive(object, s->object_size, 1,
-					 s->flags, flags);
-		p[i] = kasan_slab_alloc(s, object, flags);
+			kmemleak_alloc_recursive(object, s->object_size, 1,
+						 s->flags, flags);
+			p[i] = kasan_slab_alloc(s, object, flags);
+		}
 	}
-
 	if (memcg_kmem_enabled())
 		memcg_kmem_put_cache(s);
 }
