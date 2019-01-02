@@ -15,3 +15,5 @@ obj-$(CONFIG_PSTORE_RAM)	+= ramoops.o
 
 obj-$(CONFIG_PSTORE_ROM)	+= romoops.o
 romoops-y += romzone.o
+
+obj-$(CONFIG_PSTORE_ROMBUF)	+= rombuf.o
