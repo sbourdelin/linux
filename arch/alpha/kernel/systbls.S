@@ -7,7 +7,7 @@
 
 #include <asm/unistd.h>
 
-#define __SYSCALL(nr, entry, nargs) .quad entry
+#define __SYSCALL(nr, entry)	.quad entry
 	.data
 	.align 3
 	.globl sys_call_table
