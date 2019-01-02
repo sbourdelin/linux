@@ -44,6 +44,9 @@ void kclist_add_remap(struct kcore_list *m, void *addr, void *vaddr, size_t sz)
 	m->vaddr = (unsigned long)vaddr;
 	kclist_add(m, addr, sz, KCORE_REMAP);
 }
+
+extern int register_mem_pfn_is_ram(int (*fn)(unsigned long pfn));
+extern void unregister_mem_pfn_is_ram(void);
 #else
 static inline
 void kclist_add(struct kcore_list *new, void *addr, size_t size, int type)
