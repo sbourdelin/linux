@@ -10,7 +10,7 @@
  * Copyright (C) 1995 Adrian M. Rodriguez (adrian@remus.rutgers.edu)
  */
 
-#define __SYSCALL(nr, entry, nargs) .word entry
+#define __SYSCALL(nr, entry)	.word entry
 	.text
 	.align	4
 #ifdef CONFIG_COMPAT
