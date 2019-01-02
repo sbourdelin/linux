@@ -8,9 +8,9 @@ _dummy := $(shell [ -d '$(uapi)' ] || mkdir -p '$(uapi)')	\
 syscalln32 := $(srctree)/$(src)/syscall_n32.tbl
 syscalln64 := $(srctree)/$(src)/syscall_n64.tbl
 syscallo32 := $(srctree)/$(src)/syscall_o32.tbl
-syshdr := $(srctree)/$(src)/syscallhdr.sh
-sysnr := $(srctree)/$(src)/syscallnr.sh
-systbl := $(srctree)/$(src)/syscalltbl.sh
+syshdr := $(srctree)/scripts/syscallhdr.sh
+sysnr := $(srctree)/scripts/syscallnr.sh
+systbl := $(srctree)/scripts/syscalltbl.sh
 
 quiet_cmd_syshdr = SYSHDR  $@
       cmd_syshdr = $(CONFIG_SHELL) '$(syshdr)' '$<' '$@'	\
