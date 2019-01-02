@@ -1167,6 +1167,12 @@ int aic32x4_probe(struct device *dev, struct regmap *regmap)
 	if (IS_ERR(aic32x4->mclk)) {
 		dev_err(dev, "Failed getting the mclk. The current implementation does not support the usage of this codec without mclk\n");
 		return PTR_ERR(aic32x4->mclk);
+	} else {
+		ret = clk_prepare_enable(aic32x4->mclk);
+		if (ret != 0) {
+			dev_err(dev, "Failed to enable MCLK: %d\n", ret);
+			return ret;
+		}
 	}
 
 	if (gpio_is_valid(aic32x4->rstn_gpio)) {
