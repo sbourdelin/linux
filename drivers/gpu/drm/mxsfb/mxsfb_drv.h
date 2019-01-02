@@ -40,6 +40,7 @@ struct mxsfb_drm_private {
 	struct drm_connector		connector;
 	struct drm_panel		*panel;
 	struct drm_fbdev_cma		*fbdev;
+	unsigned int			bus_format_override;
 };
 
 int mxsfb_setup_crtc(struct drm_device *dev);

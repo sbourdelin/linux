@@ -101,7 +101,9 @@ static void mxsfb_set_bus_fmt(struct mxsfb_drm_private *mxsfb)
 
 	ctrl = readl(mxsfb->base + LCDC_CTRL);
 
-	if (mxsfb->connector.display_info.num_bus_formats)
+	if (mxsfb->bus_format_override)
+		bus_format = mxsfb->bus_format_override;
+	else if (mxsfb->connector.display_info.num_bus_formats)
 		bus_format = mxsfb->connector.display_info.bus_formats[0];
 
 	ctrl &= ~CTRL_BUS_WIDTH_MASK;

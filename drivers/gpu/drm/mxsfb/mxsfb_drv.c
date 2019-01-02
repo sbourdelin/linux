@@ -182,6 +182,7 @@ static int mxsfb_load(struct drm_device *drm, unsigned long flags)
 	struct platform_device *pdev = to_platform_device(drm->dev);
 	struct mxsfb_drm_private *mxsfb;
 	struct resource *res;
+	const char *fmt;
 	int ret;
 
 	mxsfb = devm_kzalloc(&pdev->dev, sizeof(*mxsfb), GFP_KERNEL);
@@ -207,6 +208,18 @@ static int mxsfb_load(struct drm_device *drm, unsigned long flags)
 	mxsfb->clk_disp_axi = devm_clk_get(drm->dev, "disp_axi");
 	if (IS_ERR(mxsfb->clk_disp_axi))
 		mxsfb->clk_disp_axi = NULL;
+
+	ret = of_property_read_string(drm->dev->of_node, "interface-pix-fmt", &fmt);
+	if (!ret) {
+		if (!strcmp(fmt, "rgb24"))
+			mxsfb->bus_format_override = MEDIA_BUS_FMT_RGB888_1X24;
+		else if (!strcmp(fmt, "bgr24"))
+			mxsfb->bus_format_override = MEDIA_BUS_FMT_BGR888_1X24;
+		else if (!strcmp(fmt, "rbg24"))
+			mxsfb->bus_format_override = MEDIA_BUS_FMT_RBG888_1X24;
+		else if (!strcmp(fmt, "gbr24"))
+			mxsfb->bus_format_override = MEDIA_BUS_FMT_GBR888_1X24;
+	}
 
 	ret = dma_set_mask_and_coherent(drm->dev, DMA_BIT_MASK(32));
 	if (ret)
