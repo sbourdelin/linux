@@ -14,5 +14,6 @@
 	.align 4
 	.globl sys_call_table
 sys_call_table:
+#define sys_nis_syscall	sys_ni_syscall
 #include <asm/syscall_table_32.h>	/* 32-bit native syscalls */
 #undef __SYSCALL

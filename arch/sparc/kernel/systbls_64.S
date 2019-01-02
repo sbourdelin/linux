@@ -10,6 +10,8 @@
  * Copyright (C) 1995 Adrian M. Rodriguez (adrian@remus.rutgers.edu)
  */
 
+#define sys_nis_syscall	sys_ni_syscall
+
 #define __SYSCALL(nr, entry)	.word entry
 	.text
 	.align	4
