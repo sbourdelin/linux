@@ -3353,10 +3353,18 @@ void sdhci_cqe_enable(struct mmc_host *mmc)
 
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 	ctrl &= ~SDHCI_CTRL_DMA_MASK;
-	if (host->flags & SDHCI_USE_64_BIT_DMA)
-		ctrl |= SDHCI_CTRL_ADMA64;
-	else
-		ctrl |= SDHCI_CTRL_ADMA32;
+	/* As per SD Host 4.20 Spec, Host with V4 Mode enable supports ADMA3
+	 * DMA type. ADMA3 performs integrated descriptor which is needed for
+	 * cmd queuing as it need to fetch both cmd and transfer descriptors.
+	 */
+	if (host->v4_mode) {
+		ctrl |= SDHCI_CTRL_ADMA3;
+	} else {
+		if (host->flags & SDHCI_USE_64_BIT_DMA)
+			ctrl |= SDHCI_CTRL_ADMA64;
+		else
+			ctrl |= SDHCI_CTRL_ADMA32;
+	}
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
 
 	sdhci_writew(host, SDHCI_MAKE_BLKSZ(host->sdma_boundary, 512),
