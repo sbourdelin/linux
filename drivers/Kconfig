@@ -226,6 +226,8 @@ source "drivers/visorbus/Kconfig"
 
 source "drivers/siox/Kconfig"
 
+source "drivers/fieldbus/Kconfig"
+
 source "drivers/slimbus/Kconfig"
 
 endmenu
