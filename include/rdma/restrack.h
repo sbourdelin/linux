@@ -193,4 +193,15 @@ int rdma_nl_put_driver_u32_hex(struct sk_buff *msg, const char *name,
 int rdma_nl_put_driver_u64(struct sk_buff *msg, const char *name, u64 value);
 int rdma_nl_put_driver_u64_hex(struct sk_buff *msg, const char *name,
 			       u64 value);
+/**
+ * rdma_restrack_get_byid() - translate from ID to restrack object
+ * @res: root table to lookup
+ * @type: resource track type
+ * @id: ID to take a look
+ *
+ * Return: Pointer to restrack entry or -ENOENT in case of error.
+ */
+struct rdma_restrack_entry *
+rdma_restrack_get_byid(struct rdma_restrack_root *rt,
+		       enum rdma_restrack_type type, u32 id);
 #endif /* _RDMA_RESTRACK_H_ */
