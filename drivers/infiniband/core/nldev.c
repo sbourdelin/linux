@@ -107,6 +107,7 @@ static const struct nla_policy nldev_policy[RDMA_NLDEV_ATTR_MAX] = {
 	[RDMA_NLDEV_ATTR_DRIVER_U32]		= { .type = NLA_U32 },
 	[RDMA_NLDEV_ATTR_DRIVER_S64]		= { .type = NLA_S64 },
 	[RDMA_NLDEV_ATTR_DRIVER_U64]		= { .type = NLA_U64 },
+	[RDMA_NLDEV_ATTR_RES_PDN]		= { .type = NLA_U32 },
 };
 
 static int put_driver_name_print_type(struct sk_buff *msg, const char *name,
@@ -587,6 +588,9 @@ static int fill_res_pd_entry(struct sk_buff *msg, struct netlink_callback *cb,
 	if ((pd->flags & IB_PD_UNSAFE_GLOBAL_RKEY) &&
 	    nla_put_u32(msg, RDMA_NLDEV_ATTR_RES_UNSAFE_GLOBAL_RKEY,
 			pd->unsafe_global_rkey))
+		goto err;
+
+	if (nla_put_u32(msg, RDMA_NLDEV_ATTR_RES_PDN, pd->pdn))
 		goto err;
 
 	if (fill_res_name_pid(msg, res))

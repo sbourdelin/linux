@@ -431,6 +431,10 @@ enum rdma_nldev_attr {
 	RDMA_NLDEV_ATTR_DRIVER_U64,		/* u64 */
 
 	/*
+	 * PD identifier, unique across IB device
+	 */
+	RDMA_NLDEV_ATTR_RES_PDN,		/* u32 */
+	/*
 	 * Always the end
 	 */
 	RDMA_NLDEV_ATTR_MAX
