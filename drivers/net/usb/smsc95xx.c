@@ -748,47 +748,35 @@ static void set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 {
 	struct usbnet *dev = netdev_priv(net);
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
-	int buf;
 
 	if ((pdata->chip_id == ID_REV_CHIP_ID_9500A_) ||
 	    (pdata->chip_id == ID_REV_CHIP_ID_9530_) ||
 	    (pdata->chip_id == ID_REV_CHIP_ID_89530_) ||
 	    (pdata->chip_id == ID_REV_CHIP_ID_9730_)) {
 		/* Extend Manual AutoMDIX timer for 9500A/9500Ai */
-		buf = phy_read(pdata->phydev,
-					 PHY_EDPD_CONFIG);
-		buf |= PHY_EDPD_CONFIG_EXT_CROSSOVER_;
-		phy_write(pdata->phydev,
-				    PHY_EDPD_CONFIG, buf);
+		phy_set_bits(pdata->phydev, PHY_EDPD_CONFIG,
+			     PHY_EDPD_CONFIG_EXT_CROSSOVER_);
 	}
 
 	if (mdix_ctrl == ETH_TP_MDI) {
-		buf = phy_read(pdata->phydev,
-					 SPECIAL_CTRL_STS);
-		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX_;
-		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
-			 SPECIAL_CTRL_STS_AMDIX_STATE_);
-		phy_write(pdata->phydev,
-				    SPECIAL_CTRL_STS, buf);
+		phy_modify(pdata->phydev, SPECIAL_CTRL_STS,
+			   SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
+			   SPECIAL_CTRL_STS_AMDIX_STATE_,
+			   SPECIAL_CTRL_STS_OVRRD_AMDIX_);
 	} else if (mdix_ctrl == ETH_TP_MDI_X) {
-		buf = phy_read(pdata->phydev,
-					 SPECIAL_CTRL_STS);
-		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX_;
-		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
-			 SPECIAL_CTRL_STS_AMDIX_STATE_);
-		buf |= SPECIAL_CTRL_STS_AMDIX_STATE_;
-		phy_write(pdata->phydev,
-				    SPECIAL_CTRL_STS, buf);
+		phy_modify(pdata->phydev, SPECIAL_CTRL_STS,
+			   SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
+			   SPECIAL_CTRL_STS_AMDIX_STATE_,
+			   SPECIAL_CTRL_STS_OVRRD_AMDIX_ |
+			   SPECIAL_CTRL_STS_AMDIX_STATE_);
 	} else if (mdix_ctrl == ETH_TP_MDI_AUTO) {
-		buf = phy_read(pdata->phydev,
-					 SPECIAL_CTRL_STS);
-		buf &= ~SPECIAL_CTRL_STS_OVRRD_AMDIX_;
-		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
-			 SPECIAL_CTRL_STS_AMDIX_STATE_);
-		buf |= SPECIAL_CTRL_STS_AMDIX_ENABLE_;
-		phy_write(pdata->phydev,
-				    SPECIAL_CTRL_STS, buf);
+		phy_modify(pdata->phydev, SPECIAL_CTRL_STS,
+			   SPECIAL_CTRL_STS_OVRRD_AMDIX_ |
+			   SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
+			   SPECIAL_CTRL_STS_AMDIX_STATE_,
+			   SPECIAL_CTRL_STS_AMDIX_ENABLE_);
 	}
+
 	pdata->mdix_ctrl = mdix_ctrl;
 }
 
@@ -951,7 +939,7 @@ static int smsc95xx_phy_initialize(struct usbnet *dev)
 	}
 
 	phy_write(pdata->phydev, PHY_INT_MASK,
-		PHY_INT_MASK_DEFAULT_);
+		  PHY_INT_MASK_DEFAULT_);
 
 	ret = genphy_restart_aneg(pdata->phydev);
 	if (ret)
@@ -1372,15 +1360,7 @@ static int smsc95xx_enable_phy_wakeup_interrupts(struct usbnet *dev, u16 mask)
 		return ret;
 
 	/* enable interrupt source */
-	ret = phy_read(pdata->phydev, PHY_INT_MASK);
-	if (ret < 0)
-		return ret;
-
-	ret |= mask;
-
-	phy_write(pdata->phydev, PHY_INT_MASK, ret);
-
-	return 0;
+	return phy_set_bits(pdata->phydev, PHY_INT_MASK, mask);
 }
 
 static int smsc95xx_link_ok_nopm(struct usbnet *dev)
@@ -1445,16 +1425,13 @@ static int smsc95xx_enter_suspend1(struct usbnet *dev)
 	 */
 	if (pdata->features & FEATURE_PHY_NLP_CROSSOVER)
 		phy_write(pdata->phydev, PHY_EDPD_CONFIG,
-				    PHY_EDPD_CONFIG_DEFAULT);
+			  PHY_EDPD_CONFIG_DEFAULT);
 
 	/* enable energy detect power-down mode */
-	ret = phy_read(pdata->phydev, PHY_MODE_CTRL_STS);
+	ret = phy_set_bits(pdata->phydev, PHY_MODE_CTRL_STS,
+			   MODE_CTRL_STS_EDPWRDOWN_);
 	if (ret < 0)
 		return ret;
-
-	ret |= MODE_CTRL_STS_EDPWRDOWN_;
-
-	phy_write(pdata->phydev, PHY_MODE_CTRL_STS, ret);
 
 	/* enter SUSPEND1 mode */
 	ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
