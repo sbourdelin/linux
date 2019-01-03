@@ -547,7 +547,7 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 	int ret;
 
 	/* clear interrupt status */
-	ret = smsc95xx_mdio_read(dev->net, mii->phy_id, PHY_INT_SRC);
+	ret = phy_read(pdata->phydev, PHY_INT_SRC);
 	if (ret < 0)
 		return ret;
 
@@ -557,8 +557,8 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 
 	mii_check_media(mii, 1, 1);
 	mii_ethtool_gset(&dev->mii, &ecmd);
-	lcladv = smsc95xx_mdio_read(dev->net, mii->phy_id, MII_ADVERTISE);
-	rmtadv = smsc95xx_mdio_read(dev->net, mii->phy_id, MII_LPA);
+	lcladv = phy_read(pdata->phydev, MII_ADVERTISE);
+	rmtadv = phy_read(pdata->phydev, MII_LPA);
 
 	netif_dbg(dev, link, dev->net,
 		  "speed: %u duplex: %d lcladv: %04x rmtadv: %04x\n",
@@ -630,7 +630,7 @@ static void check_carrier(struct work_struct *work)
 	if (pdata->suspend_flags != 0)
 		return;
 
-	ret = smsc95xx_mdio_read(dev->net, dev->mii.phy_id, MII_BMSR);
+	ret = phy_read(pdata->phydev, MII_BMSR);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Failed to read MII_BMSR\n");
 		return;
@@ -764,10 +764,11 @@ static int smsc95xx_ethtool_set_wol(struct net_device *net,
 static int get_mdix_status(struct net_device *net)
 {
 	struct usbnet *dev = netdev_priv(net);
+	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	u32 val;
 	int buf;
 
-	buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id, SPECIAL_CTRL_STS);
+	buf = phy_read(pdata->phydev, SPECIAL_CTRL_STS);
 	if (buf & SPECIAL_CTRL_STS_OVRRD_AMDIX_) {
 		if (buf & SPECIAL_CTRL_STS_AMDIX_ENABLE_)
 			return ETH_TP_MDI_AUTO;
@@ -793,7 +794,7 @@ static void set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 	    (pdata->chip_id == ID_REV_CHIP_ID_89530_) ||
 	    (pdata->chip_id == ID_REV_CHIP_ID_9730_)) {
 		/* Extend Manual AutoMDIX timer for 9500A/9500Ai */
-		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
+		buf = phy_read(pdata->phydev,
 					 PHY_EDPD_CONFIG);
 		buf |= PHY_EDPD_CONFIG_EXT_CROSSOVER_;
 		smsc95xx_mdio_write(dev->net, dev->mii.phy_id,
@@ -801,7 +802,7 @@ static void set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 	}
 
 	if (mdix_ctrl == ETH_TP_MDI) {
-		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
+		buf = phy_read(pdata->phydev,
 					 SPECIAL_CTRL_STS);
 		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX_;
 		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
@@ -809,7 +810,7 @@ static void set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 		smsc95xx_mdio_write(dev->net, dev->mii.phy_id,
 				    SPECIAL_CTRL_STS, buf);
 	} else if (mdix_ctrl == ETH_TP_MDI_X) {
-		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
+		buf = phy_read(pdata->phydev,
 					 SPECIAL_CTRL_STS);
 		buf |= SPECIAL_CTRL_STS_OVRRD_AMDIX_;
 		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
@@ -818,7 +819,7 @@ static void set_mdix_status(struct net_device *net, __u8 mdix_ctrl)
 		smsc95xx_mdio_write(dev->net, dev->mii.phy_id,
 				    SPECIAL_CTRL_STS, buf);
 	} else if (mdix_ctrl == ETH_TP_MDI_AUTO) {
-		buf = smsc95xx_mdio_read(dev->net, dev->mii.phy_id,
+		buf = phy_read(pdata->phydev,
 					 SPECIAL_CTRL_STS);
 		buf &= ~SPECIAL_CTRL_STS_OVRRD_AMDIX_;
 		buf &= ~(SPECIAL_CTRL_STS_AMDIX_ENABLE_ |
@@ -968,6 +969,7 @@ static void smsc95xx_adjust_link(struct net_device *netdev)
 
 static int smsc95xx_phy_initialize(struct usbnet *dev)
 {
+	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	int bmcr, ret, timeout = 0;
 
 	/* reset phy and wait for reset to complete */
@@ -975,7 +977,7 @@ static int smsc95xx_phy_initialize(struct usbnet *dev)
 
 	do {
 		msleep(10);
-		bmcr = smsc95xx_mdio_read(dev->net, dev->mii.phy_id, MII_BMCR);
+		bmcr = phy_read(pdata->phydev, MII_BMCR);
 		timeout++;
 	} while ((bmcr & BMCR_RESET) && (timeout < 100));
 
@@ -989,7 +991,7 @@ static int smsc95xx_phy_initialize(struct usbnet *dev)
 		ADVERTISE_PAUSE_ASYM);
 
 	/* read to clear */
-	ret = smsc95xx_mdio_read(dev->net, dev->mii.phy_id, PHY_INT_SRC);
+	ret = phy_read(pdata->phydev, PHY_INT_SRC);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Failed to read PHY_INT_SRC during init\n");
 		return ret;
@@ -1407,18 +1409,19 @@ static u32 smsc_crc(const u8 *buffer, size_t len, int filter)
 
 static int smsc95xx_enable_phy_wakeup_interrupts(struct usbnet *dev, u16 mask)
 {
+	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	struct mii_if_info *mii = &dev->mii;
 	int ret;
 
 	netdev_dbg(dev->net, "enabling PHY wakeup interrupts\n");
 
 	/* read to clear */
-	ret = smsc95xx_mdio_read(dev->net, mii->phy_id, PHY_INT_SRC);
+	ret = phy_read(pdata->phydev, PHY_INT_SRC);
 	if (ret < 0)
 		return ret;
 
 	/* enable interrupt source */
-	ret = smsc95xx_mdio_read(dev->net, mii->phy_id, PHY_INT_MASK);
+	ret = phy_read(pdata->phydev, PHY_INT_MASK);
 	if (ret < 0)
 		return ret;
 
@@ -1431,15 +1434,15 @@ static int smsc95xx_enable_phy_wakeup_interrupts(struct usbnet *dev, u16 mask)
 
 static int smsc95xx_link_ok_nopm(struct usbnet *dev)
 {
-	struct mii_if_info *mii = &dev->mii;
+	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	int ret;
 
 	/* first, a dummy read, needed to latch some MII phys */
-	ret = smsc95xx_mdio_read(dev->net, mii->phy_id, MII_BMSR);
+	ret = phy_read(pdata->phydev, MII_BMSR);
 	if (ret < 0)
 		return ret;
 
-	ret = smsc95xx_mdio_read(dev->net, mii->phy_id, MII_BMSR);
+	ret = phy_read(pdata->phydev, MII_BMSR);
 	if (ret < 0)
 		return ret;
 
@@ -1500,7 +1503,7 @@ static int smsc95xx_enter_suspend1(struct usbnet *dev)
 				    PHY_EDPD_CONFIG_DEFAULT);
 
 	/* enable energy detect power-down mode */
-	ret = smsc95xx_mdio_read(dev->net, mii->phy_id, PHY_MODE_CTRL_STS);
+	ret = phy_read(pdata->phydev, PHY_MODE_CTRL_STS);
 	if (ret < 0)
 		return ret;
 
