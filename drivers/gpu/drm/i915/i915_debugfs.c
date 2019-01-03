@@ -2757,7 +2757,7 @@ static int i915_edp_psr_status(struct seq_file *m, void *data)
 		seq_printf(m, "Performance counter: %u\n", val);
 	}
 
-	if (psr->debug & I915_PSR_DEBUG_IRQ) {
+	if ((psr->debug & I915_PSR_DEBUG_IRQ) && !psr->psr2_enabled) {
 		seq_printf(m, "Last attempted entry at: %lld\n",
 			   psr->last_entry_attempt);
 		seq_printf(m, "Last exit at: %lld\n", psr->last_exit);
@@ -2812,6 +2812,10 @@ retry:
 skip_mode:
 	if (!ret) {
 		mutex_lock(&dev_priv->psr.lock);
+		if (dev_priv->psr.psr2_enabled && (val & I915_PSR_DEBUG_IRQ)) {
+			val &= ~I915_PSR_DEBUG_IRQ;
+			DRM_WARN("PSR debug IRQ cannot be enabled with PSR2");
+		}
 		dev_priv->psr.debug = val;
 		intel_psr_irq_control(dev_priv, dev_priv->psr.debug);
 		mutex_unlock(&dev_priv->psr.lock);

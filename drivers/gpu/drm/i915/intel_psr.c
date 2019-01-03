@@ -201,6 +201,7 @@ void intel_psr_irq_handler(struct drm_i915_private *dev_priv, u32 psr_iir)
 			mask |= EDP_PSR_ERROR(shift);
 		}
 
+		/* PSR2 don't trigger PRE_ENTRY and POST_EXIT interruptions */
 		if (psr_iir & EDP_PSR_PRE_ENTRY(shift)) {
 			dev_priv->psr.last_entry_attempt = time_ns;
 			DRM_DEBUG_KMS("[transcoder %s] PSR entry attempt in 2 vblanks\n",
