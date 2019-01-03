@@ -87,8 +87,8 @@ static int smsc95xx_in_pm(struct usbnet *dev)
 	return dev->suspend_count != 0;
 }
 
-static int __must_check __smsc95xx_read_reg(struct usbnet *dev, u32 index,
-					    u32 *data)
+static int __must_check smsc95xx_read_reg(struct usbnet *dev, u32 index,
+					  u32 *data)
 {
 	u32 buf;
 	int ret;
@@ -116,8 +116,8 @@ static int __must_check __smsc95xx_read_reg(struct usbnet *dev, u32 index,
 	return ret;
 }
 
-static int __must_check __smsc95xx_write_reg(struct usbnet *dev, u32 index,
-					     u32 data)
+static int __must_check smsc95xx_write_reg(struct usbnet *dev, u32 index,
+					   u32 data)
 {
 	u32 buf;
 	int ret;
@@ -143,18 +143,6 @@ static int __must_check __smsc95xx_write_reg(struct usbnet *dev, u32 index,
 	return ret;
 }
 
-static int __must_check smsc95xx_read_reg(struct usbnet *dev, u32 index,
-					  u32 *data)
-{
-	return __smsc95xx_read_reg(dev, index, data);
-}
-
-static int __must_check smsc95xx_write_reg(struct usbnet *dev, u32 index,
-					   u32 data)
-{
-	return __smsc95xx_write_reg(dev, index, data);
-}
-
 /* Loop until the read is completed with timeout
  * called with phy_mutex held */
 static int __must_check __smsc95xx_phy_wait_not_busy(struct usbnet *dev)
@@ -164,7 +152,7 @@ static int __must_check __smsc95xx_phy_wait_not_busy(struct usbnet *dev)
 	int ret;
 
 	do {
-		ret = __smsc95xx_read_reg(dev, MII_ADDR, &val);
+		ret = smsc95xx_read_reg(dev, MII_ADDR, &val);
 		if (ret < 0) {
 			netdev_warn(dev->net, "Error reading MII_ACCESS\n");
 			return ret;
@@ -196,7 +184,7 @@ static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
 	addr = (phy_id << 11) | (idx << 6) | MII_READ_ | MII_BUSY_;
-	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr);
+	ret = smsc95xx_write_reg(dev, MII_ADDR, addr);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_ADDR\n");
 		goto done;
@@ -208,7 +196,7 @@ static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
 		goto done;
 	}
 
-	ret = __smsc95xx_read_reg(dev, MII_DATA, &val);
+	ret = smsc95xx_read_reg(dev, MII_DATA, &val);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error reading MII_DATA\n");
 		goto done;
@@ -238,7 +226,7 @@ static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 	}
 
 	val = regval;
-	ret = __smsc95xx_write_reg(dev, MII_DATA, val);
+	ret = smsc95xx_write_reg(dev, MII_DATA, val);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_DATA\n");
 		goto done;
@@ -248,7 +236,7 @@ static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
 	addr = (phy_id << 11) | (idx << 6) | MII_WRITE_ | MII_BUSY_;
-	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr);
+	ret = smsc95xx_write_reg(dev, MII_ADDR, addr);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_ADDR\n");
 		goto done;
@@ -972,7 +960,7 @@ static int smsc95xx_start_rx_path(struct usbnet *dev)
 	pdata->mac_cr |= MAC_CR_RXEN_;
 	spin_unlock_irqrestore(&pdata->mac_cr_lock, flags);
 
-	return __smsc95xx_write_reg(dev, MAC_CR, pdata->mac_cr);
+	return smsc95xx_write_reg(dev, MAC_CR, pdata->mac_cr);
 }
 
 static int smsc95xx_phy_initialize(struct usbnet *dev)
