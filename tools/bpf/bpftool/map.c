@@ -781,11 +781,11 @@ exit_free:
 
 static int do_update(int argc, char **argv)
 {
+	void *key = NULL, *value = NULL;
 	struct bpf_map_info info = {};
 	__u32 len = sizeof(info);
 	__u32 *value_fd = NULL;
 	__u32 flags = BPF_ANY;
-	void *key, *value;
 	int fd, err;
 
 	if (argc < 2)
@@ -795,9 +795,16 @@ static int do_update(int argc, char **argv)
 	if (fd < 0)
 		return -1;
 
-	key = malloc(info.key_size);
+	if (info.key_size) {
+		key = malloc(info.key_size);
+		if (!key) {
+			p_err("mem alloc failed");
+			err = -1;
+			goto exit_free;
+		}
+	}
 	value = alloc_value(&info);
-	if (!key || !value) {
+	if (!value) {
 		p_err("mem alloc failed");
 		err = -1;
 		goto exit_free;
@@ -1135,7 +1142,7 @@ static int do_help(int argc, char **argv)
 		"                              entries MAX_ENTRIES name NAME [flags FLAGS] \\\n"
 		"                              [dev NAME]\n"
 		"       %s %s dump       MAP\n"
-		"       %s %s update     MAP  key DATA value VALUE [UPDATE_FLAGS]\n"
+		"       %s %s update     MAP [key DATA] value VALUE [UPDATE_FLAGS]\n"
 		"       %s %s lookup     MAP  key DATA\n"
 		"       %s %s getnext    MAP [key DATA]\n"
 		"       %s %s delete     MAP  key DATA\n"
