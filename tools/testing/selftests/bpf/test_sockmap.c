@@ -1676,7 +1676,7 @@ static int __test_suite(int cg_fd, char *bpf_file)
 		}
 
 		cg_fd = create_and_get_cgroup(CG_PATH);
-		if (cg_fd < 0) {
+		if (!cg_fd) {
 			fprintf(stderr,
 				"ERROR: (%i) open cg path failed: %s\n",
 				cg_fd, optarg);

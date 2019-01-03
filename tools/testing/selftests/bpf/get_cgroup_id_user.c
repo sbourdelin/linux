@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 		return 1;
 
 	cgroup_fd = create_and_get_cgroup(TEST_CGROUP);
-	if (CHECK(cgroup_fd < 0, "create_and_get_cgroup", "err %d errno %d\n",
+	if (CHECK(!cgroup_fd, "create_and_get_cgroup", "err %d errno %d\n",
 		  cgroup_fd, errno))
 		goto cleanup_cgroup_env;
 
