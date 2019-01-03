@@ -540,7 +540,6 @@ static int smsc95xx_phy_update_flowcontrol(struct usbnet *dev, u8 duplex,
 static int smsc95xx_link_reset(struct usbnet *dev)
 {
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
-	struct mii_if_info *mii = &dev->mii;
 	struct ethtool_link_ksettings ecmd;
 	unsigned long flags;
 	u16 lcladv, rmtadv;
@@ -555,7 +554,7 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	mii_check_media(mii, 1, 1);
+	phy_read_status(pdata->phydev);
 	phy_ethtool_ksettings_get(pdata->phydev, &ecmd);
 	lcladv = phy_read(pdata->phydev, MII_ADVERTISE);
 	rmtadv = phy_read(pdata->phydev, MII_LPA);
