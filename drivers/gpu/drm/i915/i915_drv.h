@@ -3196,11 +3196,12 @@ unsigned long i915_gem_shrink(struct drm_i915_private *i915,
 			      unsigned long target,
 			      unsigned long *nr_scanned,
 			      unsigned flags);
-#define I915_SHRINK_PURGEABLE 0x1
-#define I915_SHRINK_UNBOUND 0x2
-#define I915_SHRINK_BOUND 0x4
-#define I915_SHRINK_ACTIVE 0x8
-#define I915_SHRINK_VMAPS 0x10
+#define I915_SHRINK_LOCKED	BIT(0)
+#define I915_SHRINK_PURGEABLE	BIT(1)
+#define I915_SHRINK_UNBOUND	BIT(2)
+#define I915_SHRINK_BOUND	BIT(3)
+#define I915_SHRINK_ACTIVE	BIT(4)
+#define I915_SHRINK_VMAPS	BIT(5)
 unsigned long i915_gem_shrink_all(struct drm_i915_private *i915);
 void i915_gem_shrinker_register(struct drm_i915_private *i915);
 void i915_gem_shrinker_unregister(struct drm_i915_private *i915);

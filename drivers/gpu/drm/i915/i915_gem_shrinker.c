@@ -158,9 +158,9 @@ i915_gem_shrink(struct drm_i915_private *i915,
 	}, *phase;
 	unsigned long count = 0;
 	unsigned long scanned = 0;
-	bool unlock;
+	bool unlock = false;
 
-	if (!shrinker_lock(i915, &unlock))
+	if (!(flags & I915_SHRINK_LOCKED) && !shrinker_lock(i915, &unlock))
 		return 0;
 
 	/*
@@ -352,6 +352,8 @@ i915_gem_shrinker_scan(struct shrinker *shrinker, struct shrink_control *sc)
 {
 	struct drm_i915_private *i915 =
 		container_of(shrinker, struct drm_i915_private, mm.shrinker);
+	const unsigned flags =
+		I915_SHRINK_LOCKED | I915_SHRINK_BOUND | I915_SHRINK_UNBOUND;
 	unsigned long freed;
 	bool unlock;
 
@@ -363,23 +365,18 @@ i915_gem_shrinker_scan(struct shrinker *shrinker, struct shrink_control *sc)
 	freed = i915_gem_shrink(i915,
 				sc->nr_to_scan,
 				&sc->nr_scanned,
-				I915_SHRINK_BOUND |
-				I915_SHRINK_UNBOUND |
-				I915_SHRINK_PURGEABLE);
+				flags | I915_SHRINK_PURGEABLE);
 	if (sc->nr_scanned < sc->nr_to_scan)
 		freed += i915_gem_shrink(i915,
 					 sc->nr_to_scan - sc->nr_scanned,
 					 &sc->nr_scanned,
-					 I915_SHRINK_BOUND |
-					 I915_SHRINK_UNBOUND);
+					 flags);
 	if (sc->nr_scanned < sc->nr_to_scan && current_is_kswapd()) {
 		intel_runtime_pm_get(i915);
 		freed += i915_gem_shrink(i915,
 					 sc->nr_to_scan - sc->nr_scanned,
 					 &sc->nr_scanned,
-					 I915_SHRINK_ACTIVE |
-					 I915_SHRINK_BOUND |
-					 I915_SHRINK_UNBOUND);
+					 flags | I915_SHRINK_ACTIVE);
 		intel_runtime_pm_put(i915);
 	}
 
@@ -478,6 +475,7 @@ i915_gem_shrinker_vmap(struct notifier_block *nb, unsigned long event, void *ptr
 
 	intel_runtime_pm_get(i915);
 	freed_pages += i915_gem_shrink(i915, -1UL, NULL,
+				       I915_SHRINK_LOCKED |
 				       I915_SHRINK_BOUND |
 				       I915_SHRINK_UNBOUND |
 				       I915_SHRINK_ACTIVE |
