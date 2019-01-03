@@ -882,11 +882,12 @@ static const struct ethtool_ops smsc95xx_ethtool_ops = {
 static int smsc95xx_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 {
 	struct usbnet *dev = netdev_priv(netdev);
+	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 
 	if (!netif_running(netdev))
 		return -EINVAL;
 
-	return generic_mii_ioctl(&dev->mii, if_mii(rq), cmd, NULL);
+	return phy_mii_ioctl(pdata->phydev, rq, cmd);
 }
 
 static void smsc95xx_init_mac_address(struct usbnet *dev)
