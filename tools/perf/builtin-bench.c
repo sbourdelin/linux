@@ -71,6 +71,7 @@ static struct bench futex_benchmarks[] = {
 #ifdef HAVE_EVENTFD
 static struct bench epoll_benchmarks[] = {
 	{ "wait-1pmc",	"Benchmark epoll concurrent epoll_waits",       bench_epoll_wait_1pmc	},
+	{ "wait-mp1c",	"Benchmark epoll events delivery bandwidth",    bench_epoll_wait_mp1c	},
 	{ "ctl",	"Benchmark epoll concurrent epoll_ctls",        bench_epoll_ctl		},
 	{ "all",	"Run all futex benchmarks",			NULL			},
 	{ NULL,		NULL,						NULL			}
