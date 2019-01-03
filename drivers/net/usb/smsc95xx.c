@@ -82,8 +82,13 @@ static bool turbo_mode = true;
 module_param(turbo_mode, bool, 0644);
 MODULE_PARM_DESC(turbo_mode, "Enable multiple frames per Rx transaction");
 
+static int smsc95xx_in_pm(struct usbnet *dev)
+{
+	return dev->suspend_count != 0;
+}
+
 static int __must_check __smsc95xx_read_reg(struct usbnet *dev, u32 index,
-					    u32 *data, int in_pm)
+					    u32 *data)
 {
 	u32 buf;
 	int ret;
@@ -91,7 +96,7 @@ static int __must_check __smsc95xx_read_reg(struct usbnet *dev, u32 index,
 
 	BUG_ON(!dev);
 
-	if (!in_pm)
+	if (!smsc95xx_in_pm(dev))
 		fn = usbnet_read_cmd;
 	else
 		fn = usbnet_read_cmd_nopm;
@@ -112,7 +117,7 @@ static int __must_check __smsc95xx_read_reg(struct usbnet *dev, u32 index,
 }
 
 static int __must_check __smsc95xx_write_reg(struct usbnet *dev, u32 index,
-					     u32 data, int in_pm)
+					     u32 data)
 {
 	u32 buf;
 	int ret;
@@ -120,7 +125,7 @@ static int __must_check __smsc95xx_write_reg(struct usbnet *dev, u32 index,
 
 	BUG_ON(!dev);
 
-	if (!in_pm)
+	if (!smsc95xx_in_pm(dev))
 		fn = usbnet_write_cmd;
 	else
 		fn = usbnet_write_cmd_nopm;
@@ -141,38 +146,37 @@ static int __must_check __smsc95xx_write_reg(struct usbnet *dev, u32 index,
 static int __must_check smsc95xx_read_reg_nopm(struct usbnet *dev, u32 index,
 					       u32 *data)
 {
-	return __smsc95xx_read_reg(dev, index, data, 1);
+	return __smsc95xx_read_reg(dev, index, data);
 }
 
 static int __must_check smsc95xx_write_reg_nopm(struct usbnet *dev, u32 index,
 						u32 data)
 {
-	return __smsc95xx_write_reg(dev, index, data, 1);
+	return __smsc95xx_write_reg(dev, index, data);
 }
 
 static int __must_check smsc95xx_read_reg(struct usbnet *dev, u32 index,
 					  u32 *data)
 {
-	return __smsc95xx_read_reg(dev, index, data, 0);
+	return __smsc95xx_read_reg(dev, index, data);
 }
 
 static int __must_check smsc95xx_write_reg(struct usbnet *dev, u32 index,
 					   u32 data)
 {
-	return __smsc95xx_write_reg(dev, index, data, 0);
+	return __smsc95xx_write_reg(dev, index, data);
 }
 
 /* Loop until the read is completed with timeout
  * called with phy_mutex held */
-static int __must_check __smsc95xx_phy_wait_not_busy(struct usbnet *dev,
-						     int in_pm)
+static int __must_check __smsc95xx_phy_wait_not_busy(struct usbnet *dev)
 {
 	unsigned long start_time = jiffies;
 	u32 val;
 	int ret;
 
 	do {
-		ret = __smsc95xx_read_reg(dev, MII_ADDR, &val, in_pm);
+		ret = __smsc95xx_read_reg(dev, MII_ADDR, &val);
 		if (ret < 0) {
 			netdev_warn(dev->net, "Error reading MII_ACCESS\n");
 			return ret;
@@ -185,8 +189,7 @@ static int __must_check __smsc95xx_phy_wait_not_busy(struct usbnet *dev,
 	return -EIO;
 }
 
-static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx,
-				int in_pm)
+static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u32 val, addr;
@@ -195,7 +198,7 @@ static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx,
 	mutex_lock(&dev->phy_mutex);
 
 	/* confirm MII not busy */
-	ret = __smsc95xx_phy_wait_not_busy(dev, in_pm);
+	ret = __smsc95xx_phy_wait_not_busy(dev);
 	if (ret < 0) {
 		netdev_warn(dev->net, "MII is busy in smsc95xx_mdio_read\n");
 		goto done;
@@ -205,19 +208,19 @@ static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx,
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
 	addr = (phy_id << 11) | (idx << 6) | MII_READ_ | MII_BUSY_;
-	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr, in_pm);
+	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_ADDR\n");
 		goto done;
 	}
 
-	ret = __smsc95xx_phy_wait_not_busy(dev, in_pm);
+	ret = __smsc95xx_phy_wait_not_busy(dev);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Timed out reading MII reg %02X\n", idx);
 		goto done;
 	}
 
-	ret = __smsc95xx_read_reg(dev, MII_DATA, &val, in_pm);
+	ret = __smsc95xx_read_reg(dev, MII_DATA, &val);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error reading MII_DATA\n");
 		goto done;
@@ -231,7 +234,7 @@ done:
 }
 
 static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
-				  int idx, int regval, int in_pm)
+				  int idx, int regval)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u32 val, addr;
@@ -240,14 +243,14 @@ static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 	mutex_lock(&dev->phy_mutex);
 
 	/* confirm MII not busy */
-	ret = __smsc95xx_phy_wait_not_busy(dev, in_pm);
+	ret = __smsc95xx_phy_wait_not_busy(dev);
 	if (ret < 0) {
 		netdev_warn(dev->net, "MII is busy in smsc95xx_mdio_write\n");
 		goto done;
 	}
 
 	val = regval;
-	ret = __smsc95xx_write_reg(dev, MII_DATA, val, in_pm);
+	ret = __smsc95xx_write_reg(dev, MII_DATA, val);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_DATA\n");
 		goto done;
@@ -257,13 +260,13 @@ static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
 	addr = (phy_id << 11) | (idx << 6) | MII_WRITE_ | MII_BUSY_;
-	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr, in_pm);
+	ret = __smsc95xx_write_reg(dev, MII_ADDR, addr);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Error writing MII_ADDR\n");
 		goto done;
 	}
 
-	ret = __smsc95xx_phy_wait_not_busy(dev, in_pm);
+	ret = __smsc95xx_phy_wait_not_busy(dev);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Timed out writing MII reg %02X\n", idx);
 		goto done;
@@ -276,24 +279,24 @@ done:
 static int smsc95xx_mdio_read_nopm(struct net_device *netdev, int phy_id,
 				   int idx)
 {
-	return __smsc95xx_mdio_read(netdev, phy_id, idx, 1);
+	return __smsc95xx_mdio_read(netdev, phy_id, idx);
 }
 
 static void smsc95xx_mdio_write_nopm(struct net_device *netdev, int phy_id,
 				     int idx, int regval)
 {
-	__smsc95xx_mdio_write(netdev, phy_id, idx, regval, 1);
+	__smsc95xx_mdio_write(netdev, phy_id, idx, regval);
 }
 
 static int smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
 {
-	return __smsc95xx_mdio_read(netdev, phy_id, idx, 0);
+	return __smsc95xx_mdio_read(netdev, phy_id, idx);
 }
 
 static void smsc95xx_mdio_write(struct net_device *netdev, int phy_id, int idx,
 				int regval)
 {
-	__smsc95xx_mdio_write(netdev, phy_id, idx, regval, 0);
+	__smsc95xx_mdio_write(netdev, phy_id, idx, regval);
 }
 
 static int __must_check smsc95xx_wait_eeprom(struct usbnet *dev)
@@ -972,7 +975,7 @@ static int smsc95xx_start_tx_path(struct usbnet *dev)
 }
 
 /* Starts the Receive path */
-static int smsc95xx_start_rx_path(struct usbnet *dev, int in_pm)
+static int smsc95xx_start_rx_path(struct usbnet *dev)
 {
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	unsigned long flags;
@@ -981,7 +984,7 @@ static int smsc95xx_start_rx_path(struct usbnet *dev, int in_pm)
 	pdata->mac_cr |= MAC_CR_RXEN_;
 	spin_unlock_irqrestore(&pdata->mac_cr_lock, flags);
 
-	return __smsc95xx_write_reg(dev, MAC_CR, pdata->mac_cr, in_pm);
+	return __smsc95xx_write_reg(dev, MAC_CR, pdata->mac_cr);
 }
 
 static int smsc95xx_phy_initialize(struct usbnet *dev)
@@ -1233,7 +1236,7 @@ static int smsc95xx_reset(struct usbnet *dev)
 		return ret;
 	}
 
-	ret = smsc95xx_start_rx_path(dev, 0);
+	ret = smsc95xx_start_rx_path(dev);
 	if (ret < 0) {
 		netdev_warn(dev->net, "Failed to start RX path\n");
 		return ret;
@@ -1833,7 +1836,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		goto done;
 
 	/* enable receiver to enable frame reception */
-	smsc95xx_start_rx_path(dev, 1);
+	smsc95xx_start_rx_path(dev);
 
 	/* some wol options are enabled, so enter SUSPEND0 */
 	netdev_info(dev->net, "entering SUSPEND0 mode\n");
