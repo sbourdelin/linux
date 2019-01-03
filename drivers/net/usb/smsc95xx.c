@@ -78,6 +78,7 @@ struct smsc95xx_priv {
 	struct delayed_work carrier_check;
 	struct usbnet *dev;
 	struct mii_bus *mii_bus;
+	struct phy_device *phydev;
 };
 
 static bool turbo_mode = true;
@@ -960,6 +961,11 @@ static int smsc95xx_start_rx_path(struct usbnet *dev)
 	return smsc95xx_write_reg(dev, MAC_CR, pdata->mac_cr);
 }
 
+
+static void smsc95xx_adjust_link(struct net_device *netdev)
+{
+}
+
 static int smsc95xx_phy_initialize(struct usbnet *dev)
 {
 	int bmcr, ret, timeout = 0;
@@ -1308,6 +1314,10 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (ret)
 		goto err_mdiobus_alloc;
 
+	ret = mdiobus_register(bus);
+	if (ret)
+		goto err_mdiobus_register;
+
 	/* Initialize MII structure */
 	dev->mii.dev = dev->net;
 	dev->mii.mdio_read = smsc95xx_mdio_read;
@@ -1316,9 +1326,24 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->mii.reg_num_mask = 0x1f;
 	dev->mii.phy_id = SMSC95XX_INTERNAL_PHY_ID;
 
-	ret = mdiobus_register(bus);
-	if (ret)
+	/* Connect to PHY */
+	pdata->phydev = phy_find_first(pdata->mii_bus);
+	if (!pdata->phydev) {
+		netdev_err(dev->net, "no PHY found\n");
+		ret = -EIO;
 		goto err_mdiobus_register;
+	}
+
+	ret = phy_connect_direct(dev->net, pdata->phydev,
+				 &smsc95xx_adjust_link,
+				 PHY_INTERFACE_MODE_MII);
+	if (ret) {
+		netdev_err(dev->net, "Could not connect to PHY device\n");
+		goto err_mdiobus_register;
+	}
+
+	genphy_resume(pdata->phydev);
+	phy_start(pdata->phydev);
 
 	ret = smsc95xx_reset_post(dev);
 	if (ret)
