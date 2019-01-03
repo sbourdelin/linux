@@ -944,14 +944,6 @@ static int smsc95xx_phy_initialize(struct usbnet *dev)
 {
 	int bmcr, ret, timeout = 0;
 
-	/* Initialize MII structure */
-	dev->mii.dev = dev->net;
-	dev->mii.mdio_read = smsc95xx_mdio_read;
-	dev->mii.mdio_write = smsc95xx_mdio_write;
-	dev->mii.phy_id_mask = 0x1f;
-	dev->mii.reg_num_mask = 0x1f;
-	dev->mii.phy_id = SMSC95XX_INTERNAL_PHY_ID;
-
 	/* reset phy and wait for reset to complete */
 	smsc95xx_mdio_write(dev->net, dev->mii.phy_id, MII_BMCR, BMCR_RESET);
 
@@ -985,7 +977,7 @@ static int smsc95xx_phy_initialize(struct usbnet *dev)
 	return 0;
 }
 
-static int smsc95xx_reset(struct usbnet *dev)
+static int smsc95xx_reset_pre(struct usbnet *dev)
 {
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	u32 read_buf, write_buf, burst_cap;
@@ -1165,6 +1157,13 @@ static int smsc95xx_reset(struct usbnet *dev)
 	}
 
 	smsc95xx_set_multicast(dev->net);
+	return 0;
+}
+
+static int smsc95xx_reset_post(struct usbnet *dev)
+{
+	u32 read_buf;
+	int ret;
 
 	ret = smsc95xx_phy_initialize(dev);
 	if (ret < 0) {
@@ -1197,6 +1196,25 @@ static int smsc95xx_reset(struct usbnet *dev)
 
 	netif_dbg(dev, ifup, dev->net, "smsc95xx_reset, return 0\n");
 	return 0;
+}
+
+static int smsc95xx_reset(struct usbnet *dev)
+{
+	int ret;
+
+	ret = smsc95xx_reset_pre(dev);
+	if (ret)
+		return ret;
+
+	/* Initialize MII structure */
+	dev->mii.dev = dev->net;
+	dev->mii.mdio_read = smsc95xx_mdio_read;
+	dev->mii.mdio_write = smsc95xx_mdio_write;
+	dev->mii.phy_id_mask = 0x1f;
+	dev->mii.reg_num_mask = 0x1f;
+	dev->mii.phy_id = SMSC95XX_INTERNAL_PHY_ID;
+
+	return smsc95xx_reset_post(dev);
 }
 
 static const struct net_device_ops smsc95xx_netdev_ops = {
