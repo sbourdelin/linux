@@ -57,7 +57,7 @@ struct rdma_restrack_entry;
  */
 struct rdma_restrack_root {
 	/*
-	 * @rwsem: Read/write lock to protect lists
+	 * @rwsem: Read/write lock to protect lists and IDR
 	 */
 	struct rw_semaphore	rwsem;
 	/**
