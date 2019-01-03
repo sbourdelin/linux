@@ -48,6 +48,7 @@ struct romz_info {
 	const char *part_path;
 	unsigned long part_size;
 	unsigned long dmesg_size;
+	unsigned long pmsg_size;
 	int dump_oops;
 	ssize_t (*read)(char *buf, size_t bytes, loff_t pos);
 	ssize_t (*write)(const char *buf, size_t bytes, loff_t pos);
