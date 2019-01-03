@@ -716,6 +716,20 @@ static int scpi_dvfs_add_opps_to_device(struct device *dev)
 	return 0;
 }
 
+static void scpi_dvfs_remove_device_opps(struct device *dev)
+{
+	int idx;
+	struct scpi_opp *opp;
+	struct scpi_dvfs_info *info = scpi_dvfs_info(dev);
+
+	/* We already added OPPs successfully, this data can't be invalid */
+	if (WARN_ON(IS_ERR(info) || !info->opps))
+		return;
+
+	for (opp = info->opps, idx = 0; idx < info->count; idx++, opp++)
+		dev_pm_opp_remove(dev, opp->freq);
+}
+
 static int scpi_sensor_get_capability(u16 *sensors)
 {
 	__le16 cap;
@@ -799,6 +813,7 @@ static struct scpi_ops scpi_ops = {
 	.device_domain_id = scpi_dev_domain_id,
 	.get_transition_latency = scpi_dvfs_get_transition_latency,
 	.add_opps_to_device = scpi_dvfs_add_opps_to_device,
+	.remove_device_opps = scpi_dvfs_remove_device_opps,
 	.sensor_get_capability = scpi_sensor_get_capability,
 	.sensor_get_info = scpi_sensor_get_info,
 	.sensor_get_value = scpi_sensor_get_value,
