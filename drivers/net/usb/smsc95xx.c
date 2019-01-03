@@ -541,7 +541,7 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 {
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	struct mii_if_info *mii = &dev->mii;
-	struct ethtool_cmd ecmd = { .cmd = ETHTOOL_GSET };
+	struct ethtool_link_ksettings ecmd;
 	unsigned long flags;
 	u16 lcladv, rmtadv;
 	int ret;
@@ -556,16 +556,16 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 		return ret;
 
 	mii_check_media(mii, 1, 1);
-	mii_ethtool_gset(&dev->mii, &ecmd);
+	phy_ethtool_ksettings_get(pdata->phydev, &ecmd);
 	lcladv = phy_read(pdata->phydev, MII_ADVERTISE);
 	rmtadv = phy_read(pdata->phydev, MII_LPA);
 
 	netif_dbg(dev, link, dev->net,
 		  "speed: %u duplex: %d lcladv: %04x rmtadv: %04x\n",
-		  ethtool_cmd_speed(&ecmd), ecmd.duplex, lcladv, rmtadv);
+		  ecmd.base.speed, ecmd.base.duplex, lcladv, rmtadv);
 
 	spin_lock_irqsave(&pdata->mac_cr_lock, flags);
-	if (ecmd.duplex != DUPLEX_FULL) {
+	if (ecmd.base.duplex != DUPLEX_FULL) {
 		pdata->mac_cr &= ~MAC_CR_FDPX_;
 		pdata->mac_cr |= MAC_CR_RCVOWN_;
 	} else {
@@ -578,7 +578,8 @@ static int smsc95xx_link_reset(struct usbnet *dev)
 	if (ret < 0)
 		return ret;
 
-	ret = smsc95xx_phy_update_flowcontrol(dev, ecmd.duplex, lcladv, rmtadv);
+	ret = smsc95xx_phy_update_flowcontrol(dev, ecmd.base.duplex,
+					      lcladv, rmtadv);
 	if (ret < 0)
 		netdev_warn(dev->net, "Error updating PHY flow control\n");
 
