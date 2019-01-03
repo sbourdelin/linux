@@ -75,7 +75,6 @@ struct smsc95xx_priv {
 	u8 suspend_flags;
 	u8 mdix_ctrl;
 	bool link_ok;
-	struct delayed_work carrier_check;
 	struct usbnet *dev;
 	struct mii_bus *mii_bus;
 	struct phy_device *phydev;
@@ -603,44 +602,6 @@ static void smsc95xx_status(struct usbnet *dev, struct urb *urb)
 	else
 		netdev_warn(dev->net, "unexpected interrupt, intdata=0x%08X\n",
 			    intdata);
-}
-
-static void set_carrier(struct usbnet *dev, bool link)
-{
-	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
-
-	if (pdata->link_ok == link)
-		return;
-
-	pdata->link_ok = link;
-
-	if (link)
-		usbnet_link_change(dev, 1, 0);
-	else
-		usbnet_link_change(dev, 0, 0);
-}
-
-static void check_carrier(struct work_struct *work)
-{
-	struct smsc95xx_priv *pdata = container_of(work, struct smsc95xx_priv,
-						carrier_check.work);
-	struct usbnet *dev = pdata->dev;
-	int ret;
-
-	if (pdata->suspend_flags != 0)
-		return;
-
-	ret = phy_read(pdata->phydev, MII_BMSR);
-	if (ret < 0) {
-		netdev_warn(dev->net, "Failed to read MII_BMSR\n");
-		return;
-	}
-	if (ret & BMSR_LSTATUS)
-		set_carrier(dev, 1);
-	else
-		set_carrier(dev, 0);
-
-	schedule_delayed_work(&pdata->carrier_check, CARRIER_CHECK_DELAY);
 }
 
 /* Enable or disable Tx & Rx checksum offload engines */
@@ -1370,9 +1331,6 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->net->max_mtu = ETH_DATA_LEN;
 	dev->hard_mtu = dev->net->mtu + dev->net->hard_header_len;
 
-	INIT_DELAYED_WORK(&pdata->carrier_check, check_carrier);
-	schedule_delayed_work(&pdata->carrier_check, CARRIER_CHECK_DELAY);
-
 	return 0;
 err_mdiobus_register:
 	mdiobus_free(bus);
@@ -1386,7 +1344,6 @@ static void smsc95xx_unbind(struct usbnet *dev, struct usb_interface *intf)
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 
 	if (pdata) {
-		cancel_delayed_work(&pdata->carrier_check);
 		netif_dbg(dev, ifdown, dev->net, "free pdata\n");
 		mdiobus_unregister(pdata->mii_bus);
 		mdiobus_free(pdata->mii_bus);
@@ -1639,13 +1596,13 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 	u32 val, link_up;
 	int ret;
 
+	phy_stop(pdata->phydev);
+
 	ret = usbnet_suspend(intf, message);
 	if (ret < 0) {
 		netdev_warn(dev->net, "usbnet_suspend error\n");
 		return ret;
 	}
-
-	cancel_delayed_work_sync(&pdata->carrier_check);
 
 	if (pdata->suspend_flags) {
 		netdev_warn(dev->net, "error during last resume\n");
@@ -1891,8 +1848,7 @@ done:
 		usbnet_resume(intf);
 
 	if (ret)
-		schedule_delayed_work(&pdata->carrier_check,
-				      CARRIER_CHECK_DELAY);
+		phy_start(pdata->phydev);
 
 	return ret;
 }
@@ -1913,7 +1869,6 @@ static int smsc95xx_resume(struct usb_interface *intf)
 
 	/* do this first to ensure it's cleared even in error case */
 	pdata->suspend_flags = 0;
-	schedule_delayed_work(&pdata->carrier_check, CARRIER_CHECK_DELAY);
 
 	if (suspend_flags & SUSPEND_ALLMODES) {
 		/* clear wake-up sources */
@@ -1943,6 +1898,8 @@ static int smsc95xx_resume(struct usb_interface *intf)
 	ret = usbnet_resume(intf);
 	if (ret < 0)
 		netdev_warn(dev->net, "usbnet_resume error\n");
+
+	phy_start(pdata->phydev);
 
 	return ret;
 }
