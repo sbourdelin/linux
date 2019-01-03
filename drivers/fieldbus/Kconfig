@@ -14,6 +14,5 @@ menuconfig FIELDBUS_DEV
 
 	  If unsure, say no.
 
-if FIELDBUS_DEV
+source "drivers/fieldbus/anybuss/Kconfig"
 
-endif

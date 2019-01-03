@@ -6,4 +6,6 @@
 obj-$(CONFIG_FIELDBUS_DEV)	+= fieldbus_dev.o
 fieldbus_dev-y			:= dev_core.o
 
-# Devices
+# Anybus-S core and devices
+obj-$(CONFIG_HMS_ANYBUSS_BUS)	+= anybuss/
+
