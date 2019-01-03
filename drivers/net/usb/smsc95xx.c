@@ -30,6 +30,7 @@
 #include <linux/usb/usbnet.h>
 #include <linux/slab.h>
 #include <linux/of_net.h>
+#include <linux/phy.h>
 #include "smsc95xx.h"
 
 #define SMSC_CHIPNAME			"smsc95xx"
@@ -76,6 +77,7 @@ struct smsc95xx_priv {
 	bool link_ok;
 	struct delayed_work carrier_check;
 	struct usbnet *dev;
+	struct mii_bus *mii_bus;
 };
 
 static bool turbo_mode = true;
@@ -209,6 +211,14 @@ done:
 	return ret;
 }
 
+static int smsc95xx_mii_read(struct mii_bus *bus, int phy_id, int reg)
+{
+	struct usbnet *dev = bus->priv;
+	struct net_device *netdev = dev->net;
+
+	return smsc95xx_mdio_read(netdev, phy_id, reg);
+}
+
 static void smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 				int idx, int regval)
 {
@@ -250,6 +260,16 @@ static void smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 
 done:
 	mutex_unlock(&dev->phy_mutex);
+}
+
+static int smsc95xx_mii_write(struct mii_bus *bus, int phy_id, int reg, u16 val)
+{
+	struct usbnet *dev = bus->priv;
+	struct net_device *netdev = dev->net;
+
+	smsc95xx_mdio_write(netdev, phy_id, reg, val);
+
+	return 0;
 }
 
 static int __must_check smsc95xx_wait_eeprom(struct usbnet *dev)
@@ -1206,14 +1226,6 @@ static int smsc95xx_reset(struct usbnet *dev)
 	if (ret)
 		return ret;
 
-	/* Initialize MII structure */
-	dev->mii.dev = dev->net;
-	dev->mii.mdio_read = smsc95xx_mdio_read;
-	dev->mii.mdio_write = smsc95xx_mdio_write;
-	dev->mii.phy_id_mask = 0x1f;
-	dev->mii.reg_num_mask = 0x1f;
-	dev->mii.phy_id = SMSC95XX_INTERNAL_PHY_ID;
-
 	return smsc95xx_reset_post(dev);
 }
 
@@ -1234,6 +1246,7 @@ static const struct net_device_ops smsc95xx_netdev_ops = {
 static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct smsc95xx_priv *pdata = NULL;
+	struct mii_bus *bus;
 	u32 val;
 	int ret;
 
@@ -1251,6 +1264,25 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	if (!pdata)
 		return -ENOMEM;
+
+	pdata->dev = dev;
+
+	bus = mdiobus_alloc();
+	if (!bus) {
+		ret = -ENOMEM;
+		goto err_mdiobus_alloc;
+	}
+
+	bus->priv = dev;
+	bus->name = "smsc95xx_mii_bus";
+	bus->read = smsc95xx_mii_read;
+	bus->write = smsc95xx_mii_write;
+	bus->parent = dev->net->dev.parent;
+	bus->phy_mask = BIT(0);
+	snprintf(bus->id, MII_BUS_ID_SIZE, "usb-%03d:%03d",
+		 dev->udev->bus->busnum, dev->udev->devnum);
+
+	pdata->mii_bus = bus;
 
 	spin_lock_init(&pdata->mac_cr_lock);
 
@@ -1272,12 +1304,30 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	smsc95xx_init_mac_address(dev);
 
 	/* Init all registers */
-	ret = smsc95xx_reset(dev);
+	ret = smsc95xx_reset_pre(dev);
+	if (ret)
+		goto err_mdiobus_alloc;
+
+	/* Initialize MII structure */
+	dev->mii.dev = dev->net;
+	dev->mii.mdio_read = smsc95xx_mdio_read;
+	dev->mii.mdio_write = smsc95xx_mdio_write;
+	dev->mii.phy_id_mask = 0x1f;
+	dev->mii.reg_num_mask = 0x1f;
+	dev->mii.phy_id = SMSC95XX_INTERNAL_PHY_ID;
+
+	ret = mdiobus_register(bus);
+	if (ret)
+		goto err_mdiobus_register;
+
+	ret = smsc95xx_reset_post(dev);
+	if (ret)
+		goto err_mdiobus_register;
 
 	/* detect device revision as different features may be available */
 	ret = smsc95xx_read_reg(dev, ID_REV, &val);
 	if (ret < 0)
-		goto err_read_reg;
+		goto err_mdiobus_register;
 	val >>= 16;
 	pdata->chip_id = val;
 	pdata->mdix_ctrl = get_mdix_status(dev->net);
@@ -1298,12 +1348,13 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->net->max_mtu = ETH_DATA_LEN;
 	dev->hard_mtu = dev->net->mtu + dev->net->hard_header_len;
 
-	pdata->dev = dev;
 	INIT_DELAYED_WORK(&pdata->carrier_check, check_carrier);
 	schedule_delayed_work(&pdata->carrier_check, CARRIER_CHECK_DELAY);
 
 	return 0;
-err_read_reg:
+err_mdiobus_register:
+	mdiobus_free(bus);
+err_mdiobus_alloc:
 	kfree(pdata);
 	return ret;
 }
@@ -1315,6 +1366,8 @@ static void smsc95xx_unbind(struct usbnet *dev, struct usb_interface *intf)
 	if (pdata) {
 		cancel_delayed_work(&pdata->carrier_check);
 		netif_dbg(dev, ifdown, dev->net, "free pdata\n");
+		mdiobus_unregister(pdata->mii_bus);
+		mdiobus_free(pdata->mii_bus);
 		kfree(pdata);
 		pdata = NULL;
 		dev->data[0] = 0;
