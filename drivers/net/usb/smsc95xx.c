@@ -990,7 +990,10 @@ static int smsc95xx_phy_initialize(struct usbnet *dev)
 
 	phy_write(pdata->phydev, PHY_INT_MASK,
 		PHY_INT_MASK_DEFAULT_);
-	mii_nway_restart(&dev->mii);
+
+	ret = genphy_restart_aneg(pdata->phydev);
+	if (ret)
+		return ret;
 
 	netif_dbg(dev, ifup, dev->net, "phy initialised successfully\n");
 	return 0;
