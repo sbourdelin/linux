@@ -13,6 +13,7 @@
 #include <linux/completion.h>
 #include <linux/sched/task.h>
 #include <uapi/rdma/rdma_netlink.h>
+#include <linux/xarray.h>
 
 /**
  * enum rdma_restrack_type - HW objects to track
@@ -48,7 +49,6 @@ enum rdma_restrack_type {
 	RDMA_RESTRACK_MAX
 };
 
-#define RDMA_RESTRACK_HASH_BITS	8
 struct rdma_restrack_entry;
 
 /**
@@ -61,9 +61,13 @@ struct rdma_restrack_root {
 	 */
 	struct rw_semaphore	rwsem;
 	/**
-	 * @hash: global database for all resources per-device
+	 * @xa: Array of XArray structures to hold restrack entries.
+	 * We want to use array of XArrays becasue insertion is type
+	 * dependant. For types with xisiting unique ID (like QPN),
+	 * we will insert to that unique index. For other types,
+	 * we insert based on pointers and auto-allocate unique index.
 	 */
-	DECLARE_HASHTABLE(hash, RDMA_RESTRACK_HASH_BITS);
+	struct xarray xa[RDMA_RESTRACK_MAX];
 	/**
 	 * @fill_res_entry: driver-specific fill function
 	 *
@@ -108,10 +112,6 @@ struct rdma_restrack_entry {
 	 * @kern_name: name of owner for the kernel created entities.
 	 */
 	const char		*kern_name;
-	/**
-	 * @node: hash table entry
-	 */
-	struct hlist_node	node;
 	/**
 	 * @type: various objects in restrack database
 	 */

@@ -20,8 +20,14 @@ static int fill_res_noop(struct sk_buff *msg,
 
 void rdma_restrack_init(struct rdma_restrack_root *res)
 {
+	int i;
+
+	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++)
+		xa_init(&res->xa[i]);
+
 	init_rwsem(&res->rwsem);
 	res->fill_res_entry = fill_res_noop;
+
 }
 
 static const char *type2str(enum rdma_restrack_type type)
@@ -43,33 +49,42 @@ void rdma_restrack_clean(struct rdma_restrack_root *res)
 	struct rdma_restrack_entry *e;
 	char buf[TASK_COMM_LEN];
 	struct ib_device *dev;
+	bool found = false;
 	const char *owner;
-	int bkt;
+	int i;
 
-	if (hash_empty(res->hash))
-		return;
+	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++) {
+		if (!xa_empty(&res->xa[i])) {
+			unsigned long index = 0;
 
-	dev = container_of(res, struct ib_device, res);
-	pr_err("restrack: %s", CUT_HERE);
-	dev_err(&dev->dev, "BUG: RESTRACK detected leak of resources\n");
-	hash_for_each(res->hash, bkt, e, node) {
-		if (rdma_is_kernel_res(e)) {
-			owner = e->kern_name;
-		} else {
-			/*
-			 * There is no need to call get_task_struct here,
-			 * because we can be here only if there are more
-			 * get_task_struct() call than put_task_struct().
-			 */
-			get_task_comm(buf, e->task);
-			owner = buf;
+			if (!found) {
+				dev = container_of(res, struct ib_device, res);
+				pr_err("restrack: %s", CUT_HERE);
+				dev_err(&dev->dev, "BUG: RESTRACK detected leak of resources\n");
+			}
+			xa_for_each(&res->xa[i], e, index, ULONG_MAX, XA_PRESENT) {
+				if (rdma_is_kernel_res(e)) {
+					owner = e->kern_name;
+				} else {
+					/*
+					 * There is no need to call get_task_struct here,
+					 * because we can be here only if there are more
+					 * get_task_struct() call than put_task_struct().
+					 */
+					get_task_comm(buf, e->task);
+					owner = buf;
+				}
+
+				pr_err("restrack: %s %s object allocated by %s is not freed\n",
+				       rdma_is_kernel_res(e) ? "Kernel" : "User",
+				       type2str(e->type), owner);
+			}
+			found = true;
 		}
-
-		pr_err("restrack: %s %s object allocated by %s is not freed\n",
-		       rdma_is_kernel_res(e) ? "Kernel" : "User",
-		       type2str(e->type), owner);
+		xa_destroy(&res->xa[i]);
 	}
-	pr_err("restrack: %s", CUT_HERE);
+	if (!found)
+		pr_err("restrack: %s", CUT_HERE);
 }
 
 int rdma_restrack_count(struct rdma_restrack_root *res,
@@ -77,10 +92,11 @@ int rdma_restrack_count(struct rdma_restrack_root *res,
 			struct pid_namespace *ns)
 {
 	struct rdma_restrack_entry *e;
+	unsigned long index = 0;
 	u32 cnt = 0;
 
 	down_read(&res->rwsem);
-	hash_for_each_possible(res->hash, e, node, type) {
+	xa_for_each(&res->xa[type], e, index, ULONG_MAX, XA_PRESENT) {
 		if (ns == &init_pid_ns ||
 		    (!rdma_is_kernel_res(e) &&
 		     ns == task_active_pid_ns(e->task)))
@@ -154,9 +170,29 @@ void rdma_restrack_set_task(struct rdma_restrack_entry *res,
 }
 EXPORT_SYMBOL(rdma_restrack_set_task);
 
+static unsigned long res_to_id(struct rdma_restrack_entry *res)
+{
+	switch (res->type) {
+	case RDMA_RESTRACK_PD:
+		return container_of(res, struct ib_pd, res)->pdn;
+	case RDMA_RESTRACK_MR:
+	case RDMA_RESTRACK_CM_ID:
+	case RDMA_RESTRACK_CTX:
+	case RDMA_RESTRACK_CQ:
+		return (unsigned long)res;
+	case RDMA_RESTRACK_QP:
+		return container_of(res, struct ib_qp, res)->qp_num;
+	default:
+		WARN_ONCE(true, "Wrong resource tracking type %u\n", res->type);
+		return 0;
+	}
+}
+
 static void rdma_restrack_add(struct rdma_restrack_entry *res)
 {
 	struct ib_device *dev = res_to_dev(res);
+	unsigned long id;
+	int ret;
 
 	if (!dev)
 		return;
@@ -177,7 +213,11 @@ static void rdma_restrack_add(struct rdma_restrack_entry *res)
 	res->valid = true;
 
 	down_write(&dev->res.rwsem);
-	hash_add(dev->res.hash, &res->node, res->type);
+	id = res_to_id(res);
+	ret = xa_insert(&dev->res.xa[res->type], id, res, GFP_KERNEL);
+	WARN_ONCE(ret == -EEXIST, "Tried to add non-unique type %d entry\n", res->type);
+	if (ret)
+		res->valid = false;
 	up_write(&dev->res.rwsem);
 }
 
@@ -226,6 +266,7 @@ EXPORT_SYMBOL(rdma_restrack_put);
 void rdma_restrack_del(struct rdma_restrack_entry *res)
 {
 	struct ib_device *dev;
+	unsigned long id;
 
 	if (!res->valid)
 		goto out;
@@ -237,9 +278,10 @@ void rdma_restrack_del(struct rdma_restrack_entry *res)
 	rdma_restrack_put(res);
 
 	wait_for_completion(&res->comp);
+	id = res_to_id(res);
 
 	down_write(&dev->res.rwsem);
-	hash_del(&res->node);
+	xa_erase(&dev->res.xa[res->type], id);
 	res->valid = false;
 	up_write(&dev->res.rwsem);
 
