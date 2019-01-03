@@ -491,18 +491,19 @@ static int uio_open(struct inode *inode, struct file *filep)
 	if (!idev->info) {
 		mutex_unlock(&idev->info_lock);
 		ret = -EINVAL;
-		goto err_alloc_listener;
+		goto err_idev_info;
 	}
 
 	if (idev->info && idev->info->open)
 		ret = idev->info->open(idev->info, inode);
 	mutex_unlock(&idev->info_lock);
 	if (ret)
-		goto err_infoopen;
+		goto err_idev_info;
 
 	return 0;
 
-err_infoopen:
+err_idev_info:
+	filep->private_data = NULL;
 	kfree(listener);
 
 err_alloc_listener:
