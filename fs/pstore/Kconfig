@@ -159,3 +159,12 @@ config PSTORE_ROM
 	help
 	  This enables panic and oops message to be logged to a block dev
 	  where it can be read back at some later point.
+
+config PSTORE_ROMBUF
+	tristate "romoop buffer sample"
+	depends on PSTORE_ROM
+	help
+	  This is a sample for pstore rom, but do NOT have a block dev.
+	  According to pstore_rom, the data will be saved to ram buffer and
+	  dropped when reboot. So, it can only used to dump Oops and some
+	  things will not reboot.
