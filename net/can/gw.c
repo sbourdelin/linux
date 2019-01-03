@@ -418,6 +418,10 @@ static void can_can_gw_rcv(struct sk_buff *skb, void *data)
 
 	/* check for checksum updates when the CAN frame has been modified */
 	if (modidx) {
+		/* ensure DLC boundaries after the different mods */
+		if (cf->can_dlc > 8)
+			cf->can_dlc = 8;
+
 		if (gwj->mod.csumfunc.crc8)
 			(*gwj->mod.csumfunc.crc8)(cf, &gwj->mod.csum.crc8);
 
