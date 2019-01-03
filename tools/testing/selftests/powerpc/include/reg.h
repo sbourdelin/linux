@@ -77,6 +77,51 @@
 #define TEXASR_TE	0x0000000004000000
 #define TEXASR_ROT	0x0000000002000000
 
+/* MSR register bits */
+#define MSR_SF_LG       63              /* Enable 64 bit mode */
+#define MSR_ISF_LG      61              /* Interrupt 64b mode valid on 630 */
+#define MSR_HV_LG       60              /* Hypervisor state */
+#define MSR_TS_T_LG     34              /* Trans Mem state: Transactional */
+#define MSR_TS_S_LG     33              /* Trans Mem state: Suspended */
+#define MSR_TS_LG       33              /* Trans Mem state (2 bits) */
+#define MSR_TM_LG       32              /* Trans Mem Available */
+#define MSR_VEC_LG      25              /* Enable AltiVec */
+#define MSR_VSX_LG      23              /* Enable VSX */
+#define MSR_POW_LG      18              /* Enable Power Management */
+#define MSR_WE_LG       18              /* Wait State Enable */
+#define MSR_TGPR_LG     17              /* TLB Update registers in use */
+#define MSR_CE_LG       17              /* Critical Interrupt Enable */
+#define MSR_ILE_LG      16              /* Interrupt Little Endian */
+#define MSR_EE_LG       15              /* External Interrupt Enable */
+#define MSR_PR_LG       14              /* Problem State / Privilege Level */
+#define MSR_FP_LG       13              /* Floating Point enable */
+#define MSR_ME_LG       12              /* Machine Check Enable */
+#define MSR_FE0_LG      11              /* Floating Exception mode 0 */
+#define MSR_SE_LG       10              /* Single Step */
+#define MSR_BE_LG       9               /* Branch Trace */
+#define MSR_DE_LG       9               /* Debug Exception Enable */
+#define MSR_FE1_LG      8               /* Floating Exception mode 1 */
+#define MSR_IP_LG       6               /* Exception prefix 0x000/0xFFF */
+#define MSR_IR_LG       5               /* Instruction Relocate */
+#define MSR_DR_LG       4               /* Data Relocate */
+#define MSR_PE_LG       3               /* Protection Enable */
+#define MSR_PX_LG       2               /* Protection Exclusive Mode */
+#define MSR_PMM_LG      2               /* Performance monitor */
+#define MSR_RI_LG       1               /* Recoverable Exception */
+#define MSR_LE_LG       0               /* Little Endian */
+
+#ifdef __ASSEMBLY__
+#define __MASK(X)       (1<<(X))
+#else
+#define __MASK(X)       (1UL<<(X))
+#endif
+
+/* macros to check TM MSR bits */
+#define MSR_TM          __MASK(MSR_TM_LG)     /* Transactional Mem Available */
+#define MSR_TS_S        __MASK(MSR_TS_S_LG)   /* Transaction Suspended */
+#define MSR_TS_T        __MASK(MSR_TS_T_LG)   /* Transaction Transactional */
+#define MSR_TS_MASK     (MSR_TS_T | MSR_TS_S) /* Transaction State bits */
+
 /* Vector Instructions */
 #define VSX_XX1(xs, ra, rb)	(((xs) & 0x1f) << 21 | ((ra) << 16) |  \
 				 ((rb) << 11) | (((xs) >> 5)))
