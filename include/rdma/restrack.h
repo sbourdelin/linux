@@ -7,7 +7,6 @@
 #define _RDMA_RESTRACK_H_
 
 #include <linux/typecheck.h>
-#include <linux/rwsem.h>
 #include <linux/sched.h>
 #include <linux/kref.h>
 #include <linux/completion.h>
@@ -56,10 +55,6 @@ struct rdma_restrack_entry;
  * entity, per-device
  */
 struct rdma_restrack_root {
-	/*
-	 * @rwsem: Read/write lock to protect lists and IDR
-	 */
-	struct rw_semaphore	rwsem;
 	/**
 	 * @xa: Array of XArray structures to hold restrack entries.
 	 * We want to use array of XArrays becasue insertion is type

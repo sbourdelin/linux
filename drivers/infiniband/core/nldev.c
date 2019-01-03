@@ -1116,7 +1116,6 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 
 	has_cap_net_admin = netlink_capable(cb->skb, CAP_NET_ADMIN);
 
-	down_read(&device->res.rwsem);
 	xa_for_each(&device->res.xa[res_type], res, id, ULONG_MAX, XA_PRESENT) {
 		if (idx < start)
 			goto next;
@@ -1134,13 +1133,7 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 
 		filled = true;
 
-		up_read(&device->res.rwsem);
 		ret = fe->fill_res_func(skb, has_cap_net_admin, res, port);
-		down_read(&device->res.rwsem);
-		/*
-		 * Return resource back, but it won't be released till
-		 * the &device->res.rwsem will be released for write.
-		 */
 		rdma_restrack_put(res);
 
 		if (ret == -EMSGSIZE)
@@ -1154,7 +1147,6 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 			goto res_err;
 next:		idx++;
 	}
-	up_read(&device->res.rwsem);
 
 	nla_nest_end(skb, table_attr);
 	nlmsg_end(skb, nlh);
@@ -1172,7 +1164,6 @@ next:		idx++;
 
 res_err:
 	nla_nest_cancel(skb, table_attr);
-	up_read(&device->res.rwsem);
 
 err:
 	nlmsg_cancel(skb, nlh);

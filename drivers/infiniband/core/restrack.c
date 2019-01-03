@@ -25,7 +25,6 @@ void rdma_restrack_init(struct rdma_restrack_root *res)
 	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++)
 		xa_init(&res->xa[i]);
 
-	init_rwsem(&res->rwsem);
 	res->fill_res_entry = fill_res_noop;
 
 }
@@ -95,14 +94,12 @@ int rdma_restrack_count(struct rdma_restrack_root *res,
 	unsigned long index = 0;
 	u32 cnt = 0;
 
-	down_read(&res->rwsem);
 	xa_for_each(&res->xa[type], e, index, ULONG_MAX, XA_PRESENT) {
 		if (ns == &init_pid_ns ||
 		    (!rdma_is_kernel_res(e) &&
 		     ns == task_active_pid_ns(e->task)))
 			cnt++;
 	}
-	up_read(&res->rwsem);
 	return cnt;
 }
 EXPORT_SYMBOL(rdma_restrack_count);
@@ -212,13 +209,11 @@ static void rdma_restrack_add(struct rdma_restrack_entry *res)
 	init_completion(&res->comp);
 	res->valid = true;
 
-	down_write(&dev->res.rwsem);
 	id = res_to_id(res);
 	ret = xa_insert(&dev->res.xa[res->type], id, res, GFP_KERNEL);
 	WARN_ONCE(ret == -EEXIST, "Tried to add non-unique type %d entry\n", res->type);
 	if (ret)
 		res->valid = false;
-	up_write(&dev->res.rwsem);
 }
 
 /**
@@ -293,10 +288,8 @@ void rdma_restrack_del(struct rdma_restrack_entry *res)
 	wait_for_completion(&res->comp);
 	id = res_to_id(res);
 
-	down_write(&dev->res.rwsem);
 	xa_erase(&dev->res.xa[res->type], id);
 	res->valid = false;
-	up_write(&dev->res.rwsem);
 
 out:
 	if (res->task) {
