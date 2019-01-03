@@ -22,6 +22,7 @@
 #include <asm/x86_init.h>
 #include <asm/reboot.h>
 #include <asm/kvmclock.h>
+#include <asm/processor.h>
 
 static int kvmclock __initdata = 1;
 static int kvmclock_vsyscall __initdata = 1;
@@ -312,6 +313,7 @@ static int kvmclock_setup_percpu(unsigned int cpu)
 void __init kvmclock_init(void)
 {
 	u8 flags;
+	struct cpuinfo_x86 *c = &boot_cpu_data;
 
 	if (!kvm_para_available() || !kvmclock)
 		return;
@@ -355,6 +357,18 @@ void __init kvmclock_init(void)
 	machine_ops.crash_shutdown  = kvm_crash_shutdown;
 #endif
 	kvm_get_preset_lpj();
+
+	/*
+	 * c->x86_power is 8000_0007 edx. Bit 8 is TSC runs at constant rate
+	 * with P/T states and does not stop in deep C-states.
+	 *
+	 * Invariant TSC exposed by host means kvmclock is not necessary:
+	 * can use TSC as clocksource.
+	 *
+	 */
+	if (c->x86_power & (1 << 8))
+		kvm_clock.rating = 299;
+
 	clocksource_register_hz(&kvm_clock, NSEC_PER_SEC);
 	pv_info.name = "KVM";
 }
