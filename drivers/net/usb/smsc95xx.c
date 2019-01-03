@@ -970,25 +970,16 @@ static void smsc95xx_adjust_link(struct net_device *netdev)
 static int smsc95xx_phy_initialize(struct usbnet *dev)
 {
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
-	int bmcr, ret, timeout = 0;
+	int ret;
 
 	/* reset phy and wait for reset to complete */
-	phy_write(pdata->phydev, MII_BMCR, BMCR_RESET);
+	ret = genphy_soft_reset(pdata->phydev);
+	if (ret)
+		return ret;
 
-	do {
-		msleep(10);
-		bmcr = phy_read(pdata->phydev, MII_BMCR);
-		timeout++;
-	} while ((bmcr & BMCR_RESET) && (timeout < 100));
-
-	if (timeout >= 100) {
-		netdev_warn(dev->net, "timeout on PHY Reset");
-		return -EIO;
-	}
-
-	phy_write(pdata->phydev, MII_ADVERTISE,
-		ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP |
-		ADVERTISE_PAUSE_ASYM);
+	ret = genphy_config_aneg(pdata->phydev);
+	if (ret)
+		return ret;
 
 	/* read to clear */
 	ret = phy_read(pdata->phydev, PHY_INT_SRC);
