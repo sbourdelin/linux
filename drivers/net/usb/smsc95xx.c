@@ -143,18 +143,6 @@ static int __must_check __smsc95xx_write_reg(struct usbnet *dev, u32 index,
 	return ret;
 }
 
-static int __must_check smsc95xx_read_reg_nopm(struct usbnet *dev, u32 index,
-					       u32 *data)
-{
-	return __smsc95xx_read_reg(dev, index, data);
-}
-
-static int __must_check smsc95xx_write_reg_nopm(struct usbnet *dev, u32 index,
-						u32 data)
-{
-	return __smsc95xx_write_reg(dev, index, data);
-}
-
 static int __must_check smsc95xx_read_reg(struct usbnet *dev, u32 index,
 					  u32 *data)
 {
@@ -1403,14 +1391,14 @@ static int smsc95xx_enter_suspend0(struct usbnet *dev)
 	u32 val;
 	int ret;
 
-	ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+	ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 	if (ret < 0)
 		return ret;
 
 	val &= (~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_));
 	val |= PM_CTL_SUS_MODE_0;
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		return ret;
 
@@ -1422,12 +1410,12 @@ static int smsc95xx_enter_suspend0(struct usbnet *dev)
 	if (pdata->wolopts & WAKE_PHY)
 		val |= PM_CTL_WUPS_ED_;
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		return ret;
 
 	/* read back PM_CTRL */
-	ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+	ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 	if (ret < 0)
 		return ret;
 
@@ -1460,14 +1448,14 @@ static int smsc95xx_enter_suspend1(struct usbnet *dev)
 	smsc95xx_mdio_write_nopm(dev->net, mii->phy_id, PHY_MODE_CTRL_STS, ret);
 
 	/* enter SUSPEND1 mode */
-	ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+	ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 	if (ret < 0)
 		return ret;
 
 	val &= ~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_);
 	val |= PM_CTL_SUS_MODE_1;
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		return ret;
 
@@ -1475,7 +1463,7 @@ static int smsc95xx_enter_suspend1(struct usbnet *dev)
 	val &= ~PM_CTL_WUPS_;
 	val |= (PM_CTL_WUPS_ED_ | PM_CTL_ED_EN_);
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		return ret;
 
@@ -1490,14 +1478,14 @@ static int smsc95xx_enter_suspend2(struct usbnet *dev)
 	u32 val;
 	int ret;
 
-	ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+	ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 	if (ret < 0)
 		return ret;
 
 	val &= ~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_);
 	val |= PM_CTL_SUS_MODE_2;
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		return ret;
 
@@ -1512,7 +1500,7 @@ static int smsc95xx_enter_suspend3(struct usbnet *dev)
 	u32 val;
 	int ret;
 
-	ret = smsc95xx_read_reg_nopm(dev, RX_FIFO_INF, &val);
+	ret = smsc95xx_read_reg(dev, RX_FIFO_INF, &val);
 	if (ret < 0)
 		return ret;
 
@@ -1521,14 +1509,14 @@ static int smsc95xx_enter_suspend3(struct usbnet *dev)
 		return -EBUSY;
 	}
 
-	ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+	ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 	if (ret < 0)
 		return ret;
 
 	val &= ~(PM_CTL_SUS_MODE_ | PM_CTL_WUPS_ | PM_CTL_PHY_RST_);
 	val |= PM_CTL_SUS_MODE_3 | PM_CTL_RES_CLR_WKP_STS;
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		return ret;
 
@@ -1536,7 +1524,7 @@ static int smsc95xx_enter_suspend3(struct usbnet *dev)
 	val &= ~PM_CTL_WUPS_;
 	val |= PM_CTL_WUPS_WOL_;
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		return ret;
 
@@ -1630,23 +1618,23 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		netdev_info(dev->net, "entering SUSPEND2 mode\n");
 
 		/* disable energy detect (link up) & wake up events */
-		ret = smsc95xx_read_reg_nopm(dev, WUCSR, &val);
+		ret = smsc95xx_read_reg(dev, WUCSR, &val);
 		if (ret < 0)
 			goto done;
 
 		val &= ~(WUCSR_MPEN_ | WUCSR_WAKE_EN_);
 
-		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
+		ret = smsc95xx_write_reg(dev, WUCSR, val);
 		if (ret < 0)
 			goto done;
 
-		ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+		ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 		if (ret < 0)
 			goto done;
 
 		val &= ~(PM_CTL_ED_EN_ | PM_CTL_WOL_EN_);
 
-		ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+		ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 		if (ret < 0)
 			goto done;
 
@@ -1744,7 +1732,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		}
 
 		for (i = 0; i < (wuff_filter_count * 4); i++) {
-			ret = smsc95xx_write_reg_nopm(dev, WUFF, filter_mask[i]);
+			ret = smsc95xx_write_reg(dev, WUFF, filter_mask[i]);
 			if (ret < 0) {
 				kfree(filter_mask);
 				goto done;
@@ -1753,50 +1741,50 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		kfree(filter_mask);
 
 		for (i = 0; i < (wuff_filter_count / 4); i++) {
-			ret = smsc95xx_write_reg_nopm(dev, WUFF, command[i]);
+			ret = smsc95xx_write_reg(dev, WUFF, command[i]);
 			if (ret < 0)
 				goto done;
 		}
 
 		for (i = 0; i < (wuff_filter_count / 4); i++) {
-			ret = smsc95xx_write_reg_nopm(dev, WUFF, offset[i]);
+			ret = smsc95xx_write_reg(dev, WUFF, offset[i]);
 			if (ret < 0)
 				goto done;
 		}
 
 		for (i = 0; i < (wuff_filter_count / 2); i++) {
-			ret = smsc95xx_write_reg_nopm(dev, WUFF, crc[i]);
+			ret = smsc95xx_write_reg(dev, WUFF, crc[i]);
 			if (ret < 0)
 				goto done;
 		}
 
 		/* clear any pending pattern match packet status */
-		ret = smsc95xx_read_reg_nopm(dev, WUCSR, &val);
+		ret = smsc95xx_read_reg(dev, WUCSR, &val);
 		if (ret < 0)
 			goto done;
 
 		val |= WUCSR_WUFR_;
 
-		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
+		ret = smsc95xx_write_reg(dev, WUCSR, val);
 		if (ret < 0)
 			goto done;
 	}
 
 	if (pdata->wolopts & WAKE_MAGIC) {
 		/* clear any pending magic packet status */
-		ret = smsc95xx_read_reg_nopm(dev, WUCSR, &val);
+		ret = smsc95xx_read_reg(dev, WUCSR, &val);
 		if (ret < 0)
 			goto done;
 
 		val |= WUCSR_MPR_;
 
-		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
+		ret = smsc95xx_write_reg(dev, WUCSR, val);
 		if (ret < 0)
 			goto done;
 	}
 
 	/* enable/disable wakeup sources */
-	ret = smsc95xx_read_reg_nopm(dev, WUCSR, &val);
+	ret = smsc95xx_read_reg(dev, WUCSR, &val);
 	if (ret < 0)
 		goto done;
 
@@ -1816,12 +1804,12 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		val &= ~WUCSR_MPEN_;
 	}
 
-	ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
+	ret = smsc95xx_write_reg(dev, WUCSR, val);
 	if (ret < 0)
 		goto done;
 
 	/* enable wol wakeup source */
-	ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+	ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 	if (ret < 0)
 		goto done;
 
@@ -1831,7 +1819,7 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 	if (pdata->wolopts & WAKE_PHY)
 		val |= PM_CTL_ED_EN_;
 
-	ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+	ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 	if (ret < 0)
 		goto done;
 
@@ -1877,25 +1865,25 @@ static int smsc95xx_resume(struct usb_interface *intf)
 
 	if (suspend_flags & SUSPEND_ALLMODES) {
 		/* clear wake-up sources */
-		ret = smsc95xx_read_reg_nopm(dev, WUCSR, &val);
+		ret = smsc95xx_read_reg(dev, WUCSR, &val);
 		if (ret < 0)
 			return ret;
 
 		val &= ~(WUCSR_WAKE_EN_ | WUCSR_MPEN_);
 
-		ret = smsc95xx_write_reg_nopm(dev, WUCSR, val);
+		ret = smsc95xx_write_reg(dev, WUCSR, val);
 		if (ret < 0)
 			return ret;
 
 		/* clear wake-up status */
-		ret = smsc95xx_read_reg_nopm(dev, PM_CTRL, &val);
+		ret = smsc95xx_read_reg(dev, PM_CTRL, &val);
 		if (ret < 0)
 			return ret;
 
 		val &= ~PM_CTL_WOL_EN_;
 		val |= PM_CTL_WUPS_;
 
-		ret = smsc95xx_write_reg_nopm(dev, PM_CTRL, val);
+		ret = smsc95xx_write_reg(dev, PM_CTRL, val);
 		if (ret < 0)
 			return ret;
 	}
