@@ -26,6 +26,10 @@
  *             [queue D]  ---> [worker]
  *             [queue E]  ---> [worker]
  *
+ * Both models correspond to 1 producer and many consumers, where a single
+ * producer is a writer thread and consumers are many workers threads
+ * waiting for events.
+ *
  * Naturally, the single queue will enforce more concurrency on the epoll
  * instance, and can therefore scale poorly compared to multiple queues.
  * However, this is a benchmark raw data and must be taken with a grain of
@@ -409,7 +413,7 @@ static int cmpworker(const void *p1, const void *p2)
 	return w1->tid > w2->tid;
 }
 
-int bench_epoll_wait(int argc, const char **argv)
+int bench_epoll_wait_1pmc(int argc, const char **argv)
 {
 	int ret = 0;
 	struct sigaction act;

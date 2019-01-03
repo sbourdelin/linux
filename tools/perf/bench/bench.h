@@ -38,7 +38,7 @@ int bench_futex_requeue(int argc, const char **argv);
 /* pi futexes */
 int bench_futex_lock_pi(int argc, const char **argv);
 
-int bench_epoll_wait(int argc, const char **argv);
+int bench_epoll_wait_1pmc(int argc, const char **argv);
 int bench_epoll_ctl(int argc, const char **argv);
 
 #define BENCH_FORMAT_DEFAULT_STR	"default"
