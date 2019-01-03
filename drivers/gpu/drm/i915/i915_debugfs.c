@@ -2757,10 +2757,34 @@ static int i915_edp_psr_status(struct seq_file *m, void *data)
 		seq_printf(m, "Performance counter: %u\n", val);
 	}
 
-	if ((psr->debug & I915_PSR_DEBUG_IRQ) && !psr->psr2_enabled) {
-		seq_printf(m, "Last attempted entry at: %lld\n",
-			   psr->last_entry_attempt);
-		seq_printf(m, "Last exit at: %lld\n", psr->last_exit);
+	if (!psr->psr2_enabled) {
+		if (psr->debug & I915_PSR_DEBUG_IRQ) {
+			seq_printf(m, "Last attempted entry at: %lld\n",
+				   psr->last_entry_attempt);
+			seq_printf(m, "Last exit at: %lld\n", psr->last_exit);
+		}
+	} else {
+		u8 frame;
+
+		seq_puts(m, "Frame:\tPSR2 SU blocks:\n");
+
+		for (frame = 0; frame < PSR2_SU_STATUS_FRAMES; frame++) {
+			u32 su_blocks;
+
+			/*
+			 * Avoid register reads as each register contains more
+			 * than one frame value
+			 */
+			if ((frame % 3) == 0)
+				val = I915_READ(PSR2_SU_STATUS(frame));
+
+			su_blocks = val & PSR2_SU_STATUS_MASK(frame);
+			su_blocks = su_blocks >> PSR2_SU_STATUS_SHIFT(frame);
+			/* Only printing frames with SU blocks */
+			if (!su_blocks)
+				continue;
+			seq_printf(m, "%d\t%d\n", frame, su_blocks);
+		}
 	}
 
 unlock:
