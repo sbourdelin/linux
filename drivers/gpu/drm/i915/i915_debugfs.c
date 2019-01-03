@@ -2775,19 +2775,29 @@ i915_edp_psr_debug_set(void *data, u64 val)
 {
 	struct drm_i915_private *dev_priv = data;
 	struct drm_modeset_acquire_ctx ctx;
-	int ret;
+	const u32 mode = val & I915_PSR_DEBUG_MODE_MASK;
+	int ret = 0;
 
 	if (!CAN_PSR(dev_priv))
 		return -ENODEV;
 
 	DRM_DEBUG_KMS("Setting PSR debug to %llx\n", val);
 
+	if (val & ~(I915_PSR_DEBUG_IRQ | I915_PSR_DEBUG_MODE_MASK) ||
+	    mode > I915_PSR_DEBUG_FORCE_PSR1) {
+		DRM_DEBUG_KMS("Invalid debug mask %llx\n", val);
+		return -EINVAL;
+	}
+
+	if (!mode)
+		goto skip_mode;
+
 	intel_runtime_pm_get(dev_priv);
 
 	drm_modeset_acquire_init(&ctx, DRM_MODESET_ACQUIRE_INTERRUPTIBLE);
 
 retry:
-	ret = intel_psr_set_debugfs_mode(dev_priv, &ctx, val);
+	ret = intel_psr_set_debugfs_mode(dev_priv, &ctx, mode);
 	if (ret == -EDEADLK) {
 		ret = drm_modeset_backoff(&ctx);
 		if (!ret)
@@ -2798,6 +2808,14 @@ retry:
 	drm_modeset_acquire_fini(&ctx);
 
 	intel_runtime_pm_put(dev_priv);
+
+skip_mode:
+	if (!ret) {
+		mutex_lock(&dev_priv->psr.lock);
+		dev_priv->psr.debug = val;
+		intel_psr_irq_control(dev_priv, dev_priv->psr.debug);
+		mutex_unlock(&dev_priv->psr.lock);
+	}
 
 	return ret;
 }
