@@ -1113,7 +1113,7 @@ static int rt274_i2c_probe(struct i2c_client *i2c,
 	struct rt274_priv *rt274;
 
 	int ret;
-	unsigned int val;
+	unsigned int val = ~0;
 
 	rt274 = devm_kzalloc(&i2c->dev,	sizeof(*rt274),
 				GFP_KERNEL);
@@ -1128,9 +1128,9 @@ static int rt274_i2c_probe(struct i2c_client *i2c,
 		return ret;
 	}
 
-	regmap_read(rt274->regmap,
+	ret = regmap_read(rt274->regmap,
 		RT274_GET_PARAM(AC_NODE_ROOT, AC_PAR_VENDOR_ID), &val);
-	if (val != RT274_VENDOR_ID) {
+	if (ret || val != RT274_VENDOR_ID) {
 		dev_err(&i2c->dev,
 			"Device with ID register %#x is not rt274\n", val);
 		return -ENODEV;
