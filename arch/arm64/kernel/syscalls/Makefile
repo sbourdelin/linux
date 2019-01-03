@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: GPL-2.0
+kapi := arch/$(SRCARCH)/include/generated/asm
+uapi := arch/$(SRCARCH)/include/generated/uapi/asm
+
+_dummy := $(shell [ -d '$(uapi)' ] || mkdir -p '$(uapi)')	\
+	  $(shell [ -d '$(kapi)' ] || mkdir -p '$(kapi)')
+
+syscall32 := $(srctree)/$(src)/syscall_arm32.tbl
+syscall64 := $(srctree)/scripts/syscalls/syscall.tbl
+syshdr := $(srctree)/scripts/syscallhdr.sh
+sysnr := $(srctree)/scripts/syscallnr.sh
+systbl := $(srctree)/scripts/syscalltbl.sh
+
+quiet_cmd_syshdr = SYSHDR  $@
+      cmd_syshdr = $(CONFIG_SHELL) '$(syshdr)' '$<' '$@'	\
+		   '$(syshdr_abis_$(basetarget))'		\
+		   '$(syshdr_pfx_$(basetarget))'		\
+		   '$(syshdr_offset_$(basetarget))'
+
+quiet_cmd_sysnr = SYSNR  $@
+      cmd_sysnr = $(CONFIG_SHELL) '$(sysnr)' '$<' '$@'		\
+		  '$(sysnr_abis_$(basetarget))'			\
+		  '$(sysnr_pfx_$(basetarget))'			\
+		  '$(sysnr_offset_$(basetarget))'
+
+quiet_cmd_systbl = SYSTBL  $@
+      cmd_systbl = $(CONFIG_SHELL) '$(systbl)' '$<' '$@'	\
+		   '$(systbl_abis_$(basetarget))'		\
+		   '$(systbl_abi_$(basetarget))'		\
+		   '$(systbl_offset_$(basetarget))'
+
+syshdr_abis_unistd_32 := common,eabi,rename,stat64
+$(uapi)/unistd_32.h: $(syscall32) $(syshdr)
+	$(call if_changed,syshdr)
+
+syshdr_abis_unistd_64 := common,64,rename,nwstat,mmu
+$(uapi)/unistd_64.h: $(syscall64) $(syshdr)
+	$(call if_changed,syshdr)
+
+sysnr_pfx_unistd_nr_64 := 64
+$(uapi)/unistd_nr_64.h: $(syscall64) $(sysnr)
+	$(call if_changed,sysnr)
+
+sysnr_pfx_unistd_nr_c32 := C32
+$(uapi)/unistd_nr_c32.h: $(syscall32) $(sysnr)
+	$(call if_changed,sysnr)
+
+systbl_abis_syscall_table_64 := common,64,rename,nwstat,mmu
+systbl_abi_syscall_table_64 := 64
+$(kapi)/syscall_table_64.h: $(syscall64) $(systbl)
+	$(call if_changed,systbl)
+
+systbl_abis_syscall_table_c32 := common,eabi,rename,stat64,mmu
+systbl_abi_syscall_table_c32 := c32
+$(kapi)/syscall_table_c32.h: $(syscall32) $(systbl)
+	$(call if_changed,systbl)
+
+uapisyshdr-y		+= unistd_32.h			\
+			   unistd_64.h			\
+			   unistd_nr_64.h		\
+			   unistd_nr_c32.h
+kapisyshdr-y		+= syscall_table_64.h		\
+			   syscall_table_c32.h
+
+targets	+= $(uapisyshdr-y) $(kapisyshdr-y)
+
+PHONY += all
+all: $(addprefix $(uapi)/,$(uapisyshdr-y))
+all: $(addprefix $(kapi)/,$(kapisyshdr-y))
+	@:
