@@ -8,4 +8,3 @@ fieldbus_dev-y			:= dev_core.o
 
 # Anybus-S core and devices
 obj-$(CONFIG_HMS_ANYBUSS_BUS)	+= anybuss/
-
