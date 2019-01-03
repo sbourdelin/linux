@@ -47,15 +47,8 @@ shrinker_lock(struct drm_i915_private *i915, unsigned int flags, bool *unlock)
 	case MUTEX_TRYLOCK_FAILED:
 		*unlock = false;
 		if (flags & I915_SHRINK_ACTIVE) {
-			preempt_disable();
-			do {
-				cpu_relax();
-				if (mutex_trylock(&i915->drm.struct_mutex)) {
-					*unlock = true;
-					break;
-				}
-			} while (!need_resched());
-			preempt_enable();
+			mutex_lock(&i915->drm.struct_mutex);
+			*unlock = true;
 		}
 		return *unlock;
 
