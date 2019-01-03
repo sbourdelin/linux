@@ -916,6 +916,11 @@ struct nldev_fill_res_entry {
 			     struct rdma_restrack_entry *res, u32 port);
 	enum rdma_nldev_attr nldev_attr;
 	enum rdma_nldev_command nldev_cmd;
+	u8 flags;
+};
+
+enum nldev_res_flags {
+	NLDEV_PER_DEV = 1 << 0,
 };
 
 static const struct nldev_fill_res_entry fill_entries[RDMA_RESTRACK_MAX] = {
@@ -933,16 +938,20 @@ static const struct nldev_fill_res_entry fill_entries[RDMA_RESTRACK_MAX] = {
 		.fill_res_func = fill_res_cq_entry,
 		.nldev_cmd = RDMA_NLDEV_CMD_RES_CQ_GET,
 		.nldev_attr = RDMA_NLDEV_ATTR_RES_CQ,
+		.flags = NLDEV_PER_DEV,
 	},
 	[RDMA_RESTRACK_MR] = {
 		.fill_res_func = fill_res_mr_entry,
 		.nldev_cmd = RDMA_NLDEV_CMD_RES_MR_GET,
 		.nldev_attr = RDMA_NLDEV_ATTR_RES_MR,
+		.flags = NLDEV_PER_DEV,
+
 	},
 	[RDMA_RESTRACK_PD] = {
 		.fill_res_func = fill_res_pd_entry,
 		.nldev_cmd = RDMA_NLDEV_CMD_RES_PD_GET,
 		.nldev_attr = RDMA_NLDEV_ATTR_RES_PD,
+		.flags = NLDEV_PER_DEV,
 	},
 };
 
