@@ -165,7 +165,7 @@ static int __must_check __smsc95xx_phy_wait_not_busy(struct usbnet *dev)
 	return -EIO;
 }
 
-static int __smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
+static int smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u32 val, addr;
@@ -209,8 +209,8 @@ done:
 	return ret;
 }
 
-static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
-				  int idx, int regval)
+static void smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
+				int idx, int regval)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u32 val, addr;
@@ -250,17 +250,6 @@ static void __smsc95xx_mdio_write(struct net_device *netdev, int phy_id,
 
 done:
 	mutex_unlock(&dev->phy_mutex);
-}
-
-static int smsc95xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
-{
-	return __smsc95xx_mdio_read(netdev, phy_id, idx);
-}
-
-static void smsc95xx_mdio_write(struct net_device *netdev, int phy_id, int idx,
-				int regval)
-{
-	__smsc95xx_mdio_write(netdev, phy_id, idx, regval);
 }
 
 static int __must_check smsc95xx_wait_eeprom(struct usbnet *dev)
