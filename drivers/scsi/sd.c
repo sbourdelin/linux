@@ -1193,7 +1193,11 @@ static int sd_setup_read_write_cmnd(struct scsi_cmnd *SCpnt)
 		SCpnt->cmnd[11] = (unsigned char) (this_count >> 16) & 0xff;
 		SCpnt->cmnd[12] = (unsigned char) (this_count >> 8) & 0xff;
 		SCpnt->cmnd[13] = (unsigned char) this_count & 0xff;
-		SCpnt->cmnd[14] = SCpnt->cmnd[15] = 0;
+		if (rq_data_dir(rq) == WRITE)
+			SCpnt->cmnd[14] = rq->bio->bi_write_hint & 0x3f;
+		else
+			SCpnt->cmnd[14] = 0;
+		SCpnt->cmnd[15] = 0;
 	} else if ((this_count > 0xff) || (block > 0x1fffff) ||
 		   scsi_device_protection(SCpnt->device) ||
 		   SCpnt->device->use_10_for_rw) {
@@ -1203,9 +1207,13 @@ static int sd_setup_read_write_cmnd(struct scsi_cmnd *SCpnt)
 		SCpnt->cmnd[3] = (unsigned char) (block >> 16) & 0xff;
 		SCpnt->cmnd[4] = (unsigned char) (block >> 8) & 0xff;
 		SCpnt->cmnd[5] = (unsigned char) block & 0xff;
-		SCpnt->cmnd[6] = SCpnt->cmnd[9] = 0;
+		if (rq_data_dir(rq) == WRITE)
+			SCpnt->cmnd[6] = rq->bio->bi_write_hint & 0x1f;
+		else
+			SCpnt->cmnd[6] = 0;
 		SCpnt->cmnd[7] = (unsigned char) (this_count >> 8) & 0xff;
 		SCpnt->cmnd[8] = (unsigned char) this_count & 0xff;
+		SCpnt->cmnd[9] = 0;
 	} else {
 		if (unlikely(rq->cmd_flags & REQ_FUA)) {
 			/*
