@@ -835,11 +835,11 @@ exit_free:
 
 static int do_lookup(int argc, char **argv)
 {
+	void *key = NULL, *value = NULL;
 	struct bpf_map_info info = {};
 	__u32 len = sizeof(info);
 	json_writer_t *btf_wtr;
 	struct btf *btf = NULL;
-	void *key, *value;
 	int err;
 	int fd;
 
@@ -850,9 +850,16 @@ static int do_lookup(int argc, char **argv)
 	if (fd < 0)
 		return -1;
 
-	key = malloc(info.key_size);
+	if (info.key_size) {
+		key = malloc(info.key_size);
+		if (!key) {
+			p_err("mem alloc failed");
+			err = -1;
+			goto exit_free;
+		}
+	}
 	value = alloc_value(&info);
-	if (!key || !value) {
+	if (!value) {
 		p_err("mem alloc failed");
 		err = -1;
 		goto exit_free;
@@ -1143,7 +1150,7 @@ static int do_help(int argc, char **argv)
 		"                              [dev NAME]\n"
 		"       %s %s dump       MAP\n"
 		"       %s %s update     MAP [key DATA] value VALUE [UPDATE_FLAGS]\n"
-		"       %s %s lookup     MAP  key DATA\n"
+		"       %s %s lookup     MAP [key DATA]\n"
 		"       %s %s getnext    MAP [key DATA]\n"
 		"       %s %s delete     MAP  key DATA\n"
 		"       %s %s pin        MAP  FILE\n"
