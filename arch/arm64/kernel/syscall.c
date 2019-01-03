@@ -127,13 +127,13 @@ static inline void sve_user_discard(void)
 asmlinkage void el0_svc_handler(struct pt_regs *regs)
 {
 	sve_user_discard();
-	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
+	el0_svc_common(regs, regs->regs[8], __NR_64_Linux_syscalls, sys_call_table);
 }
 
 #ifdef CONFIG_COMPAT
 asmlinkage void el0_svc_compat_handler(struct pt_regs *regs)
 {
-	el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
+	el0_svc_common(regs, regs->regs[7], __NR_C32_Linux_syscalls,
 		       compat_sys_call_table);
 }
 #endif

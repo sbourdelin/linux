@@ -13,6 +13,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <asm/unistd_nr_64.h>
+#include <asm/unistd_nr_c32.h>
+
 #ifdef CONFIG_COMPAT
 #define __ARCH_WANT_COMPAT_STAT64
 #define __ARCH_WANT_SYS_GETHOSTNAME
@@ -42,14 +46,12 @@
 #define __ARM_NR_COMPAT_BASE		0x0f0000
 #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
 #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
-
-#define __NR_compat_syscalls		399
 #endif
 
 #define __ARCH_WANT_SYS_CLONE
+#define __ARCH_WANT_RENAMEAT
+#define __ARCH_WANT_NEW_STAT
 
 #ifndef __COMPAT_SYSCALL_NR
 #include <uapi/asm/unistd.h>
 #endif
-
-#define NR_syscalls (__NR_syscalls)
