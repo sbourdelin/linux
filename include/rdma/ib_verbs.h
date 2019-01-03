@@ -1552,6 +1552,12 @@ struct ib_pd {
 	u32			unsafe_global_rkey;
 
 	/*
+	 * Unique identifier, controlled by HW for capable
+	 * devices or assigned by IB/core for the rest.
+	 */
+	u32			pdn;
+
+	/*
 	 * Implementation details of the RDMA core, don't use in drivers:
 	 */
 	struct ib_mr	       *__internal_mr;
