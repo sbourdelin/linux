@@ -15,7 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define __ARCH_WANT_RENAMEAT
-#define __ARCH_WANT_NEW_STAT
+#include <asm/bitsperlong.h>
 
-#include <asm-generic/unistd.h>
+#ifndef __SYSCALL
+#define __SYSCALL(x, y)
+#endif
+
+#if __BITS_PER_LONG == 32
+#include <asm/unistd_32.h>
+#elif __BITS_PER_LONG == 64
+#include <asm/unistd_64.h>
+#endif
