@@ -2042,7 +2042,7 @@ static int create_qp_common(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 	MLX5_SET(qpc, qpc, pm_state, MLX5_QP_PM_MIGRATED);
 
 	if (init_attr->qp_type != MLX5_IB_QPT_REG_UMR)
-		MLX5_SET(qpc, qpc, pd, to_mpd(pd ? pd : devr->p0)->pdn);
+		MLX5_SET(qpc, qpc, pd, (pd ? pd : devr->p0)->pdn);
 	else
 		MLX5_SET(qpc, qpc, latency_sensitive, 1);
 
@@ -2434,7 +2434,7 @@ static struct ib_qp *mlx5_ib_create_dct(struct ib_pd *pd,
 	MLX5_SET(create_dct_in, qp->dct.in, uid, to_mpd(pd)->uid);
 	dctc = MLX5_ADDR_OF(create_dct_in, qp->dct.in, dct_context_entry);
 	qp->qp_sub_type = MLX5_IB_QPT_DCT;
-	MLX5_SET(dctc, dctc, pd, to_mpd(pd)->pdn);
+	MLX5_SET(dctc, dctc, pd, pd->pdn);
 	MLX5_SET(dctc, dctc, srqn_xrqn, to_msrq(attr->srq)->msrq.srqn);
 	MLX5_SET(dctc, dctc, cqn, to_mcq(attr->recv_cq)->mcq.cqn);
 	MLX5_SET64(dctc, dctc, dc_access_key, ucmd->access_key);
@@ -3360,7 +3360,7 @@ static int __mlx5_ib_modify_qp(struct ib_qp *ibqp,
 	get_cqs(qp->ibqp.qp_type, qp->ibqp.send_cq, qp->ibqp.recv_cq,
 		&send_cq, &recv_cq);
 
-	context->flags_pd = cpu_to_be32(pd ? pd->pdn : to_mpd(dev->devr.p0)->pdn);
+	context->flags_pd = cpu_to_be32(pd ? pd->ibpd.pdn : dev->devr.p0->pdn);
 	context->cqn_send = send_cq ? cpu_to_be32(send_cq->mcq.cqn) : 0;
 	context->cqn_recv = recv_cq ? cpu_to_be32(recv_cq->mcq.cqn) : 0;
 	context->params1  = cpu_to_be32(MLX5_IB_ACK_REQ_FREQ << 28);
@@ -4151,7 +4151,7 @@ static void set_reg_mkey_segment(struct mlx5_mkey_seg *seg,
 
 	seg->flags = convert_access(umrwr->access_flags);
 	if (umrwr->pd)
-		seg->flags_pd = cpu_to_be32(to_mpd(umrwr->pd)->pdn);
+		seg->flags_pd = cpu_to_be32(umrwr->pd->pdn);
 	if (wr->send_flags & MLX5_IB_SEND_UMR_UPDATE_TRANSLATION &&
 	    !umrwr->length)
 		seg->flags_pd |= cpu_to_be32(MLX5_MKEY_LEN64);
@@ -4498,7 +4498,7 @@ static int set_sig_umr_wr(const struct ib_send_wr *send_wr,
 {
 	const struct ib_sig_handover_wr *wr = sig_handover_wr(send_wr);
 	struct mlx5_ib_mr *sig_mr = to_mmr(wr->sig_mr);
-	u32 pdn = get_pd(qp)->pdn;
+	u32 pdn = get_pd(qp)->ibpd.pdn;
 	u32 xlt_size;
 	int region_len, ret;
 
@@ -5650,7 +5650,7 @@ static int  create_rq(struct mlx5_ib_rwq *rwq, struct ib_pd *pd,
 			 MLX5_MIN_SINGLE_WQE_LOG_NUM_STRIDES);
 	}
 	MLX5_SET(wq, wq, log_wq_sz, rwq->log_rq_size);
-	MLX5_SET(wq, wq, pd, to_mpd(pd)->pdn);
+	MLX5_SET(wq, wq, pd, pd->pdn);
 	MLX5_SET(wq, wq, page_offset, rwq->rq_page_offset);
 	MLX5_SET(wq, wq, log_wq_pg_sz, rwq->log_page_size);
 	MLX5_SET(wq, wq, wq_signature, rwq->wq_sig);

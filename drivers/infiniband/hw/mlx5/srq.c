@@ -298,7 +298,7 @@ struct ib_srq *mlx5_ib_create_srq(struct ib_pd *pd,
 	else
 		in.cqn = to_mcq(dev->devr.c0)->mcq.cqn;
 
-	in.pd = to_mpd(pd)->pdn;
+	in.pd = pd->pdn;
 	in.db_record = srq->db.dma;
 	err = mlx5_cmd_create_srq(dev, &srq->msrq, &in);
 	kvfree(in.pas);

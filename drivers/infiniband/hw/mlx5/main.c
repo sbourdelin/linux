@@ -2279,12 +2279,12 @@ static struct ib_pd *mlx5_ib_alloc_pd(struct ib_device *ibdev,
 		return ERR_PTR(err);
 	}
 
-	pd->pdn = MLX5_GET(alloc_pd_out, out, pd);
+	pd->ibpd.pdn = MLX5_GET(alloc_pd_out, out, pd);
 	pd->uid = uid;
 	if (context) {
-		resp.pdn = pd->pdn;
+		resp.pdn = pd->ibpd.pdn;
 		if (ib_copy_to_udata(udata, &resp, sizeof(resp))) {
-			mlx5_cmd_dealloc_pd(to_mdev(ibdev)->mdev, pd->pdn, uid);
+			mlx5_cmd_dealloc_pd(to_mdev(ibdev)->mdev, pd->ibpd.pdn, uid);
 			kfree(pd);
 			return ERR_PTR(-EFAULT);
 		}
@@ -2298,7 +2298,7 @@ static int mlx5_ib_dealloc_pd(struct ib_pd *pd)
 	struct mlx5_ib_dev *mdev = to_mdev(pd->device);
 	struct mlx5_ib_pd *mpd = to_mpd(pd);
 
-	mlx5_cmd_dealloc_pd(mdev->mdev, mpd->pdn, mpd->uid);
+	mlx5_cmd_dealloc_pd(mdev->mdev, pd->pdn, mpd->uid);
 	kfree(mpd);
 
 	return 0;

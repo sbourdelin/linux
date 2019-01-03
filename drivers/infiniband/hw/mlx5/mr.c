@@ -817,7 +817,7 @@ struct ib_mr *mlx5_ib_get_dma_mr(struct ib_pd *pd, int acc)
 	MLX5_SET(mkc, mkc, lr, 1);
 
 	MLX5_SET(mkc, mkc, length64, 1);
-	MLX5_SET(mkc, mkc, pd, to_mpd(pd)->pdn);
+	MLX5_SET(mkc, mkc, pd, pd->pdn);
 	MLX5_SET(mkc, mkc, qpn, 0xffffff);
 	MLX5_SET64(mkc, mkc, start_addr, 0);
 
@@ -968,7 +968,7 @@ static struct mlx5_ib_mr *alloc_mr_from_cache(
 	mr->desc_size = sizeof(struct mlx5_mtt);
 	mr->mmkey.iova = virt_addr;
 	mr->mmkey.size = len;
-	mr->mmkey.pd = to_mpd(pd)->pdn;
+	mr->mmkey.pd = pd->pdn;
 
 	return mr;
 }
@@ -1189,7 +1189,7 @@ static struct mlx5_ib_mr *reg_create(struct ib_mr *ibmr, struct ib_pd *pd,
 
 	MLX5_SET64(mkc, mkc, start_addr, virt_addr);
 	MLX5_SET64(mkc, mkc, len, length);
-	MLX5_SET(mkc, mkc, pd, to_mpd(pd)->pdn);
+	MLX5_SET(mkc, mkc, pd, pd->pdn);
 	MLX5_SET(mkc, mkc, bsf_octword_size, 0);
 	MLX5_SET(mkc, mkc, translations_octword_size,
 		 get_octo_len(virt_addr, length, page_shift));
@@ -1268,7 +1268,7 @@ static struct ib_mr *mlx5_ib_get_memic_mr(struct ib_pd *pd, u64 memic_addr,
 	MLX5_SET(mkc, mkc, lr, 1);
 
 	MLX5_SET64(mkc, mkc, len, length);
-	MLX5_SET(mkc, mkc, pd, to_mpd(pd)->pdn);
+	MLX5_SET(mkc, mkc, pd, pd->pdn);
 	MLX5_SET(mkc, mkc, qpn, 0xffffff);
 	MLX5_SET64(mkc, mkc, start_addr,
 		   memic_addr - pci_resource_start(dev->mdev->pdev, 0));
@@ -1546,7 +1546,7 @@ int mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 		mr->access_flags = access_flags;
 		mr->mmkey.iova = addr;
 		mr->mmkey.size = len;
-		mr->mmkey.pd = to_mpd(pd)->pdn;
+		mr->mmkey.pd = pd->pdn;
 
 		if (flags & IB_MR_REREG_TRANS) {
 			upd_flags = MLX5_IB_UPD_XLT_ADDR;
@@ -1727,7 +1727,7 @@ struct ib_mr *mlx5_ib_alloc_mr(struct ib_pd *pd,
 	MLX5_SET(mkc, mkc, free, 1);
 	MLX5_SET(mkc, mkc, translations_octword_size, ndescs);
 	MLX5_SET(mkc, mkc, qpn, 0xffffff);
-	MLX5_SET(mkc, mkc, pd, to_mpd(pd)->pdn);
+	MLX5_SET(mkc, mkc, pd, pd->pdn);
 
 	if (mr_type == IB_MR_TYPE_MEM_REG) {
 		mr->access_mode = MLX5_MKC_ACCESS_MODE_MTT;
@@ -1760,7 +1760,7 @@ struct ib_mr *mlx5_ib_alloc_mr(struct ib_pd *pd,
 		}
 
 		/* create mem & wire PSVs */
-		err = mlx5_core_create_psv(dev->mdev, to_mpd(pd)->pdn,
+		err = mlx5_core_create_psv(dev->mdev, pd->pdn,
 					   2, psv_index);
 		if (err)
 			goto err_free_sig;
@@ -1858,7 +1858,7 @@ struct ib_mw *mlx5_ib_alloc_mw(struct ib_pd *pd, enum ib_mw_type type,
 
 	MLX5_SET(mkc, mkc, free, 1);
 	MLX5_SET(mkc, mkc, translations_octword_size, ndescs);
-	MLX5_SET(mkc, mkc, pd, to_mpd(pd)->pdn);
+	MLX5_SET(mkc, mkc, pd, pd->pdn);
 	MLX5_SET(mkc, mkc, umr_en, 1);
 	MLX5_SET(mkc, mkc, lr, 1);
 	MLX5_SET(mkc, mkc, access_mode_1_0, MLX5_MKC_ACCESS_MODE_KLMS);
