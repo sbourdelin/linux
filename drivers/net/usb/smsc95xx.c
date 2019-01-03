@@ -1427,16 +1427,11 @@ static int smsc95xx_link_ok_nopm(struct usbnet *dev)
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	int ret;
 
-	/* first, a dummy read, needed to latch some MII phys */
-	ret = phy_read(pdata->phydev, MII_BMSR);
-	if (ret < 0)
+	ret = genphy_update_link(pdata->phydev);
+	if (ret)
 		return ret;
 
-	ret = phy_read(pdata->phydev, MII_BMSR);
-	if (ret < 0)
-		return ret;
-
-	return !!(ret & BMSR_LSTATUS);
+	return pdata->phydev->link;
 }
 
 static int smsc95xx_enter_suspend0(struct usbnet *dev)
