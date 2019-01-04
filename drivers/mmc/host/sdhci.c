@@ -3498,27 +3498,35 @@ static int sdhci_set_dma_mask(struct sdhci_host *host)
 {
 	struct mmc_host *mmc = host->mmc;
 	struct device *dev = mmc_dev(mmc);
-	int ret = -EINVAL;
+	u64 dma_mask = dma_get_mask(dev);
+	u64 dma32 = DMA_BIT_MASK(32);
+	int ret = 0;
 
 	if (host->quirks2 & SDHCI_QUIRK2_BROKEN_64_BIT_DMA)
 		host->flags &= ~SDHCI_USE_64_BIT_DMA;
 
-	/* Try 64-bit mask if hardware is capable  of it */
-	if (host->flags & SDHCI_USE_64_BIT_DMA) {
-		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
-		if (ret) {
-			pr_warn("%s: Failed to set 64-bit DMA mask.\n",
-				mmc_hostname(mmc));
-			host->flags &= ~SDHCI_USE_64_BIT_DMA;
-		}
+	/*
+	 * Hardware that can't address more than the 32-bit address range does
+	 * not need to use 64-bit addressing mode, even if it supports it.
+	 */
+	if ((host->flags & SDHCI_USE_64_BIT_DMA) && (dma_mask <= dma32)) {
+		pr_debug("%s: controller needs addresses <= 32-bits\n",
+			mmc_hostname(mmc));
+		host->flags &= ~SDHCI_USE_64_BIT_DMA;
 	}
 
-	/* 32-bit mask as default & fallback */
-	if (ret) {
-		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+	/*
+	 * If the hardware doesn't support 64-bit addressing, make sure to
+	 * restrict the DMA mask so we don't get buffers allocated beyond the
+	 * 32-bit boundary.
+	 */
+	if (!(host->flags & SDHCI_USE_64_BIT_DMA) && (dma_mask > dma32)) {
+		WARN(1, "64-bit DMA not supported, DMA mask %llx\n", dma_mask);
+
+		ret = dma_set_mask_and_coherent(dev, dma32);
 		if (ret)
-			pr_warn("%s: Failed to set 32-bit DMA mask.\n",
-				mmc_hostname(mmc));
+			pr_warn("%s: failed to set 32-bit DMA mask: %d\n",
+				mmc_hostname(mmc), ret);
 	}
 
 	return ret;
