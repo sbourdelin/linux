@@ -1310,10 +1310,14 @@ s32 e1000e_get_speed_and_duplex_copper(struct e1000_hw *hw, u16 *speed,
 
 	status = er32(STATUS);
 
-	if (status & E1000_STATUS_AUTONEG)
+	if (status & E1000_STATUS_AUTONEG) {
+		e_dbg("status 0x%x => in auto-neg, no valid config\n", status);
 		return 1;
-	if (!(status & E1000_STATUS_LU))
+	}
+	if (!(status & E1000_STATUS_LU)) {
+		e_dbg("status 0x%x => no link, no valid config\n", status);
 		return 1;
+	}
 
 	if (status & E1000_STATUS_SPEED_1000)
 		*speed = SPEED_1000;
@@ -1327,7 +1331,7 @@ s32 e1000e_get_speed_and_duplex_copper(struct e1000_hw *hw, u16 *speed,
 	else
 		*duplex = HALF_DUPLEX;
 
-	e_dbg("%u Mbps, %s Duplex\n",
+	e_dbg("status 0x%x => %u Mbps, %s Duplex\n", status,
 	      *speed == SPEED_1000 ? 1000 : *speed == SPEED_100 ? 100 : 10,
 	      *duplex == FULL_DUPLEX ? "Full" : "Half");
 
