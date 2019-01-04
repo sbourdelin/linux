@@ -1958,9 +1958,16 @@ static int kvm_age_rmapp(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
 	u64 *sptep;
 	struct rmap_iterator uninitialized_var(iter);
 	int young = 0;
+	bool flush = (bool)data;
 
 	for_each_rmap_spte(rmap_head, &iter, sptep)
 		young |= mmu_spte_age(sptep);
+
+	if (young && flush) {
+		kvm_flush_remote_tlbs_with_address(kvm, gfn,
+				KVM_PAGES_PER_HPAGE(level));
+		young = 0;
+	}
 
 	trace_kvm_age_page(gfn, level, slot, young);
 	return young;
