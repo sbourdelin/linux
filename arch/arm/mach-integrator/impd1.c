@@ -392,6 +392,9 @@ static int __ref impd1_probe(struct lm_device *dev)
 			lookup = devm_kzalloc(&dev->dev,
 					      sizeof(*lookup) + 3 * sizeof(struct gpiod_lookup),
 					      GFP_KERNEL);
+			if (!lookup)
+				return -ENOMEM;
+
 			chipname = devm_kstrdup(&dev->dev, devname, GFP_KERNEL);
 			mmciname = kasprintf(GFP_KERNEL, "lm%x:00700", dev->id);
 			lookup->dev_id = mmciname;
