@@ -297,7 +297,10 @@ struct vmw_sg_table {
 struct vmw_piter {
 	struct page **pages;
 	const dma_addr_t *addrs;
-	struct sg_page_iter iter;
+	union {
+		struct sg_page_iter iter;
+		struct sg_dma_page_iter dma_iter;
+	};
 	unsigned long i;
 	unsigned long num_pages;
 	bool (*next)(struct vmw_piter *);
@@ -859,9 +862,24 @@ extern int vmw_bo_map_dma(struct ttm_buffer_object *bo);
 extern void vmw_bo_unmap_dma(struct ttm_buffer_object *bo);
 extern const struct vmw_sg_table *
 vmw_bo_sg_table(struct ttm_buffer_object *bo);
-extern void vmw_piter_start(struct vmw_piter *viter,
-			    const struct vmw_sg_table *vsgt,
-			    unsigned long p_offs);
+void _vmw_piter_start(struct vmw_piter *viter, const struct vmw_sg_table *vsgt,
+		      unsigned long p_offs, bool for_dma);
+
+/* Create a piter that can call vmw_piter_dma_addr() */
+static inline void vmw_piter_start(struct vmw_piter *viter,
+				   const struct vmw_sg_table *vsgt,
+				   unsigned long p_offs)
+{
+	_vmw_piter_start(viter, vsgt, p_offs, true);
+}
+
+/* Create a piter that can call vmw_piter_page() */
+static inline void vmw_piter_cpu_start(struct vmw_piter *viter,
+				   const struct vmw_sg_table *vsgt,
+				   unsigned long p_offs)
+{
+	_vmw_piter_start(viter, vsgt, p_offs, false);
+}
 
 /**
  * vmw_piter_next - Advance the iterator one page.

@@ -503,7 +503,8 @@ static void vmw_mob_assign_ppn(u32 **addr, dma_addr_t val)
  */
 static unsigned long vmw_mob_build_pt(struct vmw_piter *data_iter,
 				      unsigned long num_data_pages,
-				      struct vmw_piter *pt_iter)
+				      struct vmw_piter *pt_iter_cpu,
+				      struct vmw_piter *pt_iter_dma)
 {
 	unsigned long pt_size = num_data_pages * VMW_PPN_SIZE;
 	unsigned long num_pt_pages = DIV_ROUND_UP(pt_size, PAGE_SIZE);
@@ -513,7 +514,7 @@ static unsigned long vmw_mob_build_pt(struct vmw_piter *data_iter,
 	struct page *page;
 
 	for (pt_page = 0; pt_page < num_pt_pages; ++pt_page) {
-		page = vmw_piter_page(pt_iter);
+		page = vmw_piter_page(pt_iter_cpu);
 
 		save_addr = addr = kmap_atomic(page);
 
@@ -525,7 +526,8 @@ static unsigned long vmw_mob_build_pt(struct vmw_piter *data_iter,
 			WARN_ON(!vmw_piter_next(data_iter));
 		}
 		kunmap_atomic(save_addr);
-		vmw_piter_next(pt_iter);
+		vmw_piter_next(pt_iter_cpu);
+		vmw_piter_next(pt_iter_dma);
 	}
 
 	return num_pt_pages;
@@ -547,29 +549,31 @@ static void vmw_mob_pt_setup(struct vmw_mob *mob,
 {
 	unsigned long num_pt_pages = 0;
 	struct ttm_buffer_object *bo = mob->pt_bo;
-	struct vmw_piter save_pt_iter;
-	struct vmw_piter pt_iter;
+	struct vmw_piter pt_iter_cpu, pt_iter_dma;
 	const struct vmw_sg_table *vsgt;
+	dma_addr_t root_page = 0;
 	int ret;
 
 	ret = ttm_bo_reserve(bo, false, true, NULL);
 	BUG_ON(ret != 0);
 
 	vsgt = vmw_bo_sg_table(bo);
-	vmw_piter_start(&pt_iter, vsgt, 0);
-	BUG_ON(!vmw_piter_next(&pt_iter));
+	vmw_piter_start(&pt_iter_dma, vsgt, 0);
+	vmw_piter_cpu_start(&pt_iter_cpu, vsgt, 0);
+	BUG_ON(!vmw_piter_next(&pt_iter_cpu));
+	BUG_ON(!vmw_piter_next(&pt_iter_dma));
 	mob->pt_level = 0;
 	while (likely(num_data_pages > 1)) {
 		++mob->pt_level;
 		BUG_ON(mob->pt_level > 2);
-		save_pt_iter = pt_iter;
+		root_page = vmw_piter_dma_addr(&pt_iter_dma);
 		num_pt_pages = vmw_mob_build_pt(&data_iter, num_data_pages,
-						&pt_iter);
-		data_iter = save_pt_iter;
+						&pt_iter_cpu, &pt_iter_dma);
+		vmw_piter_start(&data_iter, vsgt, 0);
 		num_data_pages = num_pt_pages;
 	}
 
-	mob->pt_root_page = vmw_piter_dma_addr(&save_pt_iter);
+	mob->pt_root_page = root_page;
 	ttm_bo_unreserve(bo);
 }
 
