@@ -1870,10 +1870,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return -EINVAL;
 	}
 
-	chip = devm_kzalloc(dev,
-			    sizeof(*chip) +
-			    (nsels * sizeof(struct sunxi_nand_chip_sel)),
-			    GFP_KERNEL);
+	chip = devm_kzalloc(dev, struct_size(chip, sels, nsels), GFP_KERNEL);
 	if (!chip) {
 		dev_err(dev, "could not allocate chip\n");
 		return -ENOMEM;
