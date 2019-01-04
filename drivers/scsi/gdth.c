@@ -5039,7 +5039,7 @@ static int gdth_pci_probe_one(gdth_pci_str *pcistr, gdth_ha_str **ha_out)
 		if (pci_set_dma_mask(pdev, DMA_BIT_MASK(32))) {
 			printk(KERN_WARNING "GDT-PCI %d: "
 				"Unable to set 32-bit DMA\n", ha->hanum);
-				goto out_free_coal_stat;
+			goto out_free_coal_stat;
 		}
 	} else {
 		shp->max_cmd_len = 16;
