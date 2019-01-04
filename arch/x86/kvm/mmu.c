@@ -1624,20 +1624,30 @@ static bool __rmap_set_dirty(struct kvm *kvm, struct kvm_rmap_head *rmap_head)
  * Used when we do not need to care about huge page mappings: e.g. during dirty
  * logging we do not have any such mappings.
  */
-static void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
+static bool kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
 				     struct kvm_memory_slot *slot,
 				     gfn_t gfn_offset, unsigned long mask)
 {
 	struct kvm_rmap_head *rmap_head;
+	bool flush = false;
 
 	while (mask) {
 		rmap_head = __gfn_to_rmap(slot->base_gfn + gfn_offset + __ffs(mask),
 					  PT_PAGE_TABLE_LEVEL, slot);
-		__rmap_write_protect(kvm, rmap_head, false);
+		flush |= __rmap_write_protect(kvm, rmap_head, false);
 
 		/* clear the first set bit */
 		mask &= mask - 1;
 	}
+
+	if (flush && kvm_available_flush_tlb_with_range()) {
+		kvm_flush_remote_tlbs_with_address(kvm,
+				slot->base_gfn + gfn_offset,
+				hweight_long(mask));
+		flush = false;
+	}
+
+	return flush;
 }
 
 /**
@@ -1683,13 +1693,14 @@ bool kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
 				struct kvm_memory_slot *slot,
 				gfn_t gfn_offset, unsigned long mask)
 {
-	if (kvm_x86_ops->enable_log_dirty_pt_masked)
+	if (kvm_x86_ops->enable_log_dirty_pt_masked) {
 		kvm_x86_ops->enable_log_dirty_pt_masked(kvm, slot, gfn_offset,
 				mask);
-	else
-		kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
-
-	return true;
+		return true;
+	} else {
+		return kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset,
+				mask);
+	}
 }
 
 /**
