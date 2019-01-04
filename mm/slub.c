@@ -3603,6 +3603,7 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 		if (get_order(s->size) > get_order(s->object_size)) {
 			s->flags &= ~DEBUG_METADATA_FLAGS;
 			s->offset = 0;
+			s->red_left_pad = 0;
 			if (!calculate_sizes(s, -1))
 				goto error;
 		}
