@@ -1310,6 +1310,8 @@ s32 e1000e_get_speed_and_duplex_copper(struct e1000_hw *hw, u16 *speed,
 
 	status = er32(STATUS);
 
+	if (status & E1000_STATUS_AUTONEG)
+		return 1;
 	if (!(status & E1000_STATUS_LU))
 		return 1;
 

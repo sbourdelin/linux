@@ -1390,7 +1390,8 @@ static s32 e1000_check_for_copper_link_ich8lan(struct e1000_hw *hw)
 		u16 speed;
 		u8 duplex;
 
-		e1000e_get_speed_and_duplex_copper(hw, &speed, &duplex);
+		if (e1000e_get_speed_and_duplex_copper(hw, &speed, &duplex))
+			goto out;
 		tipg_reg = er32(TIPG);
 		tipg_reg &= ~E1000_TIPG_IPGT_MASK;
 
