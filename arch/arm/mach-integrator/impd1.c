@@ -389,8 +389,8 @@ static int __ref impd1_probe(struct lm_device *dev)
 			char *chipname;
 			char *mmciname;
 
-			lookup = devm_kzalloc(&dev->dev,
-					      sizeof(*lookup) + 3 * sizeof(struct gpiod_lookup),
+			lookup = devm_kzalloc(&dev->deva,
+					      struct_size(lookup, table, 3),
 					      GFP_KERNEL);
 			if (!lookup)
 				return -ENOMEM;
