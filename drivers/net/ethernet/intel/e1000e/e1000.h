@@ -200,7 +200,7 @@ struct e1000_adapter {
 	u32 rx_buffer_len;
 	u16 mng_vlan_id;
 	u16 link_speed;
-	u16 link_duplex;
+	u8 link_duplex;
 	u16 eeprom_vers;
 
 	/* track device up/down/testing state */

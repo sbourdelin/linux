@@ -998,7 +998,8 @@ static s32 e1000_platform_pm_pch_lpt(struct e1000_hw *hw, bool link)
 	u16 lat_enc = 0;	/* latency encoded */
 
 	if (link) {
-		u16 speed, duplex, scale = 0;
+		u16 speed, scale = 0;
+		u8 duplex;
 		u16 max_snoop, max_nosnoop;
 		u16 max_ltr_enc;	/* max LTR latency encoded */
 		u64 value;
@@ -1386,7 +1387,8 @@ static s32 e1000_check_for_copper_link_ich8lan(struct e1000_hw *hw)
 	 * the IPG and reduce Rx latency in the PHY.
 	 */
 	if ((hw->mac.type >= e1000_pch2lan) && link) {
-		u16 speed, duplex;
+		u16 speed;
+		u8 duplex;
 
 		e1000e_get_speed_and_duplex_copper(hw, &speed, &duplex);
 		tipg_reg = er32(TIPG);
@@ -5074,7 +5076,7 @@ static s32 e1000_setup_copper_link_pch_lpt(struct e1000_hw *hw)
  *  gigabit speeds.
  **/
 static s32 e1000_get_link_up_info_ich8lan(struct e1000_hw *hw, u16 *speed,
-					  u16 *duplex)
+					  u8 *duplex)
 {
 	s32 ret_val;
 

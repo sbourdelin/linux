@@ -105,7 +105,8 @@ static int e1000_get_link_ksettings(struct net_device *netdev,
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
-	u32 speed, supported, advertising;
+	u32 supported, advertising;
+	u16 speed;
 
 	if (hw->phy.media_type == e1000_media_type_copper) {
 		supported = (SUPPORTED_10baseT_Half |
@@ -148,21 +149,8 @@ static int e1000_get_link_ksettings(struct net_device *netdev,
 			cmd->base.duplex = adapter->link_duplex - 1;
 		}
 	} else if (!pm_runtime_suspended(netdev->dev.parent)) {
-		u32 status = er32(STATUS);
-
-		if (status & E1000_STATUS_LU) {
-			if (status & E1000_STATUS_SPEED_1000)
-				speed = SPEED_1000;
-			else if (status & E1000_STATUS_SPEED_100)
-				speed = SPEED_100;
-			else
-				speed = SPEED_10;
-
-			if (status & E1000_STATUS_FD)
-				cmd->base.duplex = DUPLEX_FULL;
-			else
-				cmd->base.duplex = DUPLEX_HALF;
-		}
+		e1000e_get_speed_and_duplex_copper(hw, &speed,
+						   &cmd->base.duplex);
 	}
 
 	cmd->base.speed = speed;

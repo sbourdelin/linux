@@ -1004,7 +1004,8 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 	s32 ret_val = 0;
 	u32 pcs_status_reg, pcs_adv_reg, pcs_lp_ability_reg, pcs_ctrl_reg;
 	u16 mii_status_reg, mii_nway_adv_reg, mii_nway_lp_ability_reg;
-	u16 speed, duplex;
+	u16 speed;
+	u8 duplex;
 
 	/* Check for the case where we have fiber media and auto-neg failed
 	 * so we had to force link.  In this case, we need to force the
@@ -1303,11 +1304,15 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
  *  speed and duplex for copper connections.
  **/
 s32 e1000e_get_speed_and_duplex_copper(struct e1000_hw *hw, u16 *speed,
-				       u16 *duplex)
+				       u8 *duplex)
 {
 	u32 status;
 
 	status = er32(STATUS);
+
+	if (!(status & E1000_STATUS_LU))
+		return 1;
+
 	if (status & E1000_STATUS_SPEED_1000)
 		*speed = SPEED_1000;
 	else if (status & E1000_STATUS_SPEED_100)
@@ -1337,7 +1342,7 @@ s32 e1000e_get_speed_and_duplex_copper(struct e1000_hw *hw, u16 *speed,
  *  for fiber/serdes links.
  **/
 s32 e1000e_get_speed_and_duplex_fiber_serdes(struct e1000_hw __always_unused
-					     *hw, u16 *speed, u16 *duplex)
+					     *hw, u16 *speed, u8 *duplex)
 {
 	*speed = SPEED_1000;
 	*duplex = FULL_DUPLEX;

@@ -17,9 +17,9 @@ s32 e1000e_get_bus_info_pcie(struct e1000_hw *hw);
 void e1000_set_lan_id_single_port(struct e1000_hw *hw);
 s32 e1000e_get_hw_semaphore(struct e1000_hw *hw);
 s32 e1000e_get_speed_and_duplex_copper(struct e1000_hw *hw, u16 *speed,
-				       u16 *duplex);
+				       u8 *duplex);
 s32 e1000e_get_speed_and_duplex_fiber_serdes(struct e1000_hw *hw,
-					     u16 *speed, u16 *duplex);
+					     u16 *speed, u8 *duplex);
 s32 e1000e_id_led_init_generic(struct e1000_hw *hw);
 s32 e1000e_led_on_generic(struct e1000_hw *hw);
 s32 e1000e_led_off_generic(struct e1000_hw *hw);

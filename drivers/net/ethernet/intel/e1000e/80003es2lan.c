@@ -638,7 +638,7 @@ static s32 e1000_get_cable_length_80003es2lan(struct e1000_hw *hw)
  *  Retrieve the current speed and duplex configuration.
  **/
 static s32 e1000_get_link_up_info_80003es2lan(struct e1000_hw *hw, u16 *speed,
-					      u16 *duplex)
+					      u8 *duplex)
 {
 	s32 ret_val;
 
@@ -1081,7 +1081,7 @@ static s32 e1000_cfg_on_link_up_80003es2lan(struct e1000_hw *hw)
 {
 	s32 ret_val = 0;
 	u16 speed;
-	u16 duplex;
+	u8 duplex;
 
 	if (hw->phy.media_type == e1000_media_type_copper) {
 		ret_val = e1000e_get_speed_and_duplex_copper(hw, &speed,
