@@ -484,34 +484,39 @@ static int goodix_reset(struct goodix_ts_data *ts)
 {
 	int error;
 
-	/* begin select I2C slave addr */
-	error = gpiod_direction_output(ts->gpiod_rst, 0);
-	if (error)
-		return error;
+	if (ts->gpiod_rst) {
+		/* begin select I2C slave addr */
+		error = gpiod_direction_output(ts->gpiod_rst, 0);
+		if (error)
+			return error;
 
-	msleep(20);				/* T2: > 10ms */
+		msleep(20);				/* T2: > 10ms */
 
-	/* HIGH: 0x28/0x29, LOW: 0xBA/0xBB */
-	error = gpiod_direction_output(ts->gpiod_int, ts->client->addr == 0x14);
-	if (error)
-		return error;
+		/* HIGH: 0x28/0x29, LOW: 0xBA/0xBB */
+		error = gpiod_direction_output(ts->gpiod_int,
+				ts->client->addr == 0x14);
+		if (error)
+			return error;
 
-	usleep_range(100, 2000);		/* T3: > 100us */
+		usleep_range(100, 2000);		/* T3: > 100us */
 
-	error = gpiod_direction_output(ts->gpiod_rst, 1);
-	if (error)
-		return error;
+		error = gpiod_direction_output(ts->gpiod_rst, 1);
+		if (error)
+			return error;
 
-	usleep_range(6000, 10000);		/* T4: > 5ms */
+		usleep_range(6000, 10000);		/* T4: > 5ms */
 
-	/* end select I2C slave addr */
-	error = gpiod_direction_input(ts->gpiod_rst);
-	if (error)
-		return error;
+		/* end select I2C slave addr */
+		error = gpiod_direction_input(ts->gpiod_rst);
+		if (error)
+			return error;
+	}
 
-	error = goodix_int_sync(ts);
-	if (error)
-		return error;
+	if (ts->gpiod_int) {
+		error = goodix_int_sync(ts);
+		if (error)
+			return error;
+	}
 
 	return 0;
 }
@@ -786,13 +791,11 @@ static int goodix_ts_probe(struct i2c_client *client,
 	if (error)
 		return error;
 
-	if (ts->gpiod_int && ts->gpiod_rst) {
-		/* reset the controller */
-		error = goodix_reset(ts);
-		if (error) {
-			dev_err(&client->dev, "Controller reset failed.\n");
-			return error;
-		}
+	/* reset the controller */
+	error = goodix_reset(ts);
+	if (error) {
+		dev_err(&client->dev, "Controller reset failed.\n");
+		return error;
 	}
 
 	error = goodix_i2c_test(client);
