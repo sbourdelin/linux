@@ -4,6 +4,20 @@
 #include <scsi/scsi_dbg.h>
 #include "scsi_debugfs.h"
 
+#ifdef CONFIG_DEBUG_FS
+struct dentry *scsi_debugfs_root;
+struct dentry *scsi_debugfs_uld;
+struct dentry *scsi_debugfs_lld;
+
+EXPORT_SYMBOL(scsi_debugfs_root);
+EXPORT_SYMBOL(scsi_debugfs_uld);
+EXPORT_SYMBOL(scsi_debugfs_lld);
+
+#endif
+
+
+#ifdef CONFIG_BLK_DEBUG_FS
+
 #define SCSI_CMD_FLAG_NAME(name)[const_ilog2(SCMD_##name)] = #name
 static const char *const scsi_cmd_flags[] = {
 	SCSI_CMD_FLAG_NAME(TAGGED),
@@ -50,3 +64,5 @@ void scsi_show_rq(struct seq_file *m, struct request *rq)
 		   timeout_ms / 1000, timeout_ms % 1000,
 		   alloc_ms / 1000, alloc_ms % 1000);
 }
+
+#endif
