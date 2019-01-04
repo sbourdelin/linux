@@ -322,7 +322,6 @@ static const struct irq_chip regmap_irq_chip = {
 	.irq_bus_sync_unlock	= regmap_irq_sync_unlock,
 	.irq_disable		= regmap_irq_disable,
 	.irq_enable		= regmap_irq_enable,
-	.irq_set_type		= regmap_irq_set_type,
 	.irq_set_wake		= regmap_irq_set_wake,
 };
 
@@ -559,6 +558,9 @@ int regmap_add_irq_chip(struct regmap *map, int irq, int irq_flags,
 	d->map = map;
 	d->chip = chip;
 	d->irq_base = irq_base;
+
+	if (num_type_reg)
+		d->irq_chip.irq_set_type = regmap_irq_set_type;
 
 	if (chip->irq_reg_stride)
 		d->irq_reg_stride = chip->irq_reg_stride;
