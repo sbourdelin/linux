@@ -12,7 +12,9 @@
 #include <linux/aer.h>
 #include <linux/if_vlan.h>
 #include <linux/jiffies.h>
+#ifdef CONFIG_IXGBE_MDIO
 #include <linux/phy.h>
+#endif
 
 #include <linux/timecounter.h>
 #include <linux/net_tstamp.h>
@@ -562,7 +564,9 @@ struct ixgbe_adapter {
 	struct net_device *netdev;
 	struct bpf_prog *xdp_prog;
 	struct pci_dev *pdev;
+#ifdef CONFIG_IXGBE_MDIO
 	struct mii_bus *mii_bus;
+#endif
 
 	unsigned long state;
 

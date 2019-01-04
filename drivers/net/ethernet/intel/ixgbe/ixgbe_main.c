@@ -39,7 +39,9 @@
 #include "ixgbe.h"
 #include "ixgbe_common.h"
 #include "ixgbe_dcb_82599.h"
+#ifdef CONFIG_IXGBE_MDIO
 #include "ixgbe_phy.h"
+#endif
 #include "ixgbe_sriov.h"
 #include "ixgbe_model.h"
 #include "ixgbe_txrx_common.h"
@@ -8791,6 +8793,7 @@ ixgbe_mdio_read(struct net_device *netdev, int prtad, int devad, u16 addr)
 	u16 value;
 	int rc;
 
+#ifdef CONFIG_IXGBE_MDIO
 	if (adapter->mii_bus) {
 		int regnum = addr;
 
@@ -8799,7 +8802,7 @@ ixgbe_mdio_read(struct net_device *netdev, int prtad, int devad, u16 addr)
 
 		return mdiobus_read(adapter->mii_bus, prtad, regnum);
 	}
-
+#endif
 	if (prtad != hw->phy.mdio.prtad)
 		return -EINVAL;
 	rc = hw->phy.ops.read_reg(hw, addr, devad, &value);
@@ -8814,6 +8817,7 @@ static int ixgbe_mdio_write(struct net_device *netdev, int prtad, int devad,
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	struct ixgbe_hw *hw = &adapter->hw;
 
+#ifdef CONFIG_IXGBE_MDIO
 	if (adapter->mii_bus) {
 		int regnum = addr;
 
@@ -8822,7 +8826,7 @@ static int ixgbe_mdio_write(struct net_device *netdev, int prtad, int devad,
 
 		return mdiobus_write(adapter->mii_bus, prtad, regnum, value);
 	}
-
+#endif
 	if (prtad != hw->phy.mdio.prtad)
 		return -EINVAL;
 	return hw->phy.ops.write_reg(hw, addr, devad, value);
@@ -11141,7 +11145,9 @@ skip_sriov:
 			IXGBE_LINK_SPEED_10GB_FULL | IXGBE_LINK_SPEED_1GB_FULL,
 			true);
 
+#ifdef CONFIG_IXGBE_MDIO
 	ixgbe_mii_bus_init(hw);
+#endif
 
 	return 0;
 
@@ -11193,8 +11199,10 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	set_bit(__IXGBE_REMOVING, &adapter->state);
 	cancel_work_sync(&adapter->service_task);
 
+#ifdef CONFIG_IXGBE_MDIO
 	if (adapter->mii_bus)
 		mdiobus_unregister(adapter->mii_bus);
+#endif
 
 #ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {

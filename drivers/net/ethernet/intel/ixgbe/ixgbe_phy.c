@@ -3,7 +3,9 @@
 
 #include <linux/pci.h>
 #include <linux/delay.h>
+#ifdef CONFIG_IXGBE_MDIO
 #include <linux/iopoll.h>
+#endif
 #include <linux/sched.h>
 
 #include "ixgbe.h"
@@ -659,6 +661,7 @@ s32 ixgbe_write_phy_reg_generic(struct ixgbe_hw *hw, u32 reg_addr,
 	return status;
 }
 
+#ifdef CONFIG_IXGBE_MDIO
 #define IXGBE_HW_READ_REG(addr) IXGBE_READ_REG(hw, addr)
 
 /**
@@ -956,6 +959,7 @@ ixgbe_no_mii_bus:
 	adapter->mii_bus = NULL;
 	return -ENODEV;
 }
+#endif
 
 /**
  *  ixgbe_setup_phy_link_generic - Set and restart autoneg
