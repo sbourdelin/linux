@@ -90,9 +90,6 @@ ENTRY(startup_32)
 	jnz	no_longmode
 
 /*
- * Compute the delta between where we were compiled to run at
- * and where the code will actually run at.
- *
  * %ebp contains the address we are loaded at by the boot loader and %ebx
  * contains the address where we should move the kernel image temporarily
  * for safe in-place decompression.
@@ -272,12 +269,12 @@ ENTRY(startup_64)
 
 	/*
 	 * Compute the decompressed kernel start address.  It is where
-	 * we were loaded at aligned to a 2M boundary. %rbp contains the
-	 * decompressed kernel start address.
+	 * we were loaded at aligned up to CONFIG_PHYSICAL_ALIGN boundary.
+	 * %rbp contains the decompressed kernel start address.
 	 *
 	 * If it is a relocatable kernel then decompress and run the kernel
-	 * from load address aligned to 2MB addr, otherwise decompress and
-	 * run the kernel from LOAD_PHYSICAL_ADDR
+	 * from load address aligned up to CONFIG_PHYSICAL_ALIGN, otherwise
+	 * decompress and run the kernel from LOAD_PHYSICAL_ADDR
 	 *
 	 * We cannot rely on the calculation done in 32-bit mode, since we
 	 * may have been invoked via the 64-bit entry point.
@@ -525,7 +522,7 @@ relocated:
  */
 	pushq	%rsi			/* Save the real mode argument */
 	movq	%rsi, %rdi		/* real mode address */
-	leaq	boot_heap(%rip), %rsi	/* malloc area for uncompression */
+	leaq	boot_heap(%rip), %rsi	/* malloc area for decompression */
 	leaq	input_data(%rip), %rdx  /* input_data */
 	movl	$z_input_len, %ecx	/* input_len */
 	movq	%rbp, %r8		/* output target address */

@@ -64,8 +64,8 @@ SECTIONS
 		_ebss = .;
 	}
 #ifdef CONFIG_X86_64
-       . = ALIGN(PAGE_SIZE);
-       .pgtable : {
+	. = ALIGN(PAGE_SIZE);
+	.pgtable : {
 		_pgtable = . ;
 		*(.pgtable)
 		_epgtable = . ;
