@@ -546,10 +546,10 @@ static void __init reserve_crashkernel(void)
 		 * as old kexec-tools loads bzImage below that, unless
 		 * "crashkernel=size[KMG],high" is specified.
 		 */
-		crash_base = memblock_find_in_range(CRASH_ALIGN,
-						    high ? CRASH_ADDR_HIGH_MAX
-							 : CRASH_ADDR_LOW_MAX,
-						    crash_size, CRASH_ALIGN);
+		crash_base = __memblock_find_range_bottom_up(CRASH_ALIGN,
+			(max_pfn * PAGE_SIZE), crash_size, CRASH_ALIGN,
+			NUMA_NO_NODE, MEMBLOCK_NONE);
+
 		if (!crash_base) {
 			pr_info("crashkernel reservation failed - No suitable area found.\n");
 			return;

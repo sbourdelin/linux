@@ -172,7 +172,7 @@ bool __init_memblock memblock_overlaps_region(struct memblock_type *type,
  * Return:
  * Found address on success, 0 on failure.
  */
-static phys_addr_t __init_memblock
+phys_addr_t __init_memblock
 __memblock_find_range_bottom_up(phys_addr_t start, phys_addr_t end,
 				phys_addr_t size, phys_addr_t align, int nid,
 				enum memblock_flags flags)
