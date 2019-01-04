@@ -712,7 +712,7 @@ store_one(scaling_max_freq, max);
 static ssize_t show_cpuinfo_cur_freq(struct cpufreq_policy *policy,
 					char *buf)
 {
-	unsigned int cur_freq = __cpufreq_get(policy);
+	unsigned int cur_freq = cpufreq_get(policy->cpu);
 
 	if (cur_freq)
 		return sprintf(buf, "%u\n", cur_freq);
