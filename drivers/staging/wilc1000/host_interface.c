@@ -2357,7 +2357,7 @@ void wilc_frame_register(struct wilc_vif *vif, u16 frame_type, bool reg)
 	default:
 		break;
 	}
-	reg_frame.frame_type = cpu_to_le16(frame_type);
+	reg_frame.frame_type = cpu_to_le32(frame_type);
 	result = wilc_send_config_pkt(vif, WILC_SET_CFG, &wid, 1,
 				      wilc_get_vif_idx(vif));
 	if (result)
