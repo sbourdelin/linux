@@ -41,6 +41,7 @@ Currently, these files are in /proc/sys/vm:
 - min_free_kbytes
 - min_slab_ratio
 - min_unmapped_ratio
+- mincore_privileged
 - mmap_min_addr
 - mmap_rnd_bits
 - mmap_rnd_compat_bits
@@ -484,6 +485,14 @@ files and similar are considered.
 
 The default is 1 percent.
 
+==============================================================
+mincore_privileged:
+
+mincore() could be potentially used to mount a side-channel attack against
+pagecache metadata. This sysctl provides system administrators means to
+make it available only to processess that own CAP_SYS_ADMIN capability.
+
+The default is 0, which means mincore() can be used without restrictions.
 ==============================================================
 
 mmap_min_addr

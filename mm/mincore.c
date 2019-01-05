@@ -21,6 +21,8 @@
 #include <linux/uaccess.h>
 #include <asm/pgtable.h>
 
+int sysctl_mincore_privileged;
+
 static int mincore_hugetlb(pte_t *pte, unsigned long hmask, unsigned long addr,
 			unsigned long end, struct mm_walk *walk)
 {
@@ -227,6 +229,9 @@ SYSCALL_DEFINE3(mincore, unsigned long, start, size_t, len,
 	long retval;
 	unsigned long pages;
 	unsigned char *tmp;
+
+	if (sysctl_mincore_privileged && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 
 	/* Check the start address: needs to be page-aligned.. */
 	if (start & ~PAGE_MASK)
