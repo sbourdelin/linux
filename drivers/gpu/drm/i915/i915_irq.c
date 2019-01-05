@@ -1558,7 +1558,8 @@ static void gen8_gt_irq_handler(struct drm_i915_private *i915,
 	if (master_ctl & (GEN8_GT_VCS1_IRQ | GEN8_GT_VCS2_IRQ)) {
 		gen8_cs_irq_handler(i915->engine[VCS],
 				    gt_iir[1] >> GEN8_VCS1_IRQ_SHIFT);
-		gen8_cs_irq_handler(i915->engine[VCS2],
+		if(HAS_BSD2(i915))
+			gen8_cs_irq_handler(i915->engine[VCS2],
 				    gt_iir[1] >> GEN8_VCS2_IRQ_SHIFT);
 	}
 
