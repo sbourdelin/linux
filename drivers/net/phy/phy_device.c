@@ -747,19 +747,22 @@ static int get_phy_id(struct mii_bus *bus, int addr, u32 *phy_id,
 	if (is_c45)
 		return get_phy_c45_ids(bus, addr, phy_id, c45_ids);
 
+	phy_reg = mdiobus_read(bus, addr, MII_BMCR);
+	if (phy_reg < 0)
+		/* returning -ENODEV allows to continue bus-scanning */
+		return (phy_reg == -EIO || phy_reg == -ENODEV) ? -ENODEV : -EIO;
+
+	/* PHY may be powered down and ID registers invalid */
+	if (phy_reg & BMCR_PDOWN) {
+		mdiobus_write(bus, addr, MII_BMCR, phy_reg & ~BMCR_PDOWN);
+		/* give the PHY some time to resume */
+		msleep(100);
+	}
+
 	/* Grab the bits from PHYIR1, and put them in the upper half */
 	phy_reg = mdiobus_read(bus, addr, MII_PHYSID1);
-	if (phy_reg < 0) {
-		/* if there is no device, return without an error so scanning
-		 * the bus works properly
-		 */
-		if (phy_reg == -EIO || phy_reg == -ENODEV) {
-			*phy_id = 0xffffffff;
-			return 0;
-		}
-
+	if (phy_reg < 0)
 		return -EIO;
-	}
 
 	*phy_id = (phy_reg & 0xffff) << 16;
 
