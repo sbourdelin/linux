@@ -178,7 +178,10 @@ static int ib_nl_ip_send_msg(struct rdma_dev_addr *dev_addr,
 	/* Construct the family header first */
 	header = skb_put(skb, NLMSG_ALIGN(sizeof(*header)));
 	header->ifindex = dev_addr->bound_dev_if;
-	nla_put(skb, attrtype, size, daddr);
+	if (nla_put(skb, attrtype, size, daddr)) {
+		nlmsg_cancel(skb, nlh);
+		return -EMSGSIZE;
+	}
 
 	/* Repair the nlmsg header length */
 	nlmsg_end(skb, nlh);
