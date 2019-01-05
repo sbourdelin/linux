@@ -12,6 +12,10 @@ Optional properties:
 - rotary-encoder,relative-axis: register a relative axis rather than an
   absolute one. Relative axis will only generate +1/-1 events on the input
   device, hence no steps need to be passed.
+- rotary-encoder,relative-keys : generate pair of key events. This setting
+  behaves just like relative-axis, generating key events. keycode[2]
+  corresponds -1/1 events.
+- rotary-encoder,relative-keycodes : keycodes for relative-keys
 - rotary-encoder,rollover: Automatic rollover when the rotary value becomes
   greater than the specified steps or smaller than 0. For absolute axis only.
 - rotary-encoder,steps-per-period: Number of steps (stable states) per period.
@@ -47,4 +51,12 @@ Example:
 			rotary-encoder,steps = <24>;
 			rotary-encoder,encoding = "binary";
 			rotary-encoder,rollover;
+		};
+
+		rotary@2 {
+			compatible = "rotary-encoder";
+			gpios = <&gpio 21 0>, <&gpio 22 0>;
+			rotary-encoder,relative-keys;
+			rotary-encoder,relative-keycode = <103>, <108>;
+			rotary-encoder,steps-per-period = <2>;
 		};
