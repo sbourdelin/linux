@@ -91,6 +91,12 @@ enum ina3221_channels {
 	INA3221_NUM_CHANNELS
 };
 
+enum ina3221_modes {
+	INA3221_MODE_SINGLE_SHOT,
+	INA3221_MODE_CONTINUOUS,
+	INA3221_NUM_MODES,
+};
+
 /**
  * struct ina3221_input - channel input source specific information
  * @label: label of channel input source
@@ -111,6 +117,7 @@ struct ina3221_input {
  * @inputs: Array of channel input source specific structures
  * @lock: mutex lock to serialize sysfs attribute accesses
  * @reg_config: Register value of INA3221_CONFIG
+ * @mode: Operating mode -- continuous or single-shot
  */
 struct ina3221_data {
 	struct device *pm_dev;
@@ -119,6 +126,7 @@ struct ina3221_data {
 	struct ina3221_input inputs[INA3221_NUM_CHANNELS];
 	struct mutex lock;
 	u32 reg_config;
+	enum ina3221_modes mode;
 };
 
 static inline bool ina3221_is_enabled(struct ina3221_data *ina, int channel)
@@ -188,6 +196,11 @@ static int ina3221_read_in(struct device *dev, u32 attr, int channel, long *val)
 		if (!ina3221_is_enabled(ina, channel))
 			return -ENODATA;
 
+		/* Write CONFIG register to trigger a single-shot measurement */
+		if (ina->mode == INA3221_MODE_SINGLE_SHOT)
+			regmap_write(ina->regmap, INA3221_CONFIG,
+				     ina->reg_config);
+
 		ret = ina3221_wait_for_data(ina);
 		if (ret)
 			return ret;
@@ -231,6 +244,11 @@ static int ina3221_read_curr(struct device *dev, u32 attr,
 	case hwmon_curr_input:
 		if (!ina3221_is_enabled(ina, channel))
 			return -ENODATA;
+
+		/* Write CONFIG register to trigger a single-shot measurement */
+		if (ina->mode == INA3221_MODE_SINGLE_SHOT)
+			regmap_write(ina->regmap, INA3221_CONFIG,
+				     ina->reg_config);
 
 		ret = ina3221_wait_for_data(ina);
 		if (ret)
@@ -617,6 +635,9 @@ static int ina3221_probe_from_dt(struct device *dev, struct ina3221_data *ina)
 	if (!np)
 		return 0;
 
+	if (of_property_read_bool(np, "ti,single-shot"))
+		ina->mode = INA3221_MODE_SINGLE_SHOT;
+
 	for_each_child_of_node(np, child) {
 		ret = ina3221_probe_child_from_dt(dev, child, ina);
 		if (ret)
@@ -654,6 +675,9 @@ static int ina3221_probe(struct i2c_client *client,
 		}
 	}
 
+	/* Hardware default uses the continuous mode */
+	ina->mode = INA3221_MODE_CONTINUOUS;
+
 	for (i = 0; i < INA3221_NUM_CHANNELS; i++)
 		ina->inputs[i].shunt_resistor = INA3221_RSHUNT_DEFAULT;
 
@@ -665,6 +689,10 @@ static int ina3221_probe(struct i2c_client *client,
 
 	/* The driver will be reset, so use reset value */
 	ina->reg_config = INA3221_CONFIG_DEFAULT;
+
+	/* Clear continuous bit to use single-shot mode */
+	if (ina->mode == INA3221_MODE_SINGLE_SHOT)
+		ina->reg_config &= ~INA3221_CONFIG_MODE_CONTINUOUS;
 
 	/* Disable channels if their inputs are disconnected */
 	for (i = 0; i < INA3221_NUM_CHANNELS; i++) {
