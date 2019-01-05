@@ -2918,6 +2918,35 @@ static ssize_t mem_cgroup_force_empty_write(struct kernfs_open_file *of,
 	return mem_cgroup_force_empty(memcg) ?: nbytes;
 }
 
+static int wipe_on_offline_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+
+	seq_printf(m, "%lu\n", (unsigned long)memcg->wipe_on_offline);
+
+	return 0;
+}
+
+static int wipe_on_offline_write(struct cgroup_subsys_state *css,
+				 struct cftype *cft, u64 val)
+{
+	int ret = 0;
+
+	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+
+	if (mem_cgroup_is_root(memcg))
+		return -EINVAL;
+
+	if (val == 0)
+		memcg->wipe_on_offline = false;
+	else if (val == 1)
+		memcg->wipe_on_offline = true;
+	else
+		ret = -EINVAL;
+
+	return ret;
+}
+
 static u64 mem_cgroup_hierarchy_read(struct cgroup_subsys_state *css,
 				     struct cftype *cft)
 {
@@ -4283,6 +4312,11 @@ static struct cftype mem_cgroup_legacy_files[] = {
 		.write = mem_cgroup_reset,
 		.read_u64 = mem_cgroup_read_u64,
 	},
+	{
+		.name = "wipe_on_offline",
+		.seq_show = wipe_on_offline_show,
+		.write_u64 = wipe_on_offline_write,
+	},
 	{ },	/* terminate */
 };
 
@@ -4568,6 +4602,15 @@ static void mem_cgroup_css_offline(struct cgroup_subsys_state *css)
 
 	page_counter_set_min(&memcg->memory, 0);
 	page_counter_set_low(&memcg->memory, 0);
+
+	/*
+	 * Reclaim as much as possible memory when offlining.
+	 *
+	 * Do it after min/low is reset otherwise some memory might
+	 * be protected by min/low.
+	 */
+	if (memcg->wipe_on_offline)
+		mem_cgroup_force_empty(memcg);
 
 	memcg_offline_kmem(memcg);
 	wb_memcg_offline(memcg);
@@ -5693,6 +5736,12 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT | CFTYPE_NS_DELEGATABLE,
 		.seq_show = memory_oom_group_show,
 		.write = memory_oom_group_write,
+	},
+	{
+		.name = "wipe_on_offline",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = wipe_on_offline_show,
+		.write_u64 = wipe_on_offline_write,
 	},
 	{ }	/* terminate */
 };
