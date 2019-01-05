@@ -800,10 +800,14 @@ static ssize_t adp8870_bl_ambient_light_zone_store(struct device *dev,
 
 	if (val == 0) {
 		/* Enable automatic ambient light sensing */
-		adp8870_set_bits(data->client, ADP8870_MDCR, CMP_AUTOEN);
+		ret = adp8870_set_bits(data->client, ADP8870_MDCR, CMP_AUTOEN);
+		if (ret < 0)
+			goto adp8870_bl_err;
 	} else if ((val > 0) && (val < 6)) {
 		/* Disable automatic ambient light sensing */
-		adp8870_clr_bits(data->client, ADP8870_MDCR, CMP_AUTOEN);
+		ret = adp8870_clr_bits(data->client, ADP8870_MDCR, CMP_AUTOEN);
+		if (ret < 0)
+			goto adp8870_bl_err;
 
 		/* Set user supplied ambient light zone */
 		mutex_lock(&data->lock);
@@ -811,12 +815,18 @@ static ssize_t adp8870_bl_ambient_light_zone_store(struct device *dev,
 		if (!ret) {
 			reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
 			reg_val |= (val - 1) << CFGR_BLV_SHIFT;
-			adp8870_write(data->client, ADP8870_CFGR, reg_val);
+			ret = adp8870_write(data->client, ADP8870_CFGR,
+						reg_val);
 		}
 		mutex_unlock(&data->lock);
+		if (ret < 0)
+			goto adp8870_bl_err;
 	}
 
 	return count;
+
+adp8870_bl_err:
+	return -1;
 }
 static DEVICE_ATTR(ambient_light_zone, 0664,
 		adp8870_bl_ambient_light_zone_show,
