@@ -1289,6 +1289,20 @@ PAGE_SIZE multiple when read back.
 	Shows pressure stall information for memory. See
 	Documentation/accounting/psi.txt for details.
 
+  memory.force_empty
+        This interface is provided to make cgroup's memory usage empty.
+        When writing anything to this
+
+        # echo 0 > memory.force_empty
+
+        the cgroup will be reclaimed and as many pages reclaimed as possible.
+
+        The typical use case for this interface is before calling rmdir().
+        Though rmdir() offlines memcg, but the memcg may still stay there due to
+        charged file caches. Some out-of-use page caches may keep charged until
+        memory pressure happens. If you want to avoid that, force_empty will be
+        useful.
+
 
 Usage Guidelines
 ~~~~~~~~~~~~~~~~

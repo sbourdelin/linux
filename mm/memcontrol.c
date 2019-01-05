@@ -5743,6 +5743,10 @@ static struct cftype memory_files[] = {
 		.seq_show = wipe_on_offline_show,
 		.write_u64 = wipe_on_offline_write,
 	},
+	{
+		.name = "force_empty",
+		.write = mem_cgroup_force_empty_write,
+	},
 	{ }	/* terminate */
 };
 
