@@ -812,6 +812,8 @@ static int __init init_scsi(void)
 
 	scsi_netlink_init();
 
+	scsi_debugfs_init();
+
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
 
@@ -832,6 +834,7 @@ cleanup_queue:
 
 static void __exit exit_scsi(void)
 {
+	scsi_debugfs_exit();
 	scsi_netlink_exit();
 	scsi_sysfs_unregister();
 	scsi_exit_sysctl();

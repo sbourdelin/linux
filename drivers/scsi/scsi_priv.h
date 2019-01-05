@@ -160,6 +160,18 @@ static inline void scsi_netlink_init(void) {}
 static inline void scsi_netlink_exit(void) {}
 #endif
 
+/* scsi_debugfs.c */
+#ifdef CONFIG_BLK_DEBUG_FS
+extern void scsi_debugfs_init(void);
+extern void scsi_debugfs_exit(void);
+extern struct dentry *scsi_debugfs_root;
+extern struct dentry *scsi_debugfs_uld;
+extern struct dentry *scsi_debugfs_lld;
+#else
+static inline void scsi_debugfs_init(void) {}
+static inline void scsi_debugfs_exit(void) {}
+#endif
+
 /* scsi_pm.c */
 #ifdef CONFIG_PM
 extern const struct dev_pm_ops scsi_bus_pm_ops;
