@@ -242,6 +242,7 @@ int public_key_verify_signature(const struct public_key *pkey,
 	char alg_name[CRYPTO_MAX_ALG_NAME];
 	void *output;
 	unsigned int outlen;
+	int verify2;
 	int ret;
 
 	pr_devel("==>%s()\n", __func__);
@@ -279,14 +280,23 @@ int public_key_verify_signature(const struct public_key *pkey,
 	if (ret)
 		goto error_free_req;
 
-	ret = -ENOMEM;
-	outlen = crypto_akcipher_maxsize(tfm);
-	output = kmalloc(outlen, GFP_KERNEL);
-	if (!output)
-		goto error_free_req;
+	verify2 = crypto_akcipher_have_verify2(req);
+	if (!verify2) {
+		/* verify2 does not need output buffer */
+		ret = -ENOMEM;
+		outlen = crypto_akcipher_maxsize(tfm);
+		output = kmalloc(outlen, GFP_KERNEL);
+		if (!output)
+			goto error_free_req;
 
+		sg_init_one(&digest_sg, output, outlen);
+	} else {
+		/* dummy init digest_sg */
+		memset(&digest_sg, 0, sizeof(digest_sg));
+		output = NULL;
+		outlen = 0;
+	}
 	sg_init_one(&sig_sg, sig->s, sig->s_size);
-	sg_init_one(&digest_sg, output, outlen);
 	akcipher_request_set_crypt(req, &sig_sg, &digest_sg, sig->s_size,
 				   outlen);
 	crypto_init_wait(&cwait);
@@ -294,18 +304,27 @@ int public_key_verify_signature(const struct public_key *pkey,
 				      CRYPTO_TFM_REQ_MAY_SLEEP,
 				      crypto_req_done, &cwait);
 
-	/* Perform the verification calculation.  This doesn't actually do the
-	 * verification, but rather calculates the hash expected by the
-	 * signature and returns that to us.
-	 */
-	ret = crypto_wait_req(crypto_akcipher_verify(req), &cwait);
-	if (ret)
-		goto out_free_output;
+	if (!verify2) {
+		/* Perform the verification calculation.  This doesn't actually
+		 * do the verification, but rather calculates the hash expected
+		 * by the signature and returns that to us.
+		 */
+		ret = crypto_wait_req(crypto_akcipher_verify(req), &cwait);
+		if (ret)
+			goto out_free_output;
 
-	/* Do the actual verification step. */
-	if (req->dst_len != sig->digest_size ||
-	    memcmp(sig->digest, output, sig->digest_size) != 0)
-		ret = -EKEYREJECTED;
+		/* Do the actual verification step. */
+		if (req->dst_len != sig->digest_size ||
+		    memcmp(sig->digest, output, sig->digest_size) != 0)
+			ret = -EKEYREJECTED;
+	} else {
+		/* Perform full verification in one call. */
+		req->digest = sig->digest;
+		req->digest_len = sig->digest_size;
+		ret = crypto_wait_req(crypto_akcipher_verify2(req), &cwait);
+		if (ret)
+			goto out_free_output;
+	}
 
 out_free_output:
 	kfree(output);

@@ -28,6 +28,8 @@
  *		result.
  *		In case of error where the dst sgl size was insufficient,
  *		it will be updated to the size required for the operation.
+ * @digest:	Digest for verify2.
+ * @digest_len:	Size of the digest.
  * @__ctx:	Start of private context data
  */
 struct akcipher_request {
@@ -36,6 +38,8 @@ struct akcipher_request {
 	struct scatterlist *dst;
 	unsigned int src_len;
 	unsigned int dst_len;
+	u8 *digest;
+	u8 digest_len;
 	void *__ctx[] CRYPTO_MINALIGN_ATTR;
 };
 
@@ -60,6 +64,8 @@ struct crypto_akcipher {
  *		algorithm. In case of error, where the dst_len was insufficient,
  *		the req->dst_len will be updated to the size required for the
  *		operation
+ * @verify2:	Function performs a verify operation as defined by public key
+ *		algorithm.
  * @encrypt:	Function performs an encrypt operation as defined by public key
  *		algorithm. In case of error, where the dst_len was insufficient,
  *		the req->dst_len will be updated to the size required for the
@@ -96,6 +102,7 @@ struct crypto_akcipher {
 struct akcipher_alg {
 	int (*sign)(struct akcipher_request *req);
 	int (*verify)(struct akcipher_request *req);
+	int (*verify2)(struct akcipher_request *req);
 	int (*encrypt)(struct akcipher_request *req);
 	int (*decrypt)(struct akcipher_request *req);
 	int (*set_pub_key)(struct crypto_akcipher *tfm, const void *key,
@@ -352,11 +359,13 @@ static inline int crypto_akcipher_sign(struct akcipher_request *req)
  * crypto_akcipher_verify() - Invoke public key verify operation
  *
  * Function invokes the specific public key verify operation for a given
- * public key algorithm
+ * public key algorithm: basically it does (rsa) decrypt of signature
+ * producing decrypted hash into dst, which should be compared by a caller
+ * with expected hash value.
  *
- * @req:	asymmetric key request
+ * @req:	asymmetric key request (without hash)
  *
- * Return: zero on success; error code in case of error
+ * Return: zero on decryption success; error code in case of error
  */
 static inline int crypto_akcipher_verify(struct akcipher_request *req)
 {
@@ -369,6 +378,45 @@ static inline int crypto_akcipher_verify(struct akcipher_request *req)
 	ret = alg->verify(req);
 	crypto_stats_akcipher_verify(ret, calg);
 	return ret;
+}
+
+/**
+ * crypto_akcipher_verify2() - Invoke public key verify operation
+ *
+ * Function performs complete public key verify operation for a given
+ * public key algorithm
+ *
+ * @req:	asymmetric key request (with hash)
+ *
+ * Return: zero on verification success; error code in case of error
+ */
+static inline int crypto_akcipher_verify2(struct akcipher_request *req)
+{
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
+	int ret;
+
+	ret = alg->verify2(req);
+	crypto_stat_akcipher_verify(req, ret);
+	return ret;
+}
+
+/**
+ * crypto_akcipher_have_verify2() - Check for existence of public key verify2
+ * operation
+ *
+ * Function checks for existence of verify2 call for the public key algorithm
+ *
+ * @req:	asymmetric key request (with hash)
+ *
+ * Return: non-zero is verify2 call exists; zero if it does not
+ */
+static inline int crypto_akcipher_have_verify2(struct akcipher_request *req)
+{
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
+
+	return !!alg->verify2;
 }
 
 /**
