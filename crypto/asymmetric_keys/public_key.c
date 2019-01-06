@@ -136,8 +136,9 @@ static int software_key_query(const struct kernel_pkey_params *params,
 	info->max_sig_size = len;
 	info->max_enc_size = len;
 	info->max_dec_size = len;
-	info->supported_ops = (KEYCTL_SUPPORTS_ENCRYPT |
-			       KEYCTL_SUPPORTS_VERIFY);
+	info->supported_ops = KEYCTL_SUPPORTS_VERIFY;
+	if (crypto_akcipher_alg(tfm)->encrypt)
+		info->supported_ops |= KEYCTL_SUPPORTS_ENCRYPT;
 	if (pkey->key_is_private)
 		info->supported_ops |= (KEYCTL_SUPPORTS_DECRYPT |
 					KEYCTL_SUPPORTS_SIGN);
