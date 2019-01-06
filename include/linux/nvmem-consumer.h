@@ -56,7 +56,11 @@ enum {
 
 /* Cell based interface */
 struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *id);
+struct nvmem_cell *nvmem_cell_get_optional(struct device *dev,
+					   const char *id);
 struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *id);
+struct nvmem_cell *devm_nvmem_cell_get_optional(struct device *dev,
+						const char *id);
 void nvmem_cell_put(struct nvmem_cell *cell);
 void devm_nvmem_cell_put(struct device *dev, struct nvmem_cell *cell);
 void *nvmem_cell_read(struct nvmem_cell *cell, size_t *len);
@@ -96,10 +100,22 @@ static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
 	return ERR_PTR(-EOPNOTSUPP);
 }
 
+static inline struct nvmem_cell *nvmem_cell_get_optional(struct device *dev,
+							 const char *id)
+{
+	return NULL;
+}
+
 static inline struct nvmem_cell *devm_nvmem_cell_get(struct device *dev,
 						     const char *id)
 {
 	return ERR_PTR(-EOPNOTSUPP);
+}
+
+static inline struct nvmem_cell *
+devm_nvmem_cell_get_optional(struct device *dev, const char *id)
+{
+	return NULL;
 }
 
 static inline void devm_nvmem_cell_put(struct device *dev,
