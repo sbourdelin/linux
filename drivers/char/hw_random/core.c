@@ -578,7 +578,8 @@ EXPORT_SYMBOL_GPL(devm_hwrng_register);
 
 void devm_hwrng_unregister(struct device *dev, struct hwrng *rng)
 {
-	devres_release(dev, devm_hwrng_release, devm_hwrng_match, rng);
+	WARN_ON(devres_release(dev, devm_hwrng_release,
+				devm_hwrng_match, rng));
 }
 EXPORT_SYMBOL_GPL(devm_hwrng_unregister);
 
