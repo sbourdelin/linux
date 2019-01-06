@@ -121,13 +121,15 @@ static int ib_device_check_mandatory(struct ib_device *device)
 	};
 	int i;
 
+	device->kverbs_provider = true;
 	for (i = 0; i < ARRAY_SIZE(mandatory_table); ++i) {
 		if (!*(void **) ((void *) &device->ops +
 				 mandatory_table[i].offset)) {
 			dev_warn(&device->dev,
-				 "Device is missing mandatory function %s\n",
+				 "Device is missing mandatory function %s, disabling kverbs support\n",
 				 mandatory_table[i].name);
-			return -EINVAL;
+			device->kverbs_provider = false;
+			break;
 		}
 	}
 
@@ -624,7 +626,8 @@ int ib_register_device(struct ib_device *device, const char *name,
 
 	list_for_each_entry(client, &client_list, list)
 		if (!add_client_context(device, client) && client->add)
-			client->add(device);
+			if (device->kverbs_provider || client->no_kverbs_req)
+				client->add(device);
 
 	down_write(&lists_rwsem);
 	list_add_tail(&device->core_list, &device_list);
@@ -721,7 +724,8 @@ int ib_register_client(struct ib_client *client)
 
 	list_for_each_entry(device, &device_list, core_list)
 		if (!add_client_context(device, client) && client->add)
-			client->add(device);
+			if (device->kverbs_provider || client->no_kverbs_req)
+				client->add(device);
 
 	down_write(&lists_rwsem);
 	list_add_tail(&client->list, &client_list);
