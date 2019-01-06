@@ -230,11 +230,24 @@ int x509_note_pkey_algo(void *context, size_t hdrlen,
 	case OID_sha224WithRSAEncryption:
 		ctx->cert->sig->hash_algo = "sha224";
 		goto rsa_pkcs1;
+
+	case OID_gost2012Signature256:
+		ctx->cert->sig->hash_algo = "streebog256";
+		goto ecrdsa;
+
+	case OID_gost2012Signature512:
+		ctx->cert->sig->hash_algo = "streebog512";
+		goto ecrdsa;
 	}
 
 rsa_pkcs1:
 	ctx->cert->sig->pkey_algo = "rsa";
 	ctx->cert->sig->encoding = "pkcs1";
+	ctx->algo_oid = ctx->last_oid;
+	return 0;
+ecrdsa:
+	ctx->cert->sig->pkey_algo = "ecrdsa";
+	ctx->cert->sig->encoding = "raw";
 	ctx->algo_oid = ctx->last_oid;
 	return 0;
 }
