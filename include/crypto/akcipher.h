@@ -13,6 +13,7 @@
 #ifndef _CRYPTO_AKCIPHER_H
 #define _CRYPTO_AKCIPHER_H
 #include <linux/crypto.h>
+#include <linux/oid_registry.h>
 
 /**
  * struct akcipher_request - public key request
@@ -73,6 +74,9 @@ struct crypto_akcipher {
  * @set_priv_key: Function invokes the algorithm specific set private key
  *		function, which knows how to decode and interpret
  *		the BER encoded private key
+ * @set_params: Function invokes the algorithm specific set parameters
+ *		function, which knows how to decode and interpret
+ *		the DER encoded public key parameters
  * @max_size:	Function returns dest buffer size required for a given key.
  * @init:	Initialize the cryptographic transformation object.
  *		This function is used to initialize the cryptographic
@@ -98,6 +102,8 @@ struct akcipher_alg {
 			   unsigned int keylen);
 	int (*set_priv_key)(struct crypto_akcipher *tfm, const void *key,
 			    unsigned int keylen);
+	int (*set_params)(struct crypto_akcipher *tfm, enum OID algo,
+			  const void *params, unsigned int paramlen);
 	unsigned int (*max_size)(struct crypto_akcipher *tfm);
 	int (*init)(struct crypto_akcipher *tfm);
 	void (*exit)(struct crypto_akcipher *tfm);
@@ -405,5 +411,32 @@ static inline int crypto_akcipher_set_priv_key(struct crypto_akcipher *tfm,
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
 	return alg->set_priv_key(tfm, key, keylen);
+}
+
+/**
+ * crypto_akcipher_set_params() - Invoke set parameters operation
+ *
+ * Function invokes the algorithm specific set parameters function, which
+ * knows how to decode and interpret the encoded parameters
+ *
+ * @tfm:	tfm handle
+ * @algo:	OID of the key algorithm
+ * @params:	DER encoded key parameters
+ * @paramlen:	length of the parameters
+ *
+ * Return: zero on success; error code in case of error
+ */
+static inline int crypto_akcipher_set_params(struct crypto_akcipher *tfm,
+					     enum OID algo,
+					     const void *params,
+					     unsigned int paramlen)
+{
+	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
+
+	if (alg->set_params)
+		return alg->set_params(tfm, algo, params, paramlen);
+	if (!params || !paramlen)
+		return 0;
+	return -ENOTSUPP;
 }
 #endif

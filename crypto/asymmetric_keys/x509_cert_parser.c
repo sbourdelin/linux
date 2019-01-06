@@ -26,6 +26,9 @@ struct x509_parse_context {
 	const void	*cert_start;		/* Start of cert content */
 	const void	*key;			/* Key data */
 	size_t		key_size;		/* Size of key data */
+	const void	*params;		/* Key parameters */
+	size_t		params_size;		/* Size of key parameters */
+	enum OID	key_algo;		/* Public key algorithm */
 	enum OID	last_oid;		/* Last OID encountered */
 	enum OID	algo_oid;		/* Algorithm OID */
 	unsigned char	nr_mpi;			/* Number of MPIs stored */
@@ -108,6 +111,13 @@ struct x509_certificate *x509_cert_parse(const void *data, size_t datalen)
 		goto error_decode;
 
 	cert->pub->keylen = ctx->key_size;
+
+	cert->pub->params = kmemdup(ctx->params, ctx->params_size, GFP_KERNEL);
+	if (!cert->pub->params)
+		goto error_decode;
+
+	cert->pub->paramlen = ctx->params_size;
+	cert->pub->algo = ctx->key_algo;
 
 	/* Grab the signature bits */
 	ret = x509_get_sig_params(cert);
@@ -401,6 +411,23 @@ int x509_note_subject(void *context, size_t hdrlen,
 }
 
 /*
+ * Extract parameters for particular keys
+ */
+int x509_note_params(void *context, size_t hdrlen,
+		     unsigned char tag,
+		     const void *value, size_t vlen)
+{
+	struct x509_parse_context *ctx = context;
+
+	if (ctx->last_oid != OID_gost2012PublicKey256 &&
+	    ctx->last_oid != OID_gost2012PublicKey512)
+		return 0;
+	ctx->params = value;
+	ctx->params_size = vlen;
+	return 0;
+}
+
+/*
  * Extract the data for the public key algorithm
  */
 int x509_extract_key_data(void *context, size_t hdrlen,
@@ -409,16 +436,21 @@ int x509_extract_key_data(void *context, size_t hdrlen,
 {
 	struct x509_parse_context *ctx = context;
 
-	if (ctx->last_oid != OID_rsaEncryption)
+	ctx->key_algo = ctx->last_oid;
+	if (ctx->last_oid == OID_rsaEncryption)
+		ctx->cert->pub->pkey_algo = "rsa";
+	else if (ctx->last_oid == OID_gost2012PublicKey256 ||
+		 ctx->last_oid == OID_gost2012PublicKey512)
+		ctx->cert->pub->pkey_algo = "ecrdsa";
+	else
 		return -ENOPKG;
-
-	ctx->cert->pub->pkey_algo = "rsa";
 
 	/* Discard the BIT STRING metadata */
 	if (vlen < 1 || *(const u8 *)value != 0)
 		return -EBADMSG;
 	ctx->key = value + 1;
 	ctx->key_size = vlen - 1;
+
 	return 0;
 }
 
