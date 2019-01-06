@@ -145,6 +145,8 @@ __acquires(ep->musb->lock)
 
 	trace_musb_req_gb(req);
 	usb_gadget_giveback_request(&req->ep->end_point, &req->request);
+	usb_gadget_control_complete(&musb->g, request->explicit_status,
+			request->status);
 	spin_lock(&musb->lock);
 	ep->busy = busy;
 }
