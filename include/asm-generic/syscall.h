@@ -122,10 +122,34 @@ syscall_set_return_value(struct task_struct *task, struct pt_regs *regs,
  * entry to a system call, due to %TIF_SYSCALL_TRACE or %TIF_SYSCALL_AUDIT.
  * It's invalid to call this with @i + @n > 6; we only support system calls
  * taking up to 6 arguments.
+ *
+ * This function is a wrapper around arch-specific __syscall_get_arguments.
  */
 static void
+__syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
+			unsigned int i, unsigned int n, unsigned long *args);
+
+static inline void
 syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
-		      unsigned int i, unsigned int n, unsigned long *args);
+		      unsigned int i, unsigned int n, unsigned long *args)
+{
+	/*
+	 * Ideally there should have been a BUILD_BUG_ON(i + n > 6)
+	 * instead of these checks because it is a "cannot happen"
+	 * kind of assertion.
+	 */
+	if (WARN_ON_ONCE(i > 6)) {
+		memset(args, 0, n * sizeof(args[0]));
+		return;
+	}
+	if (WARN_ON_ONCE(n > 6 - i)) {
+		unsigned int extra = n - (6 - i);
+
+		n = 6 - i;
+		memset(&args[n], 0, extra * sizeof(args[0]));
+	}
+	__syscall_get_arguments(task, regs, i, n, args);
+}
 
 /**
  * syscall_set_arguments - change system call parameter value
@@ -143,11 +167,30 @@ syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
  * entry to a system call, due to %TIF_SYSCALL_TRACE or %TIF_SYSCALL_AUDIT.
  * It's invalid to call this with @i + @n > 6; we only support system calls
  * taking up to 6 arguments.
+ *
+ * This function is a wrapper around arch-specific __syscall_set_arguments.
  */
 static void
+__syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
+			unsigned int i, unsigned int n,
+			const unsigned long *args);
+
+static inline void
 syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
 		      unsigned int i, unsigned int n,
-		      const unsigned long *args);
+		      const unsigned long *args)
+{
+	/*
+	 * Ideally there should have been a BUILD_BUG_ON(i + n > 6)
+	 * instead of these checks because it is a "cannot happen"
+	 * kind of assertion.
+	 */
+	if (WARN_ON_ONCE(i > 6))
+		return;
+	if (WARN_ON_ONCE(n > 6 - i))
+		n = 6 - i;
+	__syscall_set_arguments(task, regs, i, n, args);
+}
 
 /**
  * syscall_get_arch - return the AUDIT_ARCH for the current system call
