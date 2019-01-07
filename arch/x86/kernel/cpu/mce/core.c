@@ -1616,7 +1616,7 @@ static int __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 		 * they're not supported there.
 		 */
 		if (c->x86 == 0x15 &&
-		    (c->x86_model >= 0x10 && c->x86_model <= 0x1f)) {
+		    (c->x86_model >= 0x10 && c->x86_model <= 0x7f)) {
 			int i;
 			u64 hwcr;
 			bool need_toggle;
