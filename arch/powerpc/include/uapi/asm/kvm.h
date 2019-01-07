@@ -680,6 +680,7 @@ struct kvm_ppc_cpu_char {
 #define   KVM_DEV_XIVE_GET_ESB_FD	1
 #define   KVM_DEV_XIVE_GET_TIMA_FD	2
 #define   KVM_DEV_XIVE_VC_BASE		3
+#define   KVM_DEV_XIVE_SAVE_EQ_PAGES	4
 #define KVM_DEV_XIVE_GRP_SOURCES	2	/* 64-bit source attributes */
 #define KVM_DEV_XIVE_GRP_SYNC		3	/* 64-bit source attributes */
 

@@ -373,6 +373,43 @@ static int kvmppc_xive_native_get_tima_fd(struct kvmppc_xive *xive, u64 addr)
 	return put_user(ret, ubufp);
 }
 
+static int kvmppc_xive_native_vcpu_save_eq_pages(struct kvm_vcpu *vcpu)
+{
+	struct kvmppc_xive_vcpu *xc = vcpu->arch.xive_vcpu;
+	unsigned int prio;
+
+	if (!xc)
+		return -ENOENT;
+
+	for (prio = 0; prio < KVMPPC_XIVE_Q_COUNT; prio++) {
+		struct xive_q *q = &xc->queues[prio];
+
+		if (!q->qpage)
+			continue;
+
+		/* Mark EQ page dirty for migration */
+		mark_page_dirty(vcpu->kvm, gpa_to_gfn(q->guest_qpage));
+	}
+	return 0;
+}
+
+static int kvmppc_xive_native_save_eq_pages(struct kvmppc_xive *xive)
+{
+	struct kvm *kvm = xive->kvm;
+	struct kvm_vcpu *vcpu;
+	unsigned int i;
+
+	pr_devel("%s\n", __func__);
+
+	mutex_lock(&kvm->lock);
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		kvmppc_xive_native_vcpu_save_eq_pages(vcpu);
+	}
+	mutex_unlock(&kvm->lock);
+
+	return 0;
+}
+
 static int xive_native_validate_queue_size(u32 qsize)
 {
 	switch (qsize) {
@@ -498,6 +535,8 @@ static int kvmppc_xive_native_set_attr(struct kvm_device *dev,
 		switch (attr->attr) {
 		case KVM_DEV_XIVE_VC_BASE:
 			return kvmppc_xive_native_set_vc_base(xive, attr->addr);
+		case KVM_DEV_XIVE_SAVE_EQ_PAGES:
+			return kvmppc_xive_native_save_eq_pages(xive);
 		}
 		break;
 	case KVM_DEV_XIVE_GRP_SOURCES:
@@ -538,6 +577,7 @@ static int kvmppc_xive_native_has_attr(struct kvm_device *dev,
 		case KVM_DEV_XIVE_GET_ESB_FD:
 		case KVM_DEV_XIVE_GET_TIMA_FD:
 		case KVM_DEV_XIVE_VC_BASE:
+		case KVM_DEV_XIVE_SAVE_EQ_PAGES:
 			return 0;
 		}
 		break;
