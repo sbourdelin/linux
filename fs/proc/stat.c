@@ -79,12 +79,38 @@ static u64 get_iowait_time(int cpu)
 
 #endif
 
+static u64 compute_stat_irqs_sum(void)
+{
+	int i;
+	u64 sum = 0;
+
+	for_each_possible_cpu(i) {
+		sum += kstat_cpu_irqs_sum(i);
+		sum += arch_irq_stat_cpu(i);
+	}
+	sum += arch_irq_stat();
+	return sum;
+}
+
+/*
+ * Print out the "intr" line of /proc/stat.
+ */
+static void show_stat_irqs(struct seq_file *p)
+{
+	int i;
+
+	seq_put_decimal_ull(p, "intr ", compute_stat_irqs_sum());
+	for_each_irq_nr(i)
+		seq_put_decimal_ull(p, " ", kstat_irqs_usr(i));
+
+	seq_putc(p, '\n');
+}
+
 static int show_stat(struct seq_file *p, void *v)
 {
 	int i, j;
 	u64 user, nice, system, idle, iowait, irq, softirq, steal;
 	u64 guest, guest_nice;
-	u64 sum = 0;
 	u64 sum_softirq = 0;
 	unsigned int per_softirq_sums[NR_SOFTIRQS] = {0};
 	struct timespec64 boottime;
@@ -105,8 +131,6 @@ static int show_stat(struct seq_file *p, void *v)
 		steal += kcpustat_cpu(i).cpustat[CPUTIME_STEAL];
 		guest += kcpustat_cpu(i).cpustat[CPUTIME_GUEST];
 		guest_nice += kcpustat_cpu(i).cpustat[CPUTIME_GUEST_NICE];
-		sum += kstat_cpu_irqs_sum(i);
-		sum += arch_irq_stat_cpu(i);
 
 		for (j = 0; j < NR_SOFTIRQS; j++) {
 			unsigned int softirq_stat = kstat_softirqs_cpu(j, i);
@@ -115,7 +139,6 @@ static int show_stat(struct seq_file *p, void *v)
 			sum_softirq += softirq_stat;
 		}
 	}
-	sum += arch_irq_stat();
 
 	seq_put_decimal_ull(p, "cpu  ", nsec_to_clock_t(user));
 	seq_put_decimal_ull(p, " ", nsec_to_clock_t(nice));
@@ -154,14 +177,10 @@ static int show_stat(struct seq_file *p, void *v)
 		seq_put_decimal_ull(p, " ", nsec_to_clock_t(guest_nice));
 		seq_putc(p, '\n');
 	}
-	seq_put_decimal_ull(p, "intr ", (unsigned long long)sum);
-
-	/* sum again ? it could be updated? */
-	for_each_irq_nr(j)
-		seq_put_decimal_ull(p, " ", kstat_irqs_usr(j));
+	show_stat_irqs(p);
 
 	seq_printf(p,
-		"\nctxt %llu\n"
+		"ctxt %llu\n"
 		"btime %llu\n"
 		"processes %lu\n"
 		"procs_running %lu\n"
