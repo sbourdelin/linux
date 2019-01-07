@@ -521,6 +521,9 @@ xfs_vn_getattr(
 			stat->btime.tv_nsec = ip->i_d.di_crtime.t_nsec;
 		}
 	}
+	
+	/* Only return mask that we care */
+	stat->result_mask &= request_mask;
 
 	if (ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE)
 		stat->attributes |= STATX_ATTR_IMMUTABLE;
