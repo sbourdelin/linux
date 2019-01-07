@@ -607,6 +607,164 @@ static int kvmppc_xive_native_get_eas(struct kvmppc_xive *xive, long irq,
 	return 0;
 }
 
+static int kvmppc_xive_native_set_queue(struct kvmppc_xive *xive, long eq_idx,
+				      u64 addr)
+{
+	struct kvm *kvm = xive->kvm;
+	struct kvm_vcpu *vcpu;
+	struct kvmppc_xive_vcpu *xc;
+	void __user *ubufp = (u64 __user *) addr;
+	u32 server;
+	u8 priority;
+	struct kvm_ppc_xive_eq kvm_eq;
+	int rc;
+	__be32 *qaddr = 0;
+	struct page *page;
+	struct xive_q *q;
+
+	/*
+	 * Demangle priority/server tuple from the EQ index
+	 */
+	priority = (eq_idx & KVM_XIVE_EQ_PRIORITY_MASK) >>
+		KVM_XIVE_EQ_PRIORITY_SHIFT;
+	server = (eq_idx & KVM_XIVE_EQ_SERVER_MASK) >>
+		KVM_XIVE_EQ_SERVER_SHIFT;
+
+	if (copy_from_user(&kvm_eq, ubufp, sizeof(kvm_eq)))
+		return -EFAULT;
+
+	vcpu = kvmppc_xive_find_server(kvm, server);
+	if (!vcpu) {
+		pr_err("Can't find server %d\n", server);
+		return -ENOENT;
+	}
+	xc = vcpu->arch.xive_vcpu;
+
+	if (priority != xive_prio_from_guest(priority)) {
+		pr_err("Trying to restore invalid queue %d for VCPU %d\n",
+		       priority, server);
+		return -EINVAL;
+	}
+	q = &xc->queues[priority];
+
+	pr_devel("%s VCPU %d priority %d fl:%x sz:%d addr:%llx g:%d idx:%d\n",
+		 __func__, server, priority, kvm_eq.flags,
+		 kvm_eq.qsize, kvm_eq.qpage, kvm_eq.qtoggle, kvm_eq.qindex);
+
+	rc = xive_native_validate_queue_size(kvm_eq.qsize);
+	if (rc || !kvm_eq.qsize) {
+		pr_err("invalid queue size %d\n", kvm_eq.qsize);
+		return rc;
+	}
+
+	page = gfn_to_page(kvm, gpa_to_gfn(kvm_eq.qpage));
+	if (is_error_page(page)) {
+		pr_warn("Couldn't get guest page for %llx!\n", kvm_eq.qpage);
+		return -ENOMEM;
+	}
+	qaddr = page_to_virt(page) + (kvm_eq.qpage & ~PAGE_MASK);
+
+	/* Backup queue page guest address for migration */
+	q->guest_qpage = kvm_eq.qpage;
+	q->guest_qsize = kvm_eq.qsize;
+
+	rc = xive_native_configure_queue(xc->vp_id, q, priority,
+					 (__be32 *) qaddr, kvm_eq.qsize, true);
+	if (rc) {
+		pr_err("Failed to configure queue %d for VCPU %d: %d\n",
+		       priority, xc->server_num, rc);
+		put_page(page);
+		return rc;
+	}
+
+	rc = xive_native_set_queue_state(xc->vp_id, priority, kvm_eq.qtoggle,
+					 kvm_eq.qindex);
+	if (rc)
+		goto error;
+
+	rc = kvmppc_xive_attach_escalation(vcpu, priority);
+error:
+	if (rc)
+		xive_native_cleanup_queue(vcpu, priority);
+	return rc;
+}
+
+static int kvmppc_xive_native_get_queue(struct kvmppc_xive *xive, long eq_idx,
+				      u64 addr)
+{
+	struct kvm *kvm = xive->kvm;
+	struct kvm_vcpu *vcpu;
+	struct kvmppc_xive_vcpu *xc;
+	struct xive_q *q;
+	void __user *ubufp = (u64 __user *) addr;
+	u32 server;
+	u8 priority;
+	struct kvm_ppc_xive_eq kvm_eq;
+	u64 qpage;
+	u64 qsize;
+	u64 qeoi_page;
+	u32 escalate_irq;
+	u64 qflags;
+	int rc;
+
+	/*
+	 * Demangle priority/server tuple from the EQ index
+	 */
+	priority = (eq_idx & KVM_XIVE_EQ_PRIORITY_MASK) >>
+		KVM_XIVE_EQ_PRIORITY_SHIFT;
+	server = (eq_idx & KVM_XIVE_EQ_SERVER_MASK) >>
+		KVM_XIVE_EQ_SERVER_SHIFT;
+
+	vcpu = kvmppc_xive_find_server(kvm, server);
+	if (!vcpu) {
+		pr_err("Can't find server %d\n", server);
+		return -ENOENT;
+	}
+	xc = vcpu->arch.xive_vcpu;
+
+	if (priority != xive_prio_from_guest(priority)) {
+		pr_err("invalid priority for queue %d for VCPU %d\n",
+		       priority, server);
+		return -EINVAL;
+	}
+	q = &xc->queues[priority];
+
+	memset(&kvm_eq, 0, sizeof(kvm_eq));
+
+	if (!q->qpage)
+		return 0;
+
+	rc = xive_native_get_queue_info(xc->vp_id, priority, &qpage, &qsize,
+					&qeoi_page, &escalate_irq, &qflags);
+	if (rc)
+		return rc;
+
+	kvm_eq.flags = 0;
+	if (qflags & OPAL_XIVE_EQ_ENABLED)
+		kvm_eq.flags |= KVM_XIVE_EQ_FLAG_ENABLED;
+	if (qflags & OPAL_XIVE_EQ_ALWAYS_NOTIFY)
+		kvm_eq.flags |= KVM_XIVE_EQ_FLAG_ALWAYS_NOTIFY;
+	if (qflags & OPAL_XIVE_EQ_ESCALATE)
+		kvm_eq.flags |= KVM_XIVE_EQ_FLAG_ESCALATE;
+
+	kvm_eq.qsize = q->guest_qsize;
+	kvm_eq.qpage = q->guest_qpage;
+
+	rc = xive_native_get_queue_state(xc->vp_id, priority, &kvm_eq.qtoggle,
+					 &kvm_eq.qindex);
+	if (rc)
+		return rc;
+
+	pr_devel("%s VCPU %d priority %d fl:%x sz:%d addr:%llx g:%d idx:%d\n",
+		 __func__, server, priority, kvm_eq.flags,
+		 kvm_eq.qsize, kvm_eq.qpage, kvm_eq.qtoggle, kvm_eq.qindex);
+
+	if (copy_to_user(ubufp, &kvm_eq, sizeof(kvm_eq)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int kvmppc_xive_native_set_attr(struct kvm_device *dev,
 				       struct kvm_device_attr *attr)
 {
@@ -628,6 +786,9 @@ static int kvmppc_xive_native_set_attr(struct kvm_device *dev,
 		return kvmppc_xive_native_sync(xive, attr->attr, attr->addr);
 	case KVM_DEV_XIVE_GRP_EAS:
 		return kvmppc_xive_native_set_eas(xive, attr->attr, attr->addr);
+	case KVM_DEV_XIVE_GRP_EQ:
+		return kvmppc_xive_native_set_queue(xive, attr->attr,
+						    attr->addr);
 	}
 	return -ENXIO;
 }
@@ -650,6 +811,9 @@ static int kvmppc_xive_native_get_attr(struct kvm_device *dev,
 		break;
 	case KVM_DEV_XIVE_GRP_EAS:
 		return kvmppc_xive_native_get_eas(xive, attr->attr, attr->addr);
+	case KVM_DEV_XIVE_GRP_EQ:
+		return kvmppc_xive_native_get_queue(xive, attr->attr,
+						    attr->addr);
 	}
 	return -ENXIO;
 }
@@ -674,6 +838,8 @@ static int kvmppc_xive_native_has_attr(struct kvm_device *dev,
 		    attr->attr < KVMPPC_XIVE_NR_IRQS)
 			return 0;
 		break;
+	case KVM_DEV_XIVE_GRP_EQ:
+		return 0;
 	}
 	return -ENXIO;
 }
