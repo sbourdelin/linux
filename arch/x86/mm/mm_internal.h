@@ -8,6 +8,13 @@ static inline void *alloc_low_page(void)
 	return alloc_low_pages(1);
 }
 
+unsigned long __init init_range_memory_mapping(unsigned long r_start,
+	unsigned long r_end);
+void set_alloc_range(unsigned long low, unsigned long high);
+void __init memory_map_top_down(unsigned long map_start,
+				       unsigned long map_end);
+void __init memory_map_bottom_up(unsigned long map_start,
+					unsigned long map_end);
 void early_ioremap_page_table_range_init(void);
 
 unsigned long kernel_physical_mapping_init(unsigned long start,
