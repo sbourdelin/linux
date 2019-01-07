@@ -424,6 +424,84 @@ static int xive_native_validate_queue_size(u32 qsize)
 	}
 }
 
+#define TM_IPB_SHIFT 40
+#define TM_IPB_MASK  (((u64) 0xFF) << TM_IPB_SHIFT)
+
+int kvmppc_xive_native_get_vp(struct kvm_vcpu *vcpu, union kvmppc_one_reg *val)
+{
+	struct kvmppc_xive_vcpu *xc = vcpu->arch.xive_vcpu;
+	u64 opal_state;
+	int rc;
+
+	if (!kvmppc_xive_enabled(vcpu))
+		return -EPERM;
+
+	if (!xc)
+		return -ENOENT;
+
+	/* Thread context registers. We only care about IPB and CPPR */
+	val->xive_timaval[0] = vcpu->arch.xive_saved_state.w01;
+
+	/*
+	 * Return the OS CAM line to print out the VP identifier in
+	 * the QEMU monitor. This is not restored.
+	 */
+	val->xive_timaval[1] = vcpu->arch.xive_cam_word;
+
+	/* Get the VP state from OPAL */
+	rc = xive_native_get_vp_state(xc->vp_id, &opal_state);
+	if (rc)
+		return rc;
+
+	/*
+	 * Capture the backup of IPB register in the NVT structure and
+	 * merge it in our KVM VP state.
+	 *
+	 * TODO: P10 support.
+	 */
+	val->xive_timaval[0] |= cpu_to_be64(opal_state & TM_IPB_MASK);
+
+	pr_devel("%s NSR=%02x CPPR=%02x IBP=%02x PIPR=%02x w01=%016llx w2=%08x opal=%016llx\n",
+		 __func__,
+		 vcpu->arch.xive_saved_state.nsr,
+		 vcpu->arch.xive_saved_state.cppr,
+		 vcpu->arch.xive_saved_state.ipb,
+		 vcpu->arch.xive_saved_state.pipr,
+		 vcpu->arch.xive_saved_state.w01,
+		 (u32) vcpu->arch.xive_cam_word, opal_state);
+
+	return 0;
+}
+
+int kvmppc_xive_native_set_vp(struct kvm_vcpu *vcpu, union kvmppc_one_reg *val)
+{
+	struct kvmppc_xive_vcpu *xc = vcpu->arch.xive_vcpu;
+	struct kvmppc_xive *xive = vcpu->kvm->arch.xive;
+
+	pr_devel("%s w01=%016llx vp=%016llx\n", __func__,
+		 val->xive_timaval[0], val->xive_timaval[1]);
+
+	if (!kvmppc_xive_enabled(vcpu))
+		return -EPERM;
+
+	if (!xc || !xive)
+		return -ENOENT;
+
+	/* We can't update the state of a "pushed" VCPU	 */
+	if (WARN_ON(vcpu->arch.xive_pushed))
+		return -EIO;
+
+	/* Thread context registers. only restore IPB and CPPR ? */
+	vcpu->arch.xive_saved_state.w01 = val->xive_timaval[0];
+
+	/*
+	 * There is no need to restore the XIVE internal state (IPB
+	 * stored in the NVT) as the IPB register was merged in KVM VP
+	 * state.
+	 */
+	return 0;
+}
+
 static int kvmppc_xive_native_set_source(struct kvmppc_xive *xive, long irq,
 					 u64 addr)
 {
