@@ -153,6 +153,25 @@ bail:
 	return rc;
 }
 
+static int kvmppc_xive_native_set_vc_base(struct kvmppc_xive *xive, u64 addr)
+{
+	u64 __user *ubufp = (u64 __user *) addr;
+
+	if (get_user(xive->vc_base, ubufp))
+		return -EFAULT;
+	return 0;
+}
+
+static int kvmppc_xive_native_get_vc_base(struct kvmppc_xive *xive, u64 addr)
+{
+	u64 __user *ubufp = (u64 __user *) addr;
+
+	if (put_user(xive->vc_base, ubufp))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int xive_native_esb_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -289,6 +308,16 @@ static int kvmppc_xive_native_get_tima_fd(struct kvmppc_xive *xive, u64 addr)
 static int kvmppc_xive_native_set_attr(struct kvm_device *dev,
 				       struct kvm_device_attr *attr)
 {
+	struct kvmppc_xive *xive = dev->private;
+
+	switch (attr->group) {
+	case KVM_DEV_XIVE_GRP_CTRL:
+		switch (attr->attr) {
+		case KVM_DEV_XIVE_VC_BASE:
+			return kvmppc_xive_native_set_vc_base(xive, attr->addr);
+		}
+		break;
+	}
 	return -ENXIO;
 }
 
@@ -304,6 +333,8 @@ static int kvmppc_xive_native_get_attr(struct kvm_device *dev,
 			return kvmppc_xive_native_get_esb_fd(xive, attr->addr);
 		case KVM_DEV_XIVE_GET_TIMA_FD:
 			return kvmppc_xive_native_get_tima_fd(xive, attr->addr);
+		case KVM_DEV_XIVE_VC_BASE:
+			return kvmppc_xive_native_get_vc_base(xive, attr->addr);
 		}
 		break;
 	}
@@ -318,6 +349,7 @@ static int kvmppc_xive_native_has_attr(struct kvm_device *dev,
 		switch (attr->attr) {
 		case KVM_DEV_XIVE_GET_ESB_FD:
 		case KVM_DEV_XIVE_GET_TIMA_FD:
+		case KVM_DEV_XIVE_VC_BASE:
 			return 0;
 		}
 		break;
@@ -353,6 +385,11 @@ static void kvmppc_xive_native_free(struct kvm_device *dev)
 	kfree(dev);
 }
 
+/*
+ * ESB MMIO address of chip 0
+ */
+#define XIVE_VC_BASE   0x0006010000000000ull
+
 static int kvmppc_xive_native_create(struct kvm_device *dev, u32 type)
 {
 	struct kvmppc_xive *xive;
@@ -386,6 +423,8 @@ static int kvmppc_xive_native_create(struct kvm_device *dev, u32 type)
 
 	if (xive->vp_base == XIVE_INVALID_VP)
 		ret = -ENOMEM;
+
+	xive->vc_base = XIVE_VC_BASE;
 
 	xive->single_escalation = xive_native_has_single_escalation();
 
