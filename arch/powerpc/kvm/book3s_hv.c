@@ -930,6 +930,22 @@ int kvmppc_pseries_do_hcall(struct kvm_vcpu *vcpu)
 			break;
 		}
 		return RESUME_HOST;
+	case H_INT_GET_SOURCE_INFO:
+	case H_INT_SET_SOURCE_CONFIG:
+	case H_INT_GET_SOURCE_CONFIG:
+	case H_INT_GET_QUEUE_INFO:
+	case H_INT_SET_QUEUE_CONFIG:
+	case H_INT_GET_QUEUE_CONFIG:
+	case H_INT_SET_OS_REPORTING_LINE:
+	case H_INT_GET_OS_REPORTING_LINE:
+	case H_INT_ESB:
+	case H_INT_SYNC:
+	case H_INT_RESET:
+		if (kvmppc_xive_enabled(vcpu)) {
+			ret = kvmppc_xive_native_hcall(vcpu, req);
+			break;
+		}
+		return RESUME_HOST;
 	case H_SET_DABR:
 		ret = kvmppc_h_set_dabr(vcpu, kvmppc_get_gpr(vcpu, 4));
 		break;
@@ -5153,6 +5169,19 @@ static unsigned int default_hcall_list[] = {
 	H_IPOLL,
 	H_XIRR,
 	H_XIRR_X,
+#endif
+#ifdef CONFIG_KVM_XIVE
+	H_INT_GET_SOURCE_INFO,
+	H_INT_SET_SOURCE_CONFIG,
+	H_INT_GET_SOURCE_CONFIG,
+	H_INT_GET_QUEUE_INFO,
+	H_INT_SET_QUEUE_CONFIG,
+	H_INT_GET_QUEUE_CONFIG,
+	H_INT_SET_OS_REPORTING_LINE,
+	H_INT_GET_OS_REPORTING_LINE,
+	H_INT_ESB,
+	H_INT_SYNC,
+	H_INT_RESET,
 #endif
 	0
 };
