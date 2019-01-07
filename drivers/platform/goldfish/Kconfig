@@ -16,4 +16,13 @@ config GOLDFISH_PIPE
 	  This is a virtual device to drive the QEMU pipe interface used by
 	  the Goldfish Android Virtual Device.
 
+config GOLDFISH_ADDRESS_SPACE
+	tristate "A Goldfish driver that talks to the memory sharing device in QEMU"
+	depends on PCI
+	depends on GOLDFISH
+	help
+	  A Goldfish driver that allocates address space ranges in the guest to
+	  populate them later in the host. This allows sharing host's memory
+	  with the guest.
+
 endif # GOLDFISH
