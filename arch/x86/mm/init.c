@@ -76,6 +76,14 @@ static unsigned long min_pfn_mapped;
 
 static bool __initdata can_use_brk_pgt = true;
 
+static unsigned long min_pfn_allowed;
+static unsigned long max_pfn_allowed;
+void set_alloc_range(unsigned long low, unsigned long high)
+{
+	min_pfn_allowed = low;
+	max_pfn_allowed = high;
+}
+
 /*
  * Pages returned are already directly mapped.
  *
@@ -100,12 +108,10 @@ __ref void *alloc_low_pages(unsigned int num)
 	if ((pgt_buf_end + num) > pgt_buf_top || !can_use_brk_pgt) {
 		unsigned long ret = 0;
 
-		if (min_pfn_mapped < max_pfn_mapped) {
-			ret = memblock_find_in_range(
-					min_pfn_mapped << PAGE_SHIFT,
-					max_pfn_mapped << PAGE_SHIFT,
-					PAGE_SIZE * num , PAGE_SIZE);
-		}
+		ret = memblock_find_in_range(
+			min_pfn_allowed << PAGE_SHIFT,
+			max_pfn_allowed << PAGE_SHIFT,
+			PAGE_SIZE * num, PAGE_SIZE);
 		if (ret)
 			memblock_reserve(ret, PAGE_SIZE * num);
 		else if (can_use_brk_pgt)
@@ -588,14 +594,17 @@ static void __init memory_map_top_down(unsigned long map_start,
 			start = map_start;
 		mapped_ram_size += init_range_memory_mapping(start,
 							last_start);
+		set_alloc_range(min_pfn_mapped, max_pfn_mapped);
 		last_start = start;
 		min_pfn_mapped = last_start >> PAGE_SHIFT;
 		if (mapped_ram_size >= step_size)
 			step_size = get_new_step_size(step_size);
 	}
 
-	if (real_end < map_end)
+	if (real_end < map_end) {
 		init_range_memory_mapping(real_end, map_end);
+		set_alloc_range(min_pfn_mapped, max_pfn_mapped);
+	}
 }
 
 /**
@@ -636,6 +645,7 @@ static void __init memory_map_bottom_up(unsigned long map_start,
 		}
 
 		mapped_ram_size += init_range_memory_mapping(start, next);
+		set_alloc_range(min_pfn_mapped, max_pfn_mapped);
 		start = next;
 
 		if (mapped_ram_size >= step_size)
