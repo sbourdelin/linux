@@ -15,12 +15,36 @@
 
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/types.h>
 
 #define DEV_DBG(fmt, args...)   pr_debug(fmt, ##args)
 #define DEV_INFO(fmt, args...)  pr_info(fmt, ##args)
 #define DEV_WARN(fmt, args...)  pr_warn(fmt, ##args)
 #define DEV_ERR(fmt, args...)   pr_err(fmt, ##args)
+
+struct dss_io_data {
+	u32 len;
+	void __iomem *base;
+};
+
+enum dss_vreg_type {
+	DSS_REG_LDO,
+	DSS_REG_VS,
+};
+
+struct dss_vreg {
+	struct regulator *vreg; /* vreg handle */
+	char vreg_name[32];
+	int min_voltage;
+	int max_voltage;
+	int enable_load;
+	int disable_load;
+	int pre_on_sleep;
+	int post_on_sleep;
+	int pre_off_sleep;
+	int post_off_sleep;
+};
 
 struct dss_gpio {
 	unsigned int gpio;
@@ -42,6 +66,8 @@ struct dss_clk {
 };
 
 struct dss_module_power {
+	unsigned int num_vreg;
+	struct dss_vreg *vreg_config;
 	unsigned int num_gpio;
 	struct dss_gpio *gpio_config;
 	unsigned int num_clk;

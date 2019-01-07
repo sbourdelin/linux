@@ -14,7 +14,9 @@
 #include <linux/clk.h>
 #include <linux/clk/clk-conf.h>
 #include <linux/err.h>
+#include <linux/io.h>
 #include <linux/delay.h>
+#include <drm/drmP.h>
 
 #include <drm/drm_print.h>
 
