@@ -29,4 +29,6 @@ extern unsigned int atou(const char *s);
 extern unsigned long long simple_strtoull(const char *cp, char **endp,
 					  unsigned int base);
 
+int kstrtoull(const char *s, unsigned int base, unsigned long long *res);
+#define KSTRTOX_OVERFLOW       (1U << 31)
 #endif /* BOOT_STRING_H */
