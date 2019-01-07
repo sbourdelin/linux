@@ -33,7 +33,7 @@ syscall_get_return_value(struct task_struct *task, struct pt_regs *regs)
 }
 
 static inline int
-syscall_get_arch(void)
+syscall_get_arch(struct task_struct *task)
 {
 	return AUDIT_ARCH_ALPHA;
 }

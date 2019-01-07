@@ -60,7 +60,7 @@ static inline long syscall_get_return_value(struct task_struct *task,
 	return regs->r00;
 }
 
-static inline int syscall_get_arch(void)
+static inline int syscall_get_arch(struct task_struct *task)
 {
 	return AUDIT_ARCH_HEXAGON;
 }
