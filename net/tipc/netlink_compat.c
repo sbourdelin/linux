@@ -705,6 +705,9 @@ static int __tipc_nl_compat_link_set(struct sk_buff *skb,
 	if (!link)
 		return -EMSGSIZE;
 
+	if (!memchr(lc->name, '\0', TIPC_MAX_LINK_NAME))
+		return -EINVAL;
+
 	if (nla_put_string(skb, TIPC_NLA_LINK_NAME, lc->name))
 		return -EMSGSIZE;
 
