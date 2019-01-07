@@ -2568,38 +2568,6 @@ exit:
 
 }
 
-static int rtw_wps_start(struct net_device *dev,
-                               struct iw_request_info *info,
-                               union iwreq_data *wrqu, char *extra)
-{
-
-	int ret = 0;
-	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
-	struct iw_point *pdata = &wrqu->data;
-	u32   u32wps_start = 0;
-        unsigned int uintRet = 0;
-
-	if ((true == padapter->bDriverStopped) ||(true ==padapter->bSurpriseRemoved) || (NULL == pdata)) {
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	uintRet = copy_from_user((void*)&u32wps_start, pdata->pointer, 4);
-	if (u32wps_start == 0)
-		u32wps_start = *extra;
-
-	DBG_871X("[%s] wps_start = %d\n", __func__, u32wps_start);
-
-#ifdef CONFIG_INTEL_WIDI
-	process_intel_widi_wps_status(padapter, u32wps_start);
-#endif /* CONFIG_INTEL_WIDI */
-
-exit:
-
-	return ret;
-
-}
-
 static int rtw_p2p_set(struct net_device *dev,
                                struct iw_request_info *info,
                                union iwreq_data *wrqu, char *extra)
@@ -4820,7 +4788,7 @@ static iw_handler rtw_private_handler[] = {
 	rtw_get_ap_info,					/* 0x04 */
 
 	rtw_set_pid,						/* 0x05 */
-	rtw_wps_start,					/* 0x06 */
+	NULL,					/* 0x06 */
 
 /*  for PLATFORM_MT53XX */
 	rtw_wx_get_sensitivity,			/* 0x07 */
