@@ -13,6 +13,7 @@
 #include <linux/irqnr.h>
 #include <linux/sched/cputime.h>
 #include <linux/tick.h>
+#include <linux/jiffies.h>
 
 #ifndef arch_irq_stat_cpu
 #define arch_irq_stat_cpu(cpu) 0
@@ -20,6 +21,12 @@
 #ifndef arch_irq_stat
 #define arch_irq_stat() 0
 #endif
+
+/*
+ * Maximum latency (in ms) of the irq values reported in the "intr" line.
+ * This is converted internally to multiple of jiffies.
+ */
+unsigned int proc_stat_irqs_latency_ms;
 
 #ifdef arch_idle_time
 
@@ -98,7 +105,48 @@ static u64 compute_stat_irqs_sum(void)
 static void show_stat_irqs(struct seq_file *p)
 {
 	int i;
+#ifdef CONFIG_PROC_SYSCTL
+	static char *irqs_buf;		   /* Buffer for irqs values */
+	static int buflen;
+	static unsigned long last_jiffies; /* Last buffer update jiffies */
+	static DEFINE_MUTEX(irqs_mutex);
+	unsigned int latency = proc_stat_irqs_latency_ms;
 
+	if (latency) {
+		char *ptr;
+
+		latency = _msecs_to_jiffies(latency);
+
+		mutex_lock(&irqs_mutex);
+		if (irqs_buf && time_before(jiffies, last_jiffies + latency))
+			goto print_out;
+
+		/*
+		 * Each irq value may require up to 11 bytes.
+		 */
+		if (!irqs_buf) {
+			irqs_buf = kmalloc(nr_irqs * 11 + 32,
+					   GFP_KERNEL | __GFP_ZERO);
+			if (!irqs_buf) {
+				mutex_unlock(&irqs_mutex);
+				goto fallback;
+			}
+		}
+
+		ptr = irqs_buf;
+		ptr += sprintf(ptr, "intr %llu", compute_stat_irqs_sum());
+		for_each_irq_nr(i)
+			ptr += sprintf(ptr, " %u", kstat_irqs_usr(i));
+		*ptr++ = '\n';
+		buflen = ptr - irqs_buf;
+		last_jiffies = jiffies;
+print_out:
+		seq_write(p, irqs_buf, buflen);
+		mutex_unlock(&irqs_mutex);
+		return;
+	}
+fallback:
+#endif
 	seq_put_decimal_ull(p, "intr ", compute_stat_irqs_sum());
 	for_each_irq_nr(i)
 		seq_put_decimal_ull(p, " ", kstat_irqs_usr(i));

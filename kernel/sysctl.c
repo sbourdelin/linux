@@ -114,6 +114,9 @@ extern unsigned int sysctl_nr_open_min, sysctl_nr_open_max;
 #ifndef CONFIG_MMU
 extern int sysctl_nr_trim_pages;
 #endif
+#ifdef CONFIG_PROC_FS
+extern unsigned int proc_stat_irqs_latency_ms;
+#endif
 
 /* Constants used for minimum and  maximum */
 #ifdef CONFIG_LOCKUP_DETECTOR
@@ -1897,6 +1900,15 @@ static struct ctl_table fs_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &one,
 	},
+#ifdef CONFIG_PROC_FS
+	{
+		.procname	= "proc-stat-irqs-latency-ms",
+		.data		= &proc_stat_irqs_latency_ms,
+		.maxlen		= sizeof(proc_stat_irqs_latency_ms),
+		.mode		= 0644,
+		.proc_handler	= proc_douintvec,
+	},
+#endif
 	{ }
 };
 

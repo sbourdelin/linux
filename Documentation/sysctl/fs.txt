@@ -34,6 +34,7 @@ Currently, these files are in /proc/sys/fs:
 - overflowgid
 - pipe-user-pages-hard
 - pipe-user-pages-soft
+- proc-stat-irqs-latency-ms
 - protected_fifos
 - protected_hardlinks
 - protected_regular
@@ -181,6 +182,21 @@ limit total memory usage, and trying to increase them using fcntl() will be
 denied until usage goes below the limit again. The default value allows to
 allocate up to 1024 pipes at their default size. When set to 0, no limit is
 applied.
+
+==============================================================
+
+proc-stat-irqs-latency-ms:
+
+The maximum latency (in mseconds) between the time when the IRQ counts
+in the "intr" line of /proc/stat were computed and the time when they
+are reported.
+
+The default is 0 which means the counts are computed every time
+/proc/stat is read. As computing the IRQ counts can be the most time
+consuming part of accessing /proc/stat, setting a high enough value
+will shorten the time to read it in most cases.
+
+The actual maximum latency is rounded up to the next multiple of jiffies.
 
 ==============================================================
 
