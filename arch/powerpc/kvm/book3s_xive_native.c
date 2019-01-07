@@ -240,6 +240,32 @@ static int kvmppc_xive_native_get_vc_base(struct kvmppc_xive *xive, u64 addr)
 	return 0;
 }
 
+static int kvmppc_xive_native_reset_mapped(struct kvm *kvm, unsigned long irq)
+{
+	struct kvmppc_xive *xive = kvm->arch.xive;
+	struct mm_struct *mm = kvm->mm;
+	struct vm_area_struct *vma = xive->vma;
+	unsigned long address;
+
+	if (irq >= KVMPPC_XIVE_NR_IRQS)
+		return -EINVAL;
+
+	pr_debug("clearing esb pages for girq 0x%lx\n", irq);
+
+	down_read(&mm->mmap_sem);
+	/* TODO: can we clear the PTEs without keeping a VMA pointer ? */
+	if (vma) {
+		address = vma->vm_start + irq * (2ull << PAGE_SHIFT);
+		zap_vma_ptes(vma, address, 2ull << PAGE_SHIFT);
+	}
+	up_read(&mm->mmap_sem);
+	return 0;
+}
+
+static struct kvmppc_xive_ops kvmppc_xive_native_ops =  {
+	.reset_mapped = kvmppc_xive_native_reset_mapped,
+};
+
 static int xive_native_esb_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -292,6 +318,8 @@ static const struct vm_operations_struct xive_native_esb_vmops = {
 
 static int xive_native_esb_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	struct kvmppc_xive *xive = vma->vm_file->private_data;
+
 	/* There are two ESB pages (trigger and EOI) per IRQ */
 	if (vma_pages(vma) + vma->vm_pgoff > KVMPPC_XIVE_NR_IRQS * 2)
 		return -EINVAL;
@@ -299,6 +327,7 @@ static int xive_native_esb_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_flags |= VM_IO | VM_PFNMAP;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	vma->vm_ops = &xive_native_esb_vmops;
+	xive->vma = vma; /* TODO: get rid of the VMA pointer */
 	return 0;
 }
 
@@ -992,6 +1021,7 @@ static int kvmppc_xive_native_create(struct kvm_device *dev, u32 type)
 	xive->vc_base = XIVE_VC_BASE;
 
 	xive->single_escalation = xive_native_has_single_escalation();
+	xive->ops = &kvmppc_xive_native_ops;
 
 	if (ret)
 		kfree(xive);
