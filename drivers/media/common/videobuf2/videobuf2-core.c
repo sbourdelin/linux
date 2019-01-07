@@ -499,9 +499,9 @@ static int __vb2_queue_free(struct vb2_queue *q, unsigned int buffers)
 			pr_info("     buf_init: %u buf_cleanup: %u buf_prepare: %u buf_finish: %u\n",
 				vb->cnt_buf_init, vb->cnt_buf_cleanup,
 				vb->cnt_buf_prepare, vb->cnt_buf_finish);
-			pr_info("     buf_queue: %u buf_done: %u buf_request_complete: %u\n",
-				vb->cnt_buf_queue, vb->cnt_buf_done,
-				vb->cnt_buf_request_complete);
+			pr_info("     buf_out_validate: %u buf_queue: %u buf_done: %u buf_request_complete: %u\n",
+				vb->cnt_buf_out_validate, vb->cnt_buf_queue,
+				vb->cnt_buf_done, vb->cnt_buf_request_complete);
 			pr_info("     alloc: %u put: %u prepare: %u finish: %u mmap: %u\n",
 				vb->cnt_mem_alloc, vb->cnt_mem_put,
 				vb->cnt_mem_prepare, vb->cnt_mem_finish,
@@ -1508,6 +1508,14 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb,
 	     q->uses_requests)) {
 		dprintk(1, "queue in wrong mode (qbuf vs requests)\n");
 		return -EBUSY;
+	}
+
+	if (q->is_output) {
+		ret = call_vb_qop(vb, buf_out_validate, vb);
+		if (ret) {
+			dprintk(1, "buffer validation failed\n");
+			return ret;
+		}
 	}
 
 	if (req) {
