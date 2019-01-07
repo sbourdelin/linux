@@ -5,6 +5,7 @@
 #include "../string.h"
 
 #include <linux/acpi.h>
+#include <linux/numa.h>
 #include <linux/efi.h>
 #include <asm/efi.h>
 
@@ -13,6 +14,19 @@
  * digits, and '\0' for termination.
  */
 #define MAX_HEX_ADDRESS_STRING_LEN 19
+
+/*
+ * Longest parameter of 'acpi=' in cmldine is 'copy_dsdt', so max length
+ * is 10, which contains '\0' for termination.
+ */
+#define MAX_ACPI_ARG_LENGTH 10
+
+/*
+ * Information of immovable memory regions.
+ * Max amount of memory regions is MAX_NUMNODES*2, so need such array
+ * to place immovable memory regions if all of the memory is immovable.
+ */
+struct mem_vector immovable_mem[MAX_NUMNODES*2];
 
 static acpi_physical_address get_acpi_rsdp(void)
 {
@@ -196,4 +210,128 @@ static acpi_physical_address bios_get_rsdp_addr(void)
 		return address;
 	}
 	return 0;
+}
+
+/* Determine RSDP, based on acpi_os_get_root_pointer(). */
+static acpi_physical_address get_rsdp_addr(void)
+{
+	acpi_physical_address pa;
+
+	pa = get_acpi_rsdp();
+
+	if (!pa)
+		pa = efi_get_rsdp_addr();
+
+	if (!pa)
+		pa = bios_get_rsdp_addr();
+
+	return pa;
+}
+
+/* Compute SRAT address from RSDP. */
+static struct acpi_table_header *get_acpi_srat_table(void)
+{
+	acpi_physical_address acpi_table;
+	acpi_physical_address root_table;
+	struct acpi_table_header *header;
+	struct acpi_table_rsdp *rsdp;
+	u32 num_entries;
+	char arg[10];
+	u8 *entry;
+	u32 size;
+	u32 len;
+
+	rsdp = (struct acpi_table_rsdp *)(long)get_rsdp_addr();
+	if (!rsdp)
+		return NULL;
+
+	/* Get RSDT or XSDT from RSDP. */
+	if (!(cmdline_find_option("acpi", arg, sizeof(arg)) == 4 &&
+	    !strncmp(arg, "rsdt", 4)) &&
+	    rsdp->xsdt_physical_address &&
+	    rsdp->revision > 1) {
+		root_table = rsdp->xsdt_physical_address;
+		size = ACPI_XSDT_ENTRY_SIZE;
+	} else {
+		root_table = rsdp->rsdt_physical_address;
+		size = ACPI_RSDT_ENTRY_SIZE;
+	}
+
+	/* Get ACPI root table from RSDT or XSDT.*/
+	if (!root_table)
+		return NULL;
+	header = (struct acpi_table_header *)(long)root_table;
+
+	len = header->length;
+	if (len < sizeof(struct acpi_table_header) + size)
+		return NULL;
+
+	num_entries = (u32)((len - sizeof(struct acpi_table_header)) / size);
+	entry = ACPI_ADD_PTR(u8, header, sizeof(struct acpi_table_header));
+
+	while (num_entries--) {
+		u64 address64;
+
+		if (size == ACPI_RSDT_ENTRY_SIZE)
+			acpi_table =  *ACPI_CAST_PTR(u32, entry);
+		else {
+			address64 = *(u64 *)entry;
+			acpi_table = address64;
+		}
+
+		if (acpi_table) {
+			header = (struct acpi_table_header *)(long)acpi_table;
+
+			if (ACPI_COMPARE_NAME(header->signature, ACPI_SIG_SRAT))
+				return header;
+		}
+		entry += size;
+	}
+	return NULL;
+}
+
+/*
+ * According to ACPI table, filter the immovable memory regions
+ * and store them in immovable_mem[].
+ */
+void get_immovable_mem(void)
+{
+	struct acpi_table_header *table_header;
+	struct acpi_subtable_header *table;
+	struct acpi_srat_mem_affinity *ma;
+	char arg[MAX_ACPI_ARG_LENGTH];
+	unsigned long table_end;
+	int i = 0;
+
+	if (cmdline_find_option("acpi", arg, sizeof(arg)) == 3 &&
+	    !strncmp(arg, "off", 3))
+		return;
+
+	table_header = get_acpi_srat_table();
+	if (!table_header)
+		return;
+
+	table_end = (unsigned long)table_header + table_header->length;
+	table = (struct acpi_subtable_header *)
+		((unsigned long)table_header + sizeof(struct acpi_table_srat));
+
+	while (((unsigned long)table) +
+		       sizeof(struct acpi_subtable_header) < table_end) {
+		if (table->type == ACPI_SRAT_TYPE_MEMORY_AFFINITY) {
+			ma = (struct acpi_srat_mem_affinity *)table;
+			if (!(ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)) {
+				immovable_mem[i].start = ma->base_address;
+				immovable_mem[i].size = ma->length;
+				i++;
+			}
+
+			if (i >= MAX_NUMNODES*2) {
+				debug_putstr("Too many immovable memory regions, aborting.\n");
+				return;
+			}
+		}
+		table = (struct acpi_subtable_header *)
+			((unsigned long)table + table->length);
+	}
+	num_immovable_mem = i;
 }

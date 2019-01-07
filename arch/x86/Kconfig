@@ -2154,6 +2154,18 @@ config X86_NEED_RELOCS
 	def_bool y
 	depends on RANDOMIZE_BASE || (X86_32 && RELOCATABLE)
 
+config EARLY_SRAT_PARSE
+	bool "EARLY SRAT parsing"
+	def_bool y
+	depends on RANDOMIZE_BASE && MEMORY_HOTREMOVE
+	help
+	  This option enables early SRAT parsing in compressed boot stage
+	  so that memory hot-remove ranges do not overlap with KASLR
+	  chosen ranges. Kernel won't be extracted in hot-removable
+	  memory, so that make sure memory-hotremove works well with
+	  KASLR enabled.
+	  Say Y if you want to use both KASLR and memory-hotremove.
+
 config PHYSICAL_ALIGN
 	hex "Alignment value to which kernel should be aligned"
 	default "0x200000"

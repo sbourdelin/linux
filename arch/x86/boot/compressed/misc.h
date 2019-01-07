@@ -77,6 +77,11 @@ void choose_random_location(unsigned long input,
 			    unsigned long *output,
 			    unsigned long output_size,
 			    unsigned long *virt_addr);
+struct mem_vector {
+	unsigned long long start;
+	unsigned long long size;
+};
+
 /* cpuflags.c */
 bool has_cpuflag(int flag);
 #else
@@ -115,4 +120,18 @@ static inline void console_init(void)
 
 void set_sev_encryption_mask(void);
 
+#endif
+
+/* acpi.c */
+#ifdef CONFIG_RANDOMIZE_BASE
+/* Amount of immovable memory regions */
+int num_immovable_mem;
+#endif
+
+#ifdef CONFIG_EARLY_SRAT_PARSE
+void get_immovable_mem(void);
+#else
+static void get_immovable_mem(void)
+{
+}
 #endif
