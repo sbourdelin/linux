@@ -18,6 +18,7 @@
 #define __ARCH_WANT_RENAMEAT
 #define __ARCH_WANT_STAT64
 #define __ARCH_WANT_SYS_CLONE
+#define __ARCH_NOMMU
 
 /* Use the standard ABI for syscalls. */
 #include <asm-generic/unistd.h>
