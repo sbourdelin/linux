@@ -736,7 +736,7 @@ static inline int qedr_align_cq_entries(int entries)
 	return aligned_size / QEDR_CQE_SIZE;
 }
 
-static inline int qedr_init_user_queue(struct ib_ucontext *ib_ctx,
+static inline int qedr_init_user_queue(struct ib_udata *udata,
 				       struct qedr_dev *dev,
 				       struct qedr_userq *q,
 				       u64 buf_addr, size_t buf_len,
@@ -748,7 +748,7 @@ static inline int qedr_init_user_queue(struct ib_ucontext *ib_ctx,
 
 	q->buf_addr = buf_addr;
 	q->buf_len = buf_len;
-	q->umem = ib_umem_get(ib_ctx, q->buf_addr, q->buf_len, access, dmasync);
+	q->umem = ib_umem_get(udata, q->buf_addr, q->buf_len, access, dmasync);
 	if (IS_ERR(q->umem)) {
 		DP_ERR(dev, "create user queue: failed ib_umem_get, got %ld\n",
 		       PTR_ERR(q->umem));
@@ -905,9 +905,9 @@ struct ib_cq *qedr_create_cq(struct ib_device *ibdev,
 
 		cq->cq_type = QEDR_CQ_TYPE_USER;
 
-		rc = qedr_init_user_queue(ib_ctx, dev, &cq->q, ureq.addr,
-					  ureq.len, IB_ACCESS_LOCAL_WRITE,
-					  1, 1);
+		rc = qedr_init_user_queue(udata, dev, &cq->q, ureq.addr,
+					  ureq.len, IB_ACCESS_LOCAL_WRITE, 1,
+					  1);
 		if (rc)
 			goto err0;
 
@@ -1344,7 +1344,7 @@ static void qedr_free_srq_kernel_params(struct qedr_srq *srq)
 			  hw_srq->phy_prod_pair_addr);
 }
 
-static int qedr_init_srq_user_params(struct ib_ucontext *ib_ctx,
+static int qedr_init_srq_user_params(struct ib_udata *udata,
 				     struct qedr_srq *srq,
 				     struct qedr_create_srq_ureq *ureq,
 				     int access, int dmasync)
@@ -1352,12 +1352,12 @@ static int qedr_init_srq_user_params(struct ib_ucontext *ib_ctx,
 	struct scatterlist *sg;
 	int rc;
 
-	rc = qedr_init_user_queue(ib_ctx, srq->dev, &srq->usrq, ureq->srq_addr,
+	rc = qedr_init_user_queue(udata, srq->dev, &srq->usrq, ureq->srq_addr,
 				  ureq->srq_len, access, dmasync, 1);
 	if (rc)
 		return rc;
 
-	srq->prod_umem = ib_umem_get(ib_ctx, ureq->prod_pair_addr,
+	srq->prod_umem = ib_umem_get(udata, ureq->prod_pair_addr,
 				     sizeof(struct rdma_srq_producers),
 				     access, dmasync);
 	if (IS_ERR(srq->prod_umem)) {
@@ -1468,7 +1468,7 @@ struct ib_srq *qedr_create_srq(struct ib_pd *ibpd,
 			goto err0;
 		}
 
-		rc = qedr_init_srq_user_params(ib_ctx, srq, &ureq, 0, 0);
+		rc = qedr_init_srq_user_params(udata, srq, &ureq, 0, 0);
 		if (rc)
 			goto err0;
 
@@ -1714,14 +1714,14 @@ static int qedr_create_user_qp(struct qedr_dev *dev,
 	}
 
 	/* SQ - read access only (0), dma sync not required (0) */
-	rc = qedr_init_user_queue(ib_ctx, dev, &qp->usq, ureq.sq_addr,
+	rc = qedr_init_user_queue(udata, dev, &qp->usq, ureq.sq_addr,
 				  ureq.sq_len, 0, 0, alloc_and_init);
 	if (rc)
 		return rc;
 
 	if (!qp->srq) {
 		/* RQ - read access only (0), dma sync not required (0) */
-		rc = qedr_init_user_queue(ib_ctx, dev, &qp->urq, ureq.rq_addr,
+		rc = qedr_init_user_queue(udata, dev, &qp->urq, ureq.rq_addr,
 					  ureq.rq_len, 0, 0, alloc_and_init);
 		if (rc)
 			return rc;
@@ -2719,7 +2719,7 @@ struct ib_mr *qedr_reg_user_mr(struct ib_pd *ibpd, u64 start, u64 len,
 
 	mr->type = QEDR_MR_USER;
 
-	mr->umem = ib_umem_get(ibpd->uobject->context, start, len, acc, 0);
+	mr->umem = ib_umem_get(udata, start, len, acc, 0);
 	if (IS_ERR(mr->umem)) {
 		rc = -EFAULT;
 		goto err0;

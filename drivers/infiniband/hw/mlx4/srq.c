@@ -113,7 +113,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 			goto err_srq;
 		}
 
-		srq->umem = ib_umem_get(pd->uobject->context, ucmd.buf_addr,
+		srq->umem = ib_umem_get(udata, ucmd.buf_addr,
 					buf_size, 0, 0);
 		if (IS_ERR(srq->umem)) {
 			err = PTR_ERR(srq->umem);
@@ -130,7 +130,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 			goto err_mtt;
 
 		err = mlx4_ib_db_map_user(to_mucontext(pd->uobject->context),
-					  ucmd.db_addr, &srq->db);
+					  udata, ucmd.db_addr, &srq->db);
 		if (err)
 			goto err_mtt;
 	} else {

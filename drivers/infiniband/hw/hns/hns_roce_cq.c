@@ -215,7 +215,7 @@ void hns_roce_free_cq(struct hns_roce_dev *hr_dev, struct hns_roce_cq *hr_cq)
 EXPORT_SYMBOL_GPL(hns_roce_free_cq);
 
 static int hns_roce_ib_get_cq_umem(struct hns_roce_dev *hr_dev,
-				   struct ib_ucontext *context,
+				   struct ib_udata *udata,
 				   struct hns_roce_cq_buf *buf,
 				   struct ib_umem **umem, u64 buf_addr, int cqe)
 {
@@ -223,7 +223,7 @@ static int hns_roce_ib_get_cq_umem(struct hns_roce_dev *hr_dev,
 	u32 page_shift;
 	u32 npages;
 
-	*umem = ib_umem_get(context, buf_addr, cqe * hr_dev->caps.cq_entry_sz,
+	*umem = ib_umem_get(udata, buf_addr, cqe * hr_dev->caps.cq_entry_sz,
 			    IB_ACCESS_LOCAL_WRITE, 1);
 	if (IS_ERR(*umem))
 		return PTR_ERR(*umem);
@@ -347,7 +347,7 @@ struct ib_cq *hns_roce_ib_create_cq(struct ib_device *ib_dev,
 		}
 
 		/* Get user space address, write it into mtt table */
-		ret = hns_roce_ib_get_cq_umem(hr_dev, context, &hr_cq->hr_buf,
+		ret = hns_roce_ib_get_cq_umem(hr_dev, udata, &hr_cq->hr_buf,
 					      &hr_cq->umem, ucmd.buf_addr,
 					      cq_entries);
 		if (ret) {
