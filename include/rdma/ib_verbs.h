@@ -2617,6 +2617,10 @@ struct ib_client {
 	struct list_head list;
 };
 
+struct ib_uverbs {
+	/* uverbs callbacks used by ib_core */
+};
+
 struct ib_device *ib_alloc_device(size_t size);
 void ib_dealloc_device(struct ib_device *device);
 
@@ -2629,6 +2633,14 @@ void ib_unregister_device(struct ib_device *device);
 
 int ib_register_client   (struct ib_client *client);
 void ib_unregister_client(struct ib_client *client);
+
+int ib_register_uverbs(struct ib_uverbs *uverbs);
+void ib_unregister_uverbs(void);
+/*
+ * return uverbs callbacks or NULL.
+ * rcu read lock must be held as long as uverbs callbacks are in use.
+ */
+struct ib_uverbs *ib_get_uverbs(void);
 
 void *ib_get_client_data(struct ib_device *device, struct ib_client *client);
 void  ib_set_client_data(struct ib_device *device, struct ib_client *client,

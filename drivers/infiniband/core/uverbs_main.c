@@ -1370,6 +1370,7 @@ static char *uverbs_devnode(struct device *dev, umode_t *mode)
 
 static int __init ib_uverbs_init(void)
 {
+	struct ib_uverbs uverbs = {0};
 	int ret;
 
 	ret = register_chrdev_region(IB_UVERBS_BASE_DEV,
@@ -1409,7 +1410,16 @@ static int __init ib_uverbs_init(void)
 		goto out_class;
 	}
 
+	ret = ib_register_uverbs(&uverbs);
+	if (ret) {
+		pr_err("user_verbs: couldn't register uverbs\n");
+		goto out_client;
+	}
+
 	return 0;
+
+out_client:
+	ib_unregister_client(&uverbs_client);
 
 out_class:
 	class_destroy(uverbs_class);
@@ -1428,6 +1438,7 @@ out:
 
 static void __exit ib_uverbs_cleanup(void)
 {
+	ib_unregister_uverbs();
 	ib_unregister_client(&uverbs_client);
 	class_destroy(uverbs_class);
 	unregister_chrdev_region(IB_UVERBS_BASE_DEV,

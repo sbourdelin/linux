@@ -789,6 +789,56 @@ void ib_unregister_client(struct ib_client *client)
 }
 EXPORT_SYMBOL(ib_unregister_client);
 
+static DEFINE_MUTEX(uverbs_lock);
+static struct ib_uverbs __rcu *ib_core_uverbs;
+
+int ib_register_uverbs(struct ib_uverbs *uverbs)
+{
+	struct ib_uverbs *core_uverbs;
+	int ret = 0;
+
+	mutex_lock(&uverbs_lock);
+	if (ib_core_uverbs) {
+		ret = -EEXIST;
+		goto unlock;
+	}
+
+	core_uverbs = kzalloc(sizeof(*core_uverbs), GFP_KERNEL);
+	if (!core_uverbs) {
+		ret = -ENOMEM;
+		goto unlock;
+	}
+
+	*core_uverbs = *uverbs;
+	rcu_assign_pointer(ib_core_uverbs, core_uverbs);
+unlock:
+	mutex_unlock(&uverbs_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(ib_register_uverbs);
+
+void ib_unregister_uverbs(void)
+{
+	struct ib_uverbs *core_uverbs;
+
+	mutex_lock(&uverbs_lock);
+	if (!ib_core_uverbs)
+		goto unlock;
+	core_uverbs = ib_core_uverbs;
+	rcu_assign_pointer(ib_core_uverbs, NULL);
+	synchronize_rcu();
+	kfree(core_uverbs);
+unlock:
+	mutex_unlock(&uverbs_lock);
+}
+EXPORT_SYMBOL(ib_unregister_uverbs);
+
+struct ib_uverbs *ib_get_uverbs(void)
+{
+	return rcu_dereference(ib_core_uverbs);
+}
+
 /**
  * ib_get_client_data - Get IB client context
  * @device:Device to get context for
@@ -1435,6 +1485,7 @@ static void __exit ib_core_cleanup(void)
 	destroy_workqueue(ib_comp_wq);
 	/* Make sure that any pending umem accounting work is done. */
 	destroy_workqueue(ib_wq);
+	ib_unregister_uverbs();
 }
 
 MODULE_ALIAS_RDMA_NETLINK(RDMA_NL_LS, 4);
