@@ -1890,6 +1890,7 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 		return -EINVAL;
 	}
 
+	skb->dev = tun->dev;
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case IFF_TUN:
 		if (tun->flags & IFF_NO_PI) {
@@ -1911,7 +1912,6 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 
 		skb_reset_mac_header(skb);
 		skb->protocol = pi.proto;
-		skb->dev = tun->dev;
 		break;
 	case IFF_TAP:
 		if (!frags)
