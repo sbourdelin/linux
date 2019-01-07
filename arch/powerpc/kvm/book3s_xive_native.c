@@ -708,6 +708,10 @@ static int kvmppc_h_int_set_queue_config(struct kvm_vcpu *vcpu,
 	}
 	qaddr = page_to_virt(page) + (qpage & ~PAGE_MASK);
 
+	/* Backup queue page address and size for migration */
+	q->guest_qpage = qpage;
+	q->guest_qsize = qsize;
+
 	rc = xive_native_configure_queue(xc->vp_id, q, priority,
 					 (__be32 *) qaddr, qsize, true);
 	if (rc) {
