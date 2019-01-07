@@ -804,6 +804,20 @@ dump_kernel_offset(struct notifier_block *self, unsigned long v, void *p)
 	return 0;
 }
 
+/* only need the effect of acpi_numa_memory_affinity_init()
+ * ->memblock_mark_hotplug()
+ */
+static int early_detect_acpi_memhotplug(void)
+{
+#ifdef CONFIG_ACPI_NUMA
+	acpi_table_upgrade(__va(get_ramdisk_image()), get_ramdisk_size());
+	acpi_table_init();
+	acpi_numa_init();
+	acpi_tb_terminate();
+#endif
+	return 0;
+}
+
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
  * passed the efi memmap, systab, etc., so we should use these data structures
@@ -1130,6 +1144,7 @@ void __init setup_arch(char **cmdline_p)
 	trim_platform_memory_ranges();
 	trim_low_memory_range();
 
+	early_detect_acpi_memhotplug();
 	init_mem_mapping();
 
 	idt_setup_early_pf();
