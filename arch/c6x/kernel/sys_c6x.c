@@ -70,5 +70,6 @@ asmlinkage int sys_cache_sync(unsigned long s, unsigned long e)
  */
 void *sys_call_table[__NR_syscalls] = {
 	[0 ... __NR_syscalls-1] = sys_ni_syscall,
-#include <asm/unistd.h>
+#define sys_arch_specific_syscall0	sys_cache_sync
+#include <asm/syscall_table.h>
 };

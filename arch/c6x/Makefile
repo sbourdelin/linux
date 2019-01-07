@@ -53,6 +53,9 @@ dtbImage.%: vmlinux
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
+archheaders:
+	$(Q)$(MAKE) $(build)=arch/c6x/kernel/syscalls all
+
 define archhelp
   @echo '  vmlinux.bin     - Binary kernel image (arch/$(ARCH)/boot/vmlinux.bin)'
   @echo '  dtbImage.<dt>   - ELF image with $(arch)/boot/dts/<dt>.dts linked in'

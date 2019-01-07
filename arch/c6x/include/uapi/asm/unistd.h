@@ -20,9 +20,13 @@
 #define __ARCH_WANT_SYS_CLONE
 #define __ARCH_NOMMU
 
-/* Use the standard ABI for syscalls. */
-#include <asm-generic/unistd.h>
+#include <asm/bitsperlong.h>
 
-/* C6X-specific syscalls. */
-#define __NR_cache_sync	(__NR_arch_specific_syscall + 0)
-__SYSCALL(__NR_cache_sync, sys_cache_sync)
+#ifndef __SYSCALL
+#define __SYSCALL(x, y)
+#endif
+
+#if __BITS_PER_LONG == 32
+#define __NR_cache_sync	__NR_arch_specific_syscall0
+#include <asm/unistd_32.h>
+#endif
