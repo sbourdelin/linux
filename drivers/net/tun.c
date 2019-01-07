@@ -323,22 +323,30 @@ static void tun_napi_init(struct tun_struct *tun, struct tun_file *tfile,
 	tfile->napi_enabled = napi_en;
 	tfile->napi_frags_enabled = napi_en && napi_frags;
 	if (napi_en) {
+		mutex_lock(&tfile->napi_mutex);
 		netif_napi_add(tun->dev, &tfile->napi, tun_napi_poll,
 			       NAPI_POLL_WEIGHT);
 		napi_enable(&tfile->napi);
+		mutex_unlock(&tfile->napi_mutex);
 	}
 }
 
 static void tun_napi_disable(struct tun_file *tfile)
 {
-	if (tfile->napi_enabled)
+	if (tfile->napi_enabled) {
+		mutex_lock(&tfile->napi_mutex);
 		napi_disable(&tfile->napi);
+		mutex_unlock(&tfile->napi_mutex);
+	}
 }
 
 static void tun_napi_del(struct tun_file *tfile)
 {
-	if (tfile->napi_enabled)
+	if (tfile->napi_enabled) {
+		mutex_lock(&tfile->napi_mutex);
 		netif_napi_del(&tfile->napi);
+		mutex_unlock(&tfile->napi_mutex);
+	}
 }
 
 static bool tun_napi_frags_enabled(const struct tun_file *tfile)
@@ -856,7 +864,6 @@ static int tun_attach(struct tun_struct *tun, struct file *file,
 		err = 0;
 	}
 
-	rcu_assign_pointer(tfile->tun, tun);
 	rcu_assign_pointer(tun->tfiles[tun->numqueues], tfile);
 	tun->numqueues++;
 
@@ -876,6 +883,11 @@ static int tun_attach(struct tun_struct *tun, struct file *file,
 	 * refcnt.
 	 */
 
+	/* All tun_fops depend on tun_get() returning non-null pointer.
+	 * Thus, assigning tun to a tfile should be the last init operation,
+	 * otherwise we risk using half-initialized object.
+	 */
+	rcu_assign_pointer(tfile->tun, tun);
 out:
 	return err;
 }
