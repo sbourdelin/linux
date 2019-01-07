@@ -2510,10 +2510,14 @@ void pci_config_pm_runtime_put(struct pci_dev *pdev)
  */
 bool pci_bridge_d3_possible(struct pci_dev *bridge)
 {
+	int type;
+
 	if (!pci_is_pcie(bridge))
 		return false;
 
-	switch (pci_pcie_type(bridge)) {
+	type = pci_pcie_type(bridge);
+
+	switch (type) {
 	case PCI_EXP_TYPE_ROOT_PORT:
 	case PCI_EXP_TYPE_UPSTREAM:
 	case PCI_EXP_TYPE_DOWNSTREAM:
@@ -2544,6 +2548,18 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 		 * was no OS support.
 		 */
 		if (bridge->is_hotplug_bridge)
+			return false;
+
+		/*
+		 * Some systems such as Gigabyte X299 the root port is
+		 * not marked hotplug capable but ACPI based hotplug is
+		 * still used to bring in the Thunderbolt controller. To
+		 * make sure those ports do not enter D3 and possibly
+		 * confuse the BIOS SMI handler, block D3 for them.
+		 */
+		if (has_acpi_companion(&bridge->dev) &&
+		    type != PCI_EXP_TYPE_UPSTREAM &&
+		    pcie_caps_reg(bridge) & PCI_EXP_FLAGS_SLOT)
 			return false;
 
 		/*
