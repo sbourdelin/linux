@@ -16,6 +16,7 @@
 #include <linux/hash.h>
 
 #include "hfi_cmds.h"
+#include "core.h"
 
 static enum hfi_version hfi_ver;
 
@@ -161,8 +162,10 @@ void pkt_sys_image_version(struct hfi_sys_get_property_pkt *pkt)
 int pkt_session_init(struct hfi_session_init_pkt *pkt, void *cookie,
 		     u32 session_type, u32 codec)
 {
-	if (!pkt || !cookie || !codec)
+	if (!pkt || !cookie || !codec) {
+		dprintk(ERR, "%s invalid parameters\n", __func__);
 		return -EINVAL;
+		}
 
 	pkt->shdr.hdr.size = sizeof(*pkt);
 	pkt->shdr.hdr.pkt_type = HFI_CMD_SYS_SESSION_INIT;
@@ -185,8 +188,10 @@ int pkt_session_set_buffers(struct hfi_session_set_buffers_pkt *pkt,
 {
 	unsigned int i;
 
-	if (!cookie || !pkt || !bd)
+	if (!cookie || !pkt || !bd) {
+		dprintk(ERR, "%s - invalid params\n", __func__);
 		return -EINVAL;
+		}
 
 	pkt->shdr.hdr.pkt_type = HFI_CMD_SESSION_SET_BUFFERS;
 	pkt->shdr.session_id = hash32_ptr(cookie);
@@ -215,7 +220,8 @@ int pkt_session_set_buffers(struct hfi_session_set_buffers_pkt *pkt,
 	}
 
 	pkt->buffer_type = bd->buffer_type;
-
+	dprintk(DBG, "buftype:%d buffer addr: %x\n",
+		pkt->buffer_type, bd->device_addr);
 	return 0;
 }
 
@@ -263,9 +269,11 @@ int pkt_session_unset_buffers(struct hfi_session_release_buffer_pkt *pkt,
 int pkt_session_etb_decoder(struct hfi_session_empty_buffer_compressed_pkt *pkt,
 			    void *cookie, struct hfi_frame_data *in_frame)
 {
-	if (!cookie || !in_frame->device_addr)
+	if (!cookie || !in_frame->device_addr) {
+		dprintk(ERR, "%s: invalid params addr: %#x\n",
+			__func__, in_frame->device_addr);
 		return -EINVAL;
-
+	}
 	pkt->shdr.hdr.size = sizeof(*pkt);
 	pkt->shdr.hdr.pkt_type = HFI_CMD_SESSION_EMPTY_BUFFER;
 	pkt->shdr.session_id = hash32_ptr(cookie);
@@ -287,8 +295,11 @@ int pkt_session_etb_encoder(
 		struct hfi_session_empty_buffer_uncompressed_plane0_pkt *pkt,
 		void *cookie, struct hfi_frame_data *in_frame)
 {
-	if (!cookie || !in_frame->device_addr)
+	if (!cookie || !in_frame->device_addr) {
+		dprintk(ERR, "%s: invalid params addr: %#x\n",
+			__func__, in_frame->device_addr);
 		return -EINVAL;
+	}
 
 	pkt->shdr.hdr.size = sizeof(*pkt);
 	pkt->shdr.hdr.pkt_type = HFI_CMD_SESSION_EMPTY_BUFFER;
@@ -312,8 +323,11 @@ int pkt_session_etb_encoder(
 int pkt_session_ftb(struct hfi_session_fill_buffer_pkt *pkt, void *cookie,
 		    struct hfi_frame_data *out_frame)
 {
-	if (!cookie || !out_frame || !out_frame->device_addr)
+	if (!cookie || !out_frame || !out_frame->device_addr) {
+		dprintk(ERR, "%s: invalid params addr: %#x\n",
+			__func__, out_frame->device_addr);
 		return -EINVAL;
+	}
 
 	pkt->shdr.hdr.size = sizeof(*pkt);
 	pkt->shdr.hdr.pkt_type = HFI_CMD_SESSION_FILL_BUFFER;
@@ -339,8 +353,11 @@ int pkt_session_parse_seq_header(
 		struct hfi_session_parse_sequence_header_pkt *pkt,
 		void *cookie, u32 seq_hdr, u32 seq_hdr_len)
 {
-	if (!cookie || !seq_hdr || !seq_hdr_len)
+	if (!cookie || !seq_hdr || !seq_hdr_len) {
+		dprintk(ERR, "%s: invalid params hdr: %d, hdr_len:%d\n",
+			__func__, seq_hdr, seq_hdr_len);
 		return -EINVAL;
+	}
 
 	pkt->shdr.hdr.size = sizeof(*pkt);
 	pkt->shdr.hdr.pkt_type = HFI_CMD_SESSION_PARSE_SEQUENCE_HEADER;

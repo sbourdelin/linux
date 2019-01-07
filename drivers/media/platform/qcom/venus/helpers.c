@@ -75,6 +75,7 @@ bool venus_helper_check_codec(struct venus_inst *inst, u32 v4l2_pixfmt)
 		codec = HFI_VIDEO_CODEC_HEVC;
 		break;
 	default:
+		dprintk(WARN, "Unknown format:%x\n", v4l2_pixfmt);
 		return false;
 	}
 
@@ -102,8 +103,11 @@ static int venus_helper_queue_dpb_bufs(struct venus_inst *inst)
 		fdata.buffer_type = buf->type;
 
 		ret = hfi_session_process_buf(inst, &fdata);
-		if (ret)
+		if (ret) {
+			dprintk(ERR, "%s: Failed to queue dpb buf to hfi: %d\n",
+				__func__, ret);
 			goto fail;
+		}
 	}
 
 fail:
@@ -157,6 +161,7 @@ int venus_helper_alloc_dpb_bufs(struct venus_inst *inst)
 		return ret;
 
 	count = HFI_BUFREQ_COUNT_MIN(&bufreq, ver);
+	dprintk(DBG, "buf count min %d", count);
 
 	for (i = 0; i < count; i++) {
 		buf = kzalloc(sizeof(*buf), GFP_KERNEL);
@@ -174,6 +179,7 @@ int venus_helper_alloc_dpb_bufs(struct venus_inst *inst)
 		if (!buf->va) {
 			kfree(buf);
 			ret = -ENOMEM;
+			dprintk(ERR, "Failed to alloc dma attrs for dpbbufs\n");
 			goto fail;
 		}
 
@@ -208,6 +214,7 @@ static int intbufs_set_buffer(struct venus_inst *inst, u32 type)
 	for (i = 0; i < bufreq.count_actual; i++) {
 		buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 		if (!buf) {
+			dprintk(ERR, "Out of memory\n");
 			ret = -ENOMEM;
 			goto fail;
 		}
@@ -220,6 +227,7 @@ static int intbufs_set_buffer(struct venus_inst *inst, u32 type)
 					  buf->attrs);
 		if (!buf->va) {
 			ret = -ENOMEM;
+			dprintk(ERR, "Failed to alloc dma attrs for intbufs\n");
 			goto fail;
 		}
 
@@ -228,6 +236,8 @@ static int intbufs_set_buffer(struct venus_inst *inst, u32 type)
 		bd.buffer_type = buf->type;
 		bd.num_buffers = 1;
 		bd.device_addr = buf->da;
+		dprintk(DBG, "Buffer address: %#x\n bufsize: %d, buf_type: %d",
+			bd.device_addr, bd.buffer_size, bd.buffer_type);
 
 		ret = hfi_session_set_buffers(inst, &bd);
 		if (ret) {
@@ -380,8 +390,11 @@ static int load_scale_clocks(struct venus_core *core)
 set_freq:
 
 	ret = clk_set_rate(clk, freq);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to set clock rate %lu clk: %d\n",
+			freq, ret);
 		goto err;
+	}
 
 	ret = clk_set_rate(core->core0_clk, freq);
 	if (ret)
@@ -459,8 +472,10 @@ session_process_buf(struct venus_inst *inst, struct vb2_v4l2_buffer *vbuf)
 	}
 
 	ret = hfi_session_process_buf(inst, &fdata);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "%s: Failed qbuf to hfi: %d\n", __func__, ret);
 		return ret;
+		}
 
 	return 0;
 }
@@ -544,11 +559,15 @@ int venus_helper_get_bufreq(struct venus_inst *inst, u32 type,
 		memset(req, 0, sizeof(*req));
 
 	ret = hfi_session_get_property(inst, ptype, &hprop);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed getting buffer requirements: %d", ret);
 		return ret;
+		}
 
 	ret = -EINVAL;
-
+	dprintk(DBG, "Buffer requirements from HW:\n");
+	dprintk(DBG, "%15s %8s %8s %8s\n",
+		"buffer type", "count", "mincount_fw", "size");
 	for (i = 0; i < HFI_BUFFER_TYPE_MAX; i++) {
 		if (hprop.bufreq[i].type != type)
 			continue;
@@ -556,6 +575,9 @@ int venus_helper_get_bufreq(struct venus_inst *inst, u32 type,
 		if (req)
 			memcpy(req, &hprop.bufreq[i], sizeof(*req));
 		ret = 0;
+		dprintk(DBG, "%8d %8d %8d %8d\n",
+			req->type, req->count_actual,
+			req->count_min, req->size);
 		break;
 	}
 
@@ -730,16 +752,24 @@ int venus_helper_set_num_bufs(struct venus_inst *inst, unsigned int input_bufs,
 	buf_count.count_actual = input_bufs;
 
 	ret = hfi_session_set_property(inst, ptype, &buf_count);
-	if (ret)
+	if (ret) {
+		dprintk(ERR,
+			"Failed to set actual buffer count %d for buffer type %d\n",
+			buf_count.count_actual, buf_count.type);
 		return ret;
 
 	buf_count.type = HFI_BUFFER_OUTPUT;
 	buf_count.count_actual = output_bufs;
 
 	ret = hfi_session_set_property(inst, ptype, &buf_count);
-	if (ret)
+	if (ret) {
+		dprintk(ERR,
+			"Failed to set actual buffer count %d for buffer type %d\n",
+			buf_count.count_actual, buf_count.type);
 		return ret;
-
+	}
+	dprintk(DBG, "output buf: num = %d, input buf = %d\n",
+		output_bufs, input_bufs);
 	if (output2_bufs) {
 		buf_count.type = HFI_BUFFER_OUTPUT2;
 		buf_count.count_actual = output2_bufs;
@@ -776,8 +806,11 @@ int venus_helper_set_color_format(struct venus_inst *inst, u32 pixfmt)
 		return -EINVAL;
 
 	hfi_format = to_hfi_raw_fmt(pixfmt);
-	if (!hfi_format)
+	if (!hfi_format) {
+		dprintk(ERR, "Using unsupported colorformat %#x\n",
+			pixfmt);
 		return -EINVAL;
+	}
 
 	return venus_helper_set_raw_format(inst, hfi_format, buftype);
 }

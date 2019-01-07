@@ -79,9 +79,10 @@ find_format(struct venus_inst *inst, u32 pixfmt, u32 type)
 			break;
 	}
 
-	if (i == size || fmt[i].type != type)
+	if (i == size || fmt[i].type != type) {
+		dprintk(INFO, "Format not found\n");
 		return NULL;
-
+	}
 	if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
 	    !venus_helper_check_codec(inst, fmt[i].pixfmt))
 		return NULL;
@@ -112,9 +113,10 @@ find_format_by_index(struct venus_inst *inst, unsigned int index, u32 type)
 			k++;
 	}
 
-	if (i == size)
+	if (i == size) {
+		dprintk(INFO, "Format not found by index\n");
 		return NULL;
-
+	}
 	return &fmt[i];
 }
 
@@ -289,8 +291,10 @@ static int venc_enum_fmt(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 
 	memset(f->reserved, 0, sizeof(f->reserved));
 
-	if (!fmt)
+	if (!fmt) {
+		dprintk(DBG, "No more formats found\n");
 		return -EINVAL;
+	}
 
 	f->pixelformat = fmt->pixfmt;
 
@@ -367,8 +371,11 @@ static int venc_s_fmt(struct file *file, void *fh, struct v4l2_format *f)
 	orig_pixmp = *pixmp;
 
 	fmt = venc_try_fmt_common(inst, f);
-	if (!fmt)
+	if (!fmt) {
+		dprintk(ERR, "Format: %d not supported\n",
+			f->fmt.pix_mp.pixelformat);
 		return -EINVAL;
+	}
 
 	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
 		pixfmt_out = pixmp->pixelformat;
@@ -410,7 +417,8 @@ static int venc_s_fmt(struct file *file, void *fh, struct v4l2_format *f)
 		inst->fmt_out = fmt;
 	else if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
 		inst->fmt_cap = fmt;
-
+	dprintk(INFO, "s_fmt: inst width: %d height: %d\n",
+		inst->width, inst->height);
 	return 0;
 }
 
@@ -442,6 +450,13 @@ static int venc_g_fmt(struct file *file, void *fh, struct v4l2_format *f)
 	}
 
 	venc_try_fmt_common(inst, f);
+
+	dprintk(DBG,
+		"g_fmt: %x : type %d wxh %dx%d pixelfmt %#x num_planes %d size[0] %d in_reconfig %d\n",
+		inst->session_type, f->type,
+		f->fmt.pix_mp.width, f->fmt.pix_mp.height,
+		f->fmt.pix_mp.pixelformat, f->fmt.pix_mp.num_planes,
+		f->fmt.pix_mp.plane_fmt[0].sizeimage, inst->reconfig);
 
 	return 0;
 }
@@ -504,8 +519,10 @@ static int venc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 	u64 us_per_frame, fps;
 
 	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
-	    a->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+	    a->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+		dprintk(ERR, "Unknown buffer type %d\n", a->type);
 		return -EINVAL;
+	}
 
 	memset(out->reserved, 0, sizeof(out->reserved));
 
@@ -519,8 +536,11 @@ static int venc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 	us_per_frame = timeperframe->numerator * (u64)USEC_PER_SEC;
 	do_div(us_per_frame, timeperframe->denominator);
 
-	if (!us_per_frame)
+	if (!us_per_frame) {
+		dprintk(ERR,
+			"Failed to scale clocks : time between frames is 0\n");
 		return -EINVAL;
+		}
 
 	fps = (u64)USEC_PER_SEC;
 	do_div(fps, us_per_frame);
@@ -528,6 +548,7 @@ static int venc_s_parm(struct file *file, void *fh, struct v4l2_streamparm *a)
 	inst->timeperframe = *timeperframe;
 	inst->fps = fps;
 
+	dprintk(INFO, "enc: reported fps for %pK: %d\n", inst, inst->fps);
 	return 0;
 }
 
@@ -657,20 +678,26 @@ static int venc_set_properties(struct venus_inst *inst)
 	int ret;
 
 	ret = venus_helper_set_work_mode(inst, VIDC_WORK_MODE_2);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to set workmode 2\n");
 		return ret;
+	}
 
 	ret = venus_helper_set_core_usage(inst, VIDC_CORE_ID_2);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to set core usage\n");
 		return ret;
+		}
 
 	ptype = HFI_PROPERTY_CONFIG_FRAME_RATE;
 	frate.buffer_type = HFI_BUFFER_OUTPUT;
 	frate.framerate = inst->fps * (1 << 16);
 
 	ret = hfi_session_set_property(inst, ptype, &frate);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to set core usage\n");
 		return ret;
+		}
 
 	if (inst->fmt_cap->pixfmt == V4L2_PIX_FMT_H264) {
 		struct hfi_h264_vui_timing_info info;
@@ -829,28 +856,41 @@ static int venc_init_session(struct venus_inst *inst)
 	int ret;
 
 	ret = hfi_session_init(inst, inst->fmt_cap->pixfmt);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to init firmware session\n");
 		return ret;
+	}
 
 	ret = venus_helper_set_input_resolution(inst, inst->width,
 						inst->height);
-	if (ret)
+	if (ret) {
+		dprintk(ERR,
+			"Failed to set i/p resolution width: %d, height: %d",
+			inst->width, inst->height);
 		goto deinit;
+	}
 
 	ret = venus_helper_set_output_resolution(inst, inst->width,
 						 inst->height,
 						 HFI_BUFFER_OUTPUT);
-	if (ret)
+	if (ret) {
+		dprintk(ERR,
+			"Failed to set o/p resolution width: %d, height: %d",
+			inst->width, inst->height);
 		goto deinit;
+	}
 
 	ret = venus_helper_set_color_format(inst, inst->fmt_out->pixfmt);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to set color format");
 		goto deinit;
+		}
 
 	ret = venc_set_properties(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to set enc properties");
 		goto deinit;
-
+	}
 	return 0;
 deinit:
 	hfi_session_deinit(inst);
@@ -863,8 +903,10 @@ static int venc_out_num_buffers(struct venus_inst *inst, unsigned int *num)
 	int ret;
 
 	ret = venc_init_session(inst);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to init encoder session");
 		return ret;
+		}
 
 	ret = venus_helper_get_bufreq(inst, HFI_BUFFER_INPUT, &bufreq);
 
@@ -908,9 +950,12 @@ static int venc_queue_setup(struct vb2_queue *q,
 		*num_planes = inst->fmt_out->num_planes;
 
 		ret = venc_out_num_buffers(inst, &num);
-		if (ret)
+		if (ret) {
+			dprintk(ERR,
+				"Failed : No buffer requirements : %x\n",
+				HFI_BUFFER_INPUT);
 			break;
-
+		}
 		num = max(num, min);
 		*num_buffers = max(*num_buffers, num);
 		inst->num_input_bufs = *num_buffers;
@@ -930,10 +975,15 @@ static int venc_queue_setup(struct vb2_queue *q,
 		inst->output_buf_size = sizes[0];
 		break;
 	default:
+		dprintk(ERR, "Invalid q type = %d\n", q->type);
 		ret = -EINVAL;
 		break;
 	}
 
+	dprintk(DBG,
+		"queue_setup: %d : type %d num_buffers %d num_planes %d sizes[0] %d\n",
+		inst->session_type, q->type, *num_buffers,
+		*num_planes, sizes[0]);
 	return ret;
 }
 
@@ -943,25 +993,52 @@ static int venc_verify_conf(struct venus_inst *inst)
 	struct hfi_buffer_requirements bufreq;
 	int ret;
 
-	if (!inst->num_input_bufs || !inst->num_output_bufs)
+	if (!inst->num_input_bufs || !inst->num_output_bufs) {
+		dprintk(ERR,
+			"Failed with insufficient bufs i/p_buf: %d o/p_buf: %d",
+			inst->num_input_bufs, inst->num_output_bufs);
 		return -EINVAL;
+	}
 
 	ret = venus_helper_get_bufreq(inst, HFI_BUFFER_OUTPUT, &bufreq);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to get bufreq o/p\n");
 		return ret;
+		}
+	dprintk(DBG, "Verifying Buffer: %d\n", bufreq.type);
 
 	if (inst->num_output_bufs < bufreq.count_actual ||
-	    inst->num_output_bufs < HFI_BUFREQ_COUNT_MIN(&bufreq, ver))
+	    inst->num_output_bufs < HFI_BUFREQ_COUNT_MIN(&bufreq, ver)) {
+		dprintk(ERR,
+			"Invalid data : Counts mismatch\n");
+		dprintk(ERR, "num of output bufs = %d ",
+			inst->num_output_bufs);
+		dprintk(ERR, "actual buf count = %d ",
+			bufreq.count_actual);
+		dprintk(ERR, "Min Actual Count = %d\n",
+			HFI_BUFREQ_COUNT_MIN(&bufreq, ver));
 		return -EINVAL;
+		}
 
+	dprintk(DBG, "Verifying Buffer: %d\n", bufreq.type);
 	ret = venus_helper_get_bufreq(inst, HFI_BUFFER_INPUT, &bufreq);
-	if (ret)
+	if (ret) {
+		dprintk(ERR, "Failed to get bufreq i/p\n");
 		return ret;
+		}
 
 	if (inst->num_input_bufs < bufreq.count_actual ||
-	    inst->num_input_bufs < HFI_BUFREQ_COUNT_MIN(&bufreq, ver))
+	    inst->num_input_bufs < HFI_BUFREQ_COUNT_MIN(&bufreq, ver)) {
+		dprintk(ERR,
+			"Invalid data : Counts mismatch\n");
+		dprintk(ERR, "num of input bufs = %d ",
+			inst->num_output_bufs);
+		dprintk(ERR, "actual buf count = %d ",
+			bufreq.count_actual);
+		dprintk(ERR, "Min Actual Count = %d\n",
+			HFI_BUFREQ_COUNT_MIN(&bufreq, ver));
 		return -EINVAL;
-
+		}
 	return 0;
 }
 
@@ -971,6 +1048,9 @@ static int venc_start_streaming(struct vb2_queue *q, unsigned int count)
 	int ret;
 
 	mutex_lock(&inst->lock);
+
+	dprintk(DBG, "Streamon called on: %d capability for inst: %pK\n",
+		q->type, inst);
 
 	if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
 		inst->streamon_out = 1;
@@ -1148,8 +1228,10 @@ static int venc_open(struct file *file)
 	int ret;
 
 	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
-	if (!inst)
+	if (!inst) {
+		dprintk(ERR, "enc: Failed to create video instance");
 		return -ENOMEM;
+	}
 
 	INIT_LIST_HEAD(&inst->dpbbufs);
 	INIT_LIST_HEAD(&inst->registeredbufs);
@@ -1358,6 +1440,7 @@ static __maybe_unused int venc_runtime_resume(struct device *dev)
 err_unprepare_core1:
 	clk_disable_unprepare(core->core1_clk);
 err_power_disable:
+	dprintk(ERR, "Failed to enable core1 clk");
 	venus_helper_power_enable(core, VIDC_SESSION_TYPE_ENC, false);
 	return ret;
 }
