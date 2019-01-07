@@ -477,6 +477,29 @@ submit_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 	return NOTIFY_DONE;
 }
 
+static noinline struct i915_request *
+i915_request_alloc_slow(struct intel_context *ce)
+{
+	struct intel_ring *ring = ce->ring;
+	struct i915_request *rq, *next;
+
+	list_for_each_entry_safe(rq, next, &ring->request_list, ring_link) {
+		/* Ratelimit ourselves to prevent oom from malicious clients */
+		if (&next->ring_link == &ring->request_list) {
+			cond_synchronize_rcu(rq->rcustate);
+			break; /* keep the last objects for the next request */
+		}
+
+		if (!i915_request_completed(rq))
+			break;
+
+		/* Retire our old requests in the hope that we free some */
+		i915_request_retire(rq);
+	}
+
+	return kmem_cache_alloc(ce->gem_context->i915->requests, GFP_KERNEL);
+}
+
 /**
  * i915_request_alloc - allocate a request structure
  *
@@ -559,15 +582,7 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 	rq = kmem_cache_alloc(i915->requests,
 			      GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
 	if (unlikely(!rq)) {
-		i915_retire_requests(i915);
-
-		/* Ratelimit ourselves to prevent oom from malicious clients */
-		rq = i915_gem_active_raw(&ce->ring->timeline->last_request,
-					 &i915->drm.struct_mutex);
-		if (rq)
-			cond_synchronize_rcu(rq->rcustate);
-
-		rq = kmem_cache_alloc(i915->requests, GFP_KERNEL);
+		rq = i915_request_alloc_slow(ce);
 		if (!rq) {
 			ret = -ENOMEM;
 			goto err_unreserve;
