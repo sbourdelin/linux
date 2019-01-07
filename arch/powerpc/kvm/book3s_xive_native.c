@@ -979,6 +979,29 @@ static void kvmppc_xive_native_free(struct kvm_device *dev)
 	kfree(dev);
 }
 
+static int kvmppc_xive_native_delete(struct kvm_device *dev)
+{
+	struct kvm *kvm = dev->kvm;
+	unsigned int i;
+	struct kvm_vcpu *vcpu;
+
+	if (!kvm->arch.xive)
+		return -EPERM;
+
+	/*
+	 * call kick_all_cpus_sync() to ensure that all CPUs have
+	 * executed any pending interrupts
+	 */
+	if (is_kvmppc_hv_enabled(kvm))
+		kick_all_cpus_sync();
+
+	kvm_for_each_vcpu(i, vcpu, kvm)
+		kvmppc_xive_native_cleanup_vcpu(vcpu);
+
+	kvmppc_xive_native_free(dev);
+	return 0;
+}
+
 /*
  * ESB MMIO address of chip 0
  */
@@ -1350,6 +1373,7 @@ struct kvm_device_ops kvm_xive_native_ops = {
 	.create = kvmppc_xive_native_create,
 	.init = kvmppc_xive_native_init,
 	.destroy = kvmppc_xive_native_free,
+	.delete = kvmppc_xive_native_delete,
 	.set_attr = kvmppc_xive_native_set_attr,
 	.get_attr = kvmppc_xive_native_get_attr,
 	.has_attr = kvmppc_xive_native_has_attr,

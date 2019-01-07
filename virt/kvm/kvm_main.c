@@ -3009,6 +3009,31 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
 	return 0;
 }
 
+static int kvm_ioctl_delete_device(struct kvm *kvm,
+				   struct kvm_create_device *cd)
+{
+	struct fd f;
+	struct kvm_device *dev;
+	int ret;
+
+	f = fdget(cd->fd);
+	if (!f.file)
+		return -EBADF;
+
+	dev = kvm_device_from_filp(f.file);
+	fdput(f);
+
+	if (!dev)
+		return -EPERM;
+
+	mutex_lock(&kvm->lock);
+	list_del(&dev->vm_node);
+	mutex_unlock(&kvm->lock);
+	ret = dev->ops->delete(dev);
+
+	return ret;
+}
+
 static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 {
 	switch (arg) {
@@ -3248,6 +3273,20 @@ out_free_irq_routing:
 
 		r = -EFAULT;
 		if (copy_to_user(argp, &cd, sizeof(cd)))
+			goto out;
+
+		r = 0;
+		break;
+	}
+	case KVM_DELETE_DEVICE: {
+		struct kvm_create_device cd;
+
+		r = -EFAULT;
+		if (copy_from_user(&cd, argp, sizeof(cd)))
+			goto out;
+
+		r = kvm_ioctl_delete_device(kvm, &cd);
+		if (r)
 			goto out;
 
 		r = 0;

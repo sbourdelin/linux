@@ -1109,10 +1109,18 @@ void kvmppc_xive_disable_vcpu_interrupts(struct kvm_vcpu *vcpu)
 void kvmppc_xive_cleanup_vcpu(struct kvm_vcpu *vcpu)
 {
 	struct kvmppc_xive_vcpu *xc = vcpu->arch.xive_vcpu;
-	struct kvmppc_xive *xive = xc->xive;
+	struct kvmppc_xive *xive;
 	int i;
 
+	if (!kvmppc_xics_enabled(vcpu))
+		return;
+
+	if (!xc)
+		return;
+
 	pr_devel("cleanup_vcpu(cpu=%d)\n", xc->server_num);
+
+	xive = xc->xive;
 
 	/* Ensure no interrupt is still routed to that VP */
 	xc->valid = false;
@@ -1150,6 +1158,10 @@ void kvmppc_xive_cleanup_vcpu(struct kvm_vcpu *vcpu)
 	}
 	/* Free the VP */
 	kfree(xc);
+
+	/* Cleanup the vcpu */
+	vcpu->arch.irq_type = KVMPPC_IRQ_DEFAULT;
+	vcpu->arch.xive_vcpu = NULL;
 }
 
 int kvmppc_xive_connect_vcpu(struct kvm_device *dev,
@@ -1861,6 +1873,29 @@ static void kvmppc_xive_free(struct kvm_device *dev)
 	kfree(dev);
 }
 
+static int kvmppc_xive_delete(struct kvm_device *dev)
+{
+	struct kvm *kvm = dev->kvm;
+	unsigned int i;
+	struct kvm_vcpu *vcpu;
+
+	if (!kvm->arch.xive)
+		return -EPERM;
+
+	/*
+	 * call kick_all_cpus_sync() to ensure that all CPUs have
+	 * executed any pending interrupts
+	 */
+	if (is_kvmppc_hv_enabled(kvm))
+		kick_all_cpus_sync();
+
+	kvm_for_each_vcpu(i, vcpu, kvm)
+		kvmppc_xive_cleanup_vcpu(vcpu);
+
+	kvmppc_xive_free(dev);
+	return 0;
+}
+
 static int kvmppc_xive_create(struct kvm_device *dev, u32 type)
 {
 	struct kvmppc_xive *xive;
@@ -2035,6 +2070,7 @@ struct kvm_device_ops kvm_xive_ops = {
 	.create = kvmppc_xive_create,
 	.init = kvmppc_xive_init,
 	.destroy = kvmppc_xive_free,
+	.delete = kvmppc_xive_delete,
 	.set_attr = xive_set_attr,
 	.get_attr = xive_get_attr,
 	.has_attr = xive_has_attr,
