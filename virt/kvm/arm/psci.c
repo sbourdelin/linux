@@ -445,12 +445,18 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 
 int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu)
 {
-	return 1;		/* PSCI version */
+	return 3;		/* PSCI version and two workaround registers */
 }
 
 int kvm_arm_copy_fw_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
 {
-	if (put_user(KVM_REG_ARM_PSCI_VERSION, uindices))
+	if (put_user(KVM_REG_ARM_PSCI_VERSION, uindices++))
+		return -EFAULT;
+
+	if (put_user(KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1, uindices++))
+		return -EFAULT;
+
+	if (put_user(KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2, uindices++))
 		return -EFAULT;
 
 	return 0;
@@ -463,6 +469,45 @@ int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 		u64 val;
 
 		val = kvm_psci_version(vcpu, vcpu->kvm);
+		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	if (reg->id == KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1) {
+		void __user *uaddr = (void __user *)(long)reg->addr;
+		u64 val = 0;
+
+		if (kvm_arm_harden_branch_predictor())
+			val = KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL;
+
+		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	if (reg->id == KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2) {
+		void __user *uaddr = (void __user *)(long)reg->addr;
+		u64 val = KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL;
+
+		switch (kvm_arm_have_ssbd()) {
+		case KVM_SSBD_FORCE_DISABLE:
+		case KVM_SSBD_UNKNOWN:
+			break;
+		case KVM_SSBD_KERNEL:
+			val |= KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL;
+			break;
+		case KVM_SSBD_FORCE_ENABLE:
+		case KVM_SSBD_MITIGATED:
+			val |= KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED;
+			break;
+		}
+
+		if (kvm_arm_get_vcpu_workaround_2_flag(vcpu))
+			val |= KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED;
+
 		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
 			return -EFAULT;
 
@@ -497,6 +542,95 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 			vcpu->kvm->arch.psci_version = val;
 			return 0;
 		}
+	}
+
+	if (reg->id == KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1) {
+		void __user *uaddr = (void __user *)(long)reg->addr;
+		u64 val;
+
+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		/* Make sure we support WORKAROUND_1 if userland asks for it. */
+		if ((val & KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL) &&
+		    !kvm_arm_harden_branch_predictor())
+			return -EINVAL;
+
+		/* Any other bit is reserved. */
+		if (val & ~KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL)
+			return -EINVAL;
+
+		return 0;
+	}
+
+	if (reg->id == KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2) {
+		void __user *uaddr = (void __user *)(long)reg->addr;
+		unsigned int wa_state;
+		bool wa_flag;
+		u64 val;
+
+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		/* Reject any unknown bits. */
+		if (val & ~(KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK|
+			    KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED))
+			return -EINVAL;
+
+		/*
+		 * The value passed from userland has to be compatible with
+		 * our own workaround status. We also have to consider the
+		 * requested per-VCPU state for some combinations:
+		 * --------------+-----------+-----------------+---------------
+		 * \ user value  |           |                 |
+		 *  ------------ | SSBD_NONE |   SSBD_KERNEL   |  SSBD_ALWAYS
+		 *  this kernel \|           |                 |
+		 * --------------+-----------+-----------------+---------------
+		 * UNKNOWN       |     OK    |   -EINVAL       |   -EINVAL
+		 * FORCE_DISABLE |           |                 |
+		 * --------------+-----------+-----------------+---------------
+		 * KERNEL        |     OK    | copy VCPU state | set VCPU state
+		 * --------------+-----------+-----------------+---------------
+		 * FORCE_ENABLE  |     OK    |      OK         |      OK
+		 * MITIGATED     |           |                 |
+		 * --------------+-----------+-----------------+---------------
+		 */
+
+		wa_state = val & KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK;
+		switch (wa_state) {
+		case  KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL:
+			/* We can always support no mitigation (1st column). */
+			return 0;
+		case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL:
+		case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED:
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		switch (kvm_arm_have_ssbd()) {
+		case KVM_SSBD_UNKNOWN:
+		case KVM_SSBD_FORCE_DISABLE:
+		default:
+			/* ... but some mitigation was requested (1st line). */
+			return -EINVAL;
+		case KVM_SSBD_FORCE_ENABLE:
+		case KVM_SSBD_MITIGATED:
+			/* Always-on is always compatible (3rd line). */
+			return 0;
+		case KVM_SSBD_KERNEL:		/* 2nd line */
+			wa_flag = val;
+			wa_flag |= KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK;
+
+			/* Force on when always-on is requested. */
+			if (wa_state == KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED)
+				wa_flag = true;
+			break;
+		}
+
+		kvm_arm_set_vcpu_workaround_2_flag(vcpu, wa_flag);
+
+		return 0;
 	}
 
 	return -EINVAL;
