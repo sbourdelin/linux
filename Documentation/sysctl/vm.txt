@@ -222,6 +222,10 @@ To increase the number of objects freed by this operation, the user may run
 number of dirty objects on the system and create more candidates to be
 dropped.
 
+By default, pages which are currently mapped are not dropped from the
+pagecache.  If you want to unmap and drop these pages too, echo 9 or 11 instead
+of 1 or 3 respectively (set bit 4).
+
 This file is not a means to control the growth of the various kernel caches
 (inodes, dentries, pagecache, etc...)  These objects are automatically
 reclaimed by the kernel when memory is needed elsewhere on the system.

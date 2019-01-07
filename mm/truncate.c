@@ -245,6 +245,22 @@ int generic_error_remove_page(struct address_space *mapping, struct page *page)
 }
 EXPORT_SYMBOL(generic_error_remove_page);
 
+static int __invalidate_inode_page(struct page *page, bool unmap)
+{
+	struct address_space *mapping = page_mapping(page);
+	if (!mapping)
+		return 0;
+	if (PageDirty(page) || PageWriteback(page))
+		return 0;
+	if (page_mapped(page)) {
+		if (!unmap)
+			return 0;
+		if (!try_to_unmap(page, TTU_IGNORE_ACCESS))
+			return 0;
+	}
+	return invalidate_complete_page(mapping, page);
+}
+
 /*
  * Safely invalidate one page from its pagecache mapping.
  * It only drops clean, unused pages. The page must be locked.
@@ -253,15 +269,9 @@ EXPORT_SYMBOL(generic_error_remove_page);
  */
 int invalidate_inode_page(struct page *page)
 {
-	struct address_space *mapping = page_mapping(page);
-	if (!mapping)
-		return 0;
-	if (PageDirty(page) || PageWriteback(page))
-		return 0;
-	if (page_mapped(page))
-		return 0;
-	return invalidate_complete_page(mapping, page);
+	return __invalidate_inode_page(page, false);
 }
+
 
 /**
  * truncate_inode_pages_range - truncate range of pages specified by start & end byte offsets
@@ -532,16 +542,17 @@ EXPORT_SYMBOL(truncate_inode_pages_final);
  * @mapping: the address_space which holds the pages to invalidate
  * @start: the offset 'from' which to invalidate
  * @end: the offset 'to' which to invalidate (inclusive)
+ * @unmap: try to unmap pages
  *
  * This function only removes the unlocked pages, if you want to
  * remove all the pages of one inode, you must call truncate_inode_pages.
  *
  * invalidate_mapping_pages() will not block on IO activity. It will not
- * invalidate pages which are dirty, locked, under writeback or mapped into
- * pagetables.
+ * invalidate pages which are dirty, locked, under writeback or, if unmap is
+ * false, mapped into pagetables.
  */
-unsigned long invalidate_mapping_pages(struct address_space *mapping,
-		pgoff_t start, pgoff_t end)
+unsigned long __invalidate_mapping_pages(struct address_space *mapping,
+		pgoff_t start, pgoff_t end, bool unmap)
 {
 	pgoff_t indices[PAGEVEC_SIZE];
 	struct pagevec pvec;
@@ -591,7 +602,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 				}
 			}
 
-			ret = invalidate_inode_page(page);
+			ret = __invalidate_inode_page(page, unmap);
 			unlock_page(page);
 			/*
 			 * Invalidation is a hint that the page is no longer
@@ -608,7 +619,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 	}
 	return count;
 }
-EXPORT_SYMBOL(invalidate_mapping_pages);
+EXPORT_SYMBOL(__invalidate_mapping_pages);
 
 /*
  * This is like invalidate_complete_page(), except it ignores the page's
