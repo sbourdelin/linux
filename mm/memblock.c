@@ -192,6 +192,35 @@ __memblock_find_range_bottom_up(phys_addr_t start, phys_addr_t end,
 	return 0;
 }
 
+phys_addr_t __init_memblock
+memblock_find_range_bottom_up(phys_addr_t start, phys_addr_t end,
+	phys_addr_t size, phys_addr_t align, int nid)
+{
+	phys_addr_t ret;
+	enum memblock_flags flags = choose_memblock_flags();
+
+	/* pump up @end */
+	if (end == MEMBLOCK_ALLOC_ACCESSIBLE)
+		end = memblock.current_limit;
+
+	/* avoid allocating the first page */
+	start = max_t(phys_addr_t, start, PAGE_SIZE);
+	end = max(start, end);
+
+again:
+	ret = __memblock_find_range_bottom_up(start, end, size, align,
+					    nid, flags);
+
+	if (!ret && (flags & MEMBLOCK_MIRROR)) {
+		pr_warn("Could not allocate %pap bytes of mirrored memory\n",
+			&size);
+		flags &= ~MEMBLOCK_MIRROR;
+		goto again;
+	}
+
+	return ret;
+}
+
 /**
  * __memblock_find_range_top_down - find free area utility, in top-down
  * @start: start of candidate range
