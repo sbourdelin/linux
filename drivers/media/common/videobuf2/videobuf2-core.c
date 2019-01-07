@@ -2273,6 +2273,8 @@ __poll_t vb2_core_poll(struct vb2_queue *q, struct file *file,
 	struct vb2_buffer *vb = NULL;
 	unsigned long flags;
 
+	poll_wait(file, &q->done_wq, wait);
+
 	if (!q->is_output && !(req_events & (EPOLLIN | EPOLLRDNORM)))
 		return 0;
 	if (q->is_output && !(req_events & (EPOLLOUT | EPOLLWRNORM)))
@@ -2329,8 +2331,6 @@ __poll_t vb2_core_poll(struct vb2_queue *q, struct file *file,
 		 */
 		if (q->last_buffer_dequeued)
 			return EPOLLIN | EPOLLRDNORM;
-
-		poll_wait(file, &q->done_wq, wait);
 	}
 
 	/*
