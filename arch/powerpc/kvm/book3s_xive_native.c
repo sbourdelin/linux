@@ -525,6 +525,88 @@ static int kvmppc_xive_native_sync(struct kvmppc_xive *xive, long irq, u64 addr)
 	return 0;
 }
 
+static int kvmppc_xive_native_set_eas(struct kvmppc_xive *xive, long irq,
+				      u64 addr)
+{
+	struct kvmppc_xive_src_block *sb;
+	struct kvmppc_xive_irq_state *state;
+	u64 __user *ubufp = (u64 __user *) addr;
+	u16 src;
+	u64 kvm_eas;
+	u32 server;
+	u8 priority;
+	u32 eisn;
+
+	sb = kvmppc_xive_find_source(xive, irq, &src);
+	if (!sb)
+		return -ENOENT;
+
+	state = &sb->irq_state[src];
+
+	if (!state->valid)
+		return -EINVAL;
+
+	if (get_user(kvm_eas, ubufp))
+		return -EFAULT;
+
+	pr_devel("%s irq=0x%lx eas=%016llx\n", __func__, irq, kvm_eas);
+
+	priority = (kvm_eas & KVM_XIVE_EAS_PRIORITY_MASK) >>
+		KVM_XIVE_EAS_PRIORITY_SHIFT;
+	server = (kvm_eas & KVM_XIVE_EAS_SERVER_MASK) >>
+		KVM_XIVE_EAS_SERVER_SHIFT;
+	eisn = (kvm_eas & KVM_XIVE_EAS_EISN_MASK) >> KVM_XIVE_EAS_EISN_SHIFT;
+
+	if (priority != xive_prio_from_guest(priority)) {
+		pr_err("invalid priority for queue %d for VCPU %d\n",
+		       priority, server);
+		return -EINVAL;
+	}
+
+	return kvmppc_xive_native_set_source_config(xive, sb, state, server,
+						    priority, eisn);
+}
+
+static int kvmppc_xive_native_get_eas(struct kvmppc_xive *xive, long irq,
+				      u64 addr)
+{
+	struct kvmppc_xive_src_block *sb;
+	struct kvmppc_xive_irq_state *state;
+	u64 __user *ubufp = (u64 __user *) addr;
+	u16 src;
+	u64 kvm_eas;
+
+	sb = kvmppc_xive_find_source(xive, irq, &src);
+	if (!sb)
+		return -ENOENT;
+
+	state = &sb->irq_state[src];
+
+	if (!state->valid)
+		return -EINVAL;
+
+	arch_spin_lock(&sb->lock);
+
+	if (state->act_priority == MASKED)
+		kvm_eas = KVM_XIVE_EAS_MASK_MASK;
+	else {
+		kvm_eas = (state->act_priority << KVM_XIVE_EAS_PRIORITY_SHIFT) &
+			KVM_XIVE_EAS_PRIORITY_MASK;
+		kvm_eas |= (state->act_server << KVM_XIVE_EAS_SERVER_SHIFT) &
+			KVM_XIVE_EAS_SERVER_MASK;
+		kvm_eas |= ((u64) state->eisn << KVM_XIVE_EAS_EISN_SHIFT) &
+			KVM_XIVE_EAS_EISN_MASK;
+	}
+	arch_spin_unlock(&sb->lock);
+
+	pr_devel("%s irq=0x%lx eas=%016llx\n", __func__, irq, kvm_eas);
+
+	if (put_user(kvm_eas, ubufp))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int kvmppc_xive_native_set_attr(struct kvm_device *dev,
 				       struct kvm_device_attr *attr)
 {
@@ -544,6 +626,8 @@ static int kvmppc_xive_native_set_attr(struct kvm_device *dev,
 						     attr->addr);
 	case KVM_DEV_XIVE_GRP_SYNC:
 		return kvmppc_xive_native_sync(xive, attr->attr, attr->addr);
+	case KVM_DEV_XIVE_GRP_EAS:
+		return kvmppc_xive_native_set_eas(xive, attr->attr, attr->addr);
 	}
 	return -ENXIO;
 }
@@ -564,6 +648,8 @@ static int kvmppc_xive_native_get_attr(struct kvm_device *dev,
 			return kvmppc_xive_native_get_vc_base(xive, attr->addr);
 		}
 		break;
+	case KVM_DEV_XIVE_GRP_EAS:
+		return kvmppc_xive_native_get_eas(xive, attr->attr, attr->addr);
 	}
 	return -ENXIO;
 }
@@ -583,6 +669,7 @@ static int kvmppc_xive_native_has_attr(struct kvm_device *dev,
 		break;
 	case KVM_DEV_XIVE_GRP_SOURCES:
 	case KVM_DEV_XIVE_GRP_SYNC:
+	case KVM_DEV_XIVE_GRP_EAS:
 		if (attr->attr >= KVMPPC_XIVE_FIRST_IRQ &&
 		    attr->attr < KVMPPC_XIVE_NR_IRQS)
 			return 0;

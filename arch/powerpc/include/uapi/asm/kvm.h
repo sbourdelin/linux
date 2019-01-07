@@ -683,9 +683,20 @@ struct kvm_ppc_cpu_char {
 #define   KVM_DEV_XIVE_SAVE_EQ_PAGES	4
 #define KVM_DEV_XIVE_GRP_SOURCES	2	/* 64-bit source attributes */
 #define KVM_DEV_XIVE_GRP_SYNC		3	/* 64-bit source attributes */
+#define KVM_DEV_XIVE_GRP_EAS		4	/* 64-bit eas attributes */
 
 /* Layout of 64-bit XIVE source attribute values */
 #define KVM_XIVE_LEVEL_SENSITIVE	(1ULL << 0)
 #define KVM_XIVE_LEVEL_ASSERTED		(1ULL << 1)
+
+/* Layout of 64-bit eas attribute values */
+#define KVM_XIVE_EAS_PRIORITY_SHIFT	0
+#define KVM_XIVE_EAS_PRIORITY_MASK	0x7
+#define KVM_XIVE_EAS_SERVER_SHIFT	3
+#define KVM_XIVE_EAS_SERVER_MASK	0xfffffff8ULL
+#define KVM_XIVE_EAS_MASK_SHIFT		32
+#define KVM_XIVE_EAS_MASK_MASK		0x100000000ULL
+#define KVM_XIVE_EAS_EISN_SHIFT		33
+#define KVM_XIVE_EAS_EISN_MASK		0xfffffffe00000000ULL
 
 #endif /* __LINUX_KVM_POWERPC_H */
