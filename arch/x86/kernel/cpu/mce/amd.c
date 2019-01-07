@@ -545,12 +545,46 @@ out:
 	return offset;
 }
 
+void disable_err_thresholding(struct cpuinfo_x86 *c)
+{
+	int i;
+	u64 hwcr;
+	bool need_toggle;
+	u32 msrs[] = {
+		0x00000413, /* MC4_MISC0 */
+		0xc0000408, /* MC4_MISC1 */
+	};
+
+	if (c->x86_model >= 0x10 && c->x86_model <= 0x7f) {
+		rdmsrl(MSR_K7_HWCR, hwcr);
+
+		/* McStatusWrEn has to be set */
+		need_toggle = !(hwcr & BIT(18));
+
+		if (need_toggle)
+			wrmsrl(MSR_K7_HWCR, hwcr | BIT(18));
+
+		/* Clear CntP bit safely */
+		for (i = 0; i < ARRAY_SIZE(msrs); i++)
+			msr_clear_bit(msrs[i], 62);
+
+		/* restore old settings */
+		if (need_toggle)
+			wrmsrl(MSR_K7_HWCR, hwcr);
+	}
+}
 /* cpu init entry point, called from mce.c with preempt off */
 void mce_amd_feature_init(struct cpuinfo_x86 *c)
 {
 	u32 low = 0, high = 0, address = 0;
 	unsigned int bank, block, cpu = smp_processor_id();
 	int offset = -1;
+
+	/* Disable error thresholding bank in S3 resume path as well,
+	 * for 15h family
+	 */
+	if (c->x86 == 0x15)
+		disable_err_thresholding(c);
 
 	for (bank = 0; bank < mca_cfg.banks; ++bank) {
 		if (mce_flags.smca)
