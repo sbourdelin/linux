@@ -377,6 +377,30 @@ out_start_err:
 	return ret;
 }
 
+static int hns3_config_xps(struct hns3_nic_priv *priv)
+{
+	struct hnae3_handle *h = priv->ae_handle;
+	struct hnae3_knic_private_info *kinfo = &h->kinfo;
+	unsigned int queue_size = kinfo->rss_size * kinfo->num_tc;
+	struct hns3_enet_tqp_vector *tqp_vector;
+	struct hns3_nic_ring_data ring_data;
+	int ret = 0, i;
+
+	for (i = 0; i < queue_size; i++) {
+		ring_data = priv->ring_data[i];
+		tqp_vector = ring_data.ring->tqp_vector;
+		ret = netif_set_xps_queue(kinfo->netdev,
+					  &tqp_vector->affinity_mask,
+					  ring_data.queue_index);
+		if (ret) {
+			netdev_err(kinfo->netdev, "ret %d xps %d\n", ret,
+				   tqp_vector->idx);
+			return ret;
+		}
+	}
+	return ret;
+}
+
 static int hns3_nic_net_open(struct net_device *netdev)
 {
 	struct hns3_nic_priv *priv = netdev_priv(netdev);
@@ -409,6 +433,12 @@ static int hns3_nic_net_open(struct net_device *netdev)
 	if (h->ae_algo->ops->set_timer_task)
 		h->ae_algo->ops->set_timer_task(priv->ae_handle, true);
 
+	ret = hns3_config_xps(priv);
+	if (ret) {
+		netdev_err(netdev,
+			   "hns xps init fail, ret=%d!\n", ret);
+		return ret;
+	}
 	return 0;
 }
 
