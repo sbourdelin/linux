@@ -61,6 +61,7 @@
 #include <linux/sched/rt.h>
 #include <linux/sched/mm.h>
 #include <linux/page_owner.h>
+#include <linux/shuffle.h>
 #include <linux/kthread.h>
 #include <linux/memcontrol.h>
 #include <linux/ftrace.h>
@@ -1633,6 +1634,8 @@ static int __init deferred_init_memmap(void *data)
 		deferred_free_pages(nid, zid, spfn, epfn);
 	}
 	pgdat_resize_unlock(pgdat, &flags);
+
+	shuffle_zone(zone, first_init_pfn, zone_end_pfn(zone));
 
 	/* Sanity check that the next zone really is unpopulated */
 	WARN_ON(++zid < MAX_NR_ZONES && populated_zone(++zone));
