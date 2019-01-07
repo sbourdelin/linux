@@ -14,6 +14,11 @@ phys_addr_t __virt_to_phys(unsigned long x)
 	      (void *)x,
 	      (void *)x);
 
+	/* trap all non-linear and non-symbol addresses */
+	VIRTUAL_BUG_ON(!__is_lm_address(x) &&
+			(x < (unsigned long)KERNEL_START ||
+			 x > (unsigned long)KERNEL_END));
+
 	return __virt_to_phys_nodebug(x);
 }
 EXPORT_SYMBOL(__virt_to_phys);
