@@ -111,3 +111,89 @@ static acpi_physical_address efi_get_rsdp_addr(void)
 #endif
 	return rsdp_addr;
 }
+
+static u8 compute_checksum(u8 *buffer, u32 length)
+{
+	u8 *end = buffer + length;
+	u8 sum = 0;
+
+	while (buffer < end)
+		sum += *(buffer++);
+
+	return sum;
+}
+
+/* Search a block of memory for the RSDP signature. */
+static u8 *scan_mem_for_rsdp(u8 *start, u32 length)
+{
+	struct acpi_table_rsdp *rsdp;
+	u8 *address;
+	u8 *end;
+
+	end = start + length;
+
+	/* Search from given start address for the requested length */
+	for (address = start; address < end; address += ACPI_RSDP_SCAN_STEP) {
+		/*
+		 * Both RSDP signature and checksum must be correct.
+		 * Note: Sometimes there exists more than one RSDP in memory;
+		 * the valid RSDP has a valid checksum, all others have an
+		 * invalid checksum.
+		 */
+		rsdp = (struct acpi_table_rsdp *)address;
+
+		/* BAD Signature */
+		if (!ACPI_VALIDATE_RSDP_SIG(rsdp->signature))
+			continue;
+
+		/* Check the standard checksum */
+		if (compute_checksum((u8 *)rsdp, ACPI_RSDP_CHECKSUM_LENGTH))
+			continue;
+
+		/* Check extended checksum if table version >= 2 */
+		if ((rsdp->revision >= 2) &&
+		    (compute_checksum((u8 *)rsdp, ACPI_RSDP_XCHECKSUM_LENGTH)))
+			continue;
+
+		/* Signature and checksum valid, we have found a real RSDP */
+		return address;
+	}
+	return NULL;
+}
+
+/* Search RSDP address, based on acpi_find_root_pointer(). */
+static acpi_physical_address bios_get_rsdp_addr(void)
+{
+	u8 *table_ptr;
+	u32 address;
+	u8 *rsdp;
+
+	/* Get the location of the Extended BIOS Data Area (EBDA) */
+	table_ptr = (u8 *)ACPI_EBDA_PTR_LOCATION;
+	address = *(u16 *)table_ptr;
+	address <<= 4;
+	table_ptr = (u8 *)(long)address;
+
+	/*
+	 * Search EBDA paragraphs (EBDA is required to be a minimum of
+	 * 1K length)
+	 */
+	if (address > 0x400) {
+		rsdp = scan_mem_for_rsdp(table_ptr, ACPI_EBDA_WINDOW_SIZE);
+		if (rsdp) {
+			address += (u32)ACPI_PTR_DIFF(rsdp, table_ptr);
+			return address;
+		}
+	}
+
+	/* Search upper memory: 16-byte boundaries in E0000h-FFFFFh */
+	table_ptr = (u8 *)ACPI_HI_RSDP_WINDOW_BASE;
+	rsdp = scan_mem_for_rsdp(table_ptr, ACPI_HI_RSDP_WINDOW_SIZE);
+
+	if (rsdp) {
+		address = (u32)(ACPI_HI_RSDP_WINDOW_BASE +
+				ACPI_PTR_DIFF(rsdp, table_ptr));
+		return address;
+	}
+	return 0;
+}
