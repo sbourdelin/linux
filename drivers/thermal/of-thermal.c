@@ -1024,6 +1024,7 @@ int __init of_parse_thermal_zones(void)
 		struct thermal_zone_params *tzp;
 		int i, mask = 0;
 		u32 prop;
+		const char *name;
 
 		tz = thermal_of_build_thermal_zone(child);
 		if (IS_ERR(tz)) {
@@ -1048,6 +1049,10 @@ int __init of_parse_thermal_zones(void)
 
 		if (!of_property_read_u32(child, "sustainable-power", &prop))
 			tzp->sustainable_power = prop;
+
+		if (!of_property_read_string(child, "governor", &name))
+			strncpy(tzp->governor_name, name,
+				THERMAL_NAME_LENGTH);
 
 		for (i = 0; i < tz->ntrips; i++)
 			mask |= 1 << i;
