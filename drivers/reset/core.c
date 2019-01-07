@@ -459,6 +459,42 @@ static void __reset_control_put_internal(struct reset_control *rstc)
 	kref_put(&rstc->refcnt, __reset_control_release);
 }
 
+static bool __of_reset_is_exclusive(const struct device_node *node,
+				    const struct of_phandle_args *args,
+				    const char *id)
+{
+	struct of_phandle_args args2;
+	struct device_node *node2;
+	int index, ret;
+	bool eq;
+
+	for_each_node_with_property(node2, "resets") {
+		if (node == node2)
+			continue;
+
+		for (index = 0; ; index++) {
+			ret = of_parse_phandle_with_args(node2, "resets",
+							 "#reset-cells", index,
+							 &args2);
+			if (ret)
+				break;
+
+			eq = (args2.np == args.np &&
+			      args2.args_count == args.args_count &&
+			      !memcmp(args2.args, args.args,
+				      args.args_count * sizeof(args.args[0])));
+			of_node_put(args2.np);
+			if (eq) {
+				pr_warn("%pOF requests exclusive control over reset %s shared with %pOF on %pOF\n",
+					node, id, node2, args->np);
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 struct reset_control *__of_reset_control_get(struct device_node *node,
 				     const char *id, int index, bool shared,
 				     bool optional)
@@ -513,6 +549,11 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
 		goto out;
 	}
 
+	if (!shared && !__of_reset_is_exclusive(node, &args, id)) {
+		rstc = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
 	/* reset_list_mutex also protects the rcdev's reset_control list */
 	rstc = __reset_control_get_internal(rcdev, rstc_id, shared);
 
@@ -542,6 +583,27 @@ __reset_controller_by_name(const char *name)
 	return NULL;
 }
 
+static bool __reset_is_exclusive(const struct reset_control_lookup *lookup)
+{
+	const struct reset_control_lookup *lookup2;
+
+	list_for_each_entry(lookup2, &reset_lookup_list, list) {
+		if (lookup2 == lookup)
+			continue;
+
+		if (lookup2->provider == lookup->provider &&
+		    lookup2->index == lookup->index) {
+			pr_warn("%s/%s requests exclusive control over reset %s:%u shared with %s/%s",
+				lookup->dev_id, lookup->con_id,
+				lookup->provider, lookup->index,
+				lookup2->dev_id, lookup2->con_id);
+			return false;
+		}
+	}
+
+	return true;
+}
+
 static struct reset_control *
 __reset_control_get_from_lookup(struct device *dev, const char *con_id,
 				bool shared, bool optional)
@@ -563,6 +625,11 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
 		if ((!con_id && !lookup->con_id) ||
 		    ((con_id && lookup->con_id) &&
 		     !strcmp(con_id, lookup->con_id))) {
+			if (!shared && !__reset_is_exclusive(lookup)) {
+				mutex_unlock(&reset_lookup_mutex);
+				return ERR_PTR(-EINVAL);
+			}
+
 			mutex_lock(&reset_list_mutex);
 			rcdev = __reset_controller_by_name(lookup->provider);
 			if (!rcdev) {
