@@ -553,6 +553,15 @@ try_again:
 
 		if (interval || timeout) {
 			while (!waitpid(child_pid, &status, WNOHANG)) {
+				if (!is_target_alive(&target,
+					evsel_list->threads)) {
+					int pid = child_pid;
+
+					if (pid != -1)
+						kill(pid, SIGTERM);
+					break;
+				}
+
 				nanosleep(&ts, NULL);
 				if (timeout)
 					break;
