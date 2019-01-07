@@ -159,3 +159,12 @@ config PSTORE_BLK
 	help
 	  This enables panic and oops message to be logged to a block dev
 	  where it can be read back at some later point.
+
+config PSTORE_BLKBUF
+	tristate "pstore block buffer sample"
+	depends on PSTORE_BLK
+	help
+	  This is a sample for pstore block, but do NOT have a block dev.
+	  According to pstore_blk, the data will be saved to ram buffer and
+	  dropped when reboot. So, it can only used to dump Oops and some
+	  things will not reboot.

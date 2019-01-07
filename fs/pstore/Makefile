@@ -15,3 +15,5 @@ obj-$(CONFIG_PSTORE_RAM)	+= ramoops.o
 
 obj-$(CONFIG_PSTORE_BLK)	+= pstore_blk.o
 pstore_blk-y += blkzone.o
+
+obj-$(CONFIG_PSTORE_BLKBUF)	+= blkbuf.o
