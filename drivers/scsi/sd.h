@@ -195,15 +195,15 @@ static inline sector_t sectors_to_logical(struct scsi_device *sdev, sector_t sec
 static inline unsigned int sd_prot_op(bool write, bool dix, bool dif)
 {
 	/* Lookup table: bit 2 (write), bit 1 (dix), bit 0 (dif) */
-	const unsigned int ops[] = {	/* wrt dix dif */
-		SCSI_PROT_NORMAL,	/*  0	0   0  */
-		SCSI_PROT_READ_STRIP,	/*  0	0   1  */
-		SCSI_PROT_READ_INSERT,	/*  0	1   0  */
-		SCSI_PROT_READ_PASS,	/*  0	1   1  */
-		SCSI_PROT_NORMAL,	/*  1	0   0  */
-		SCSI_PROT_WRITE_INSERT, /*  1	0   1  */
-		SCSI_PROT_WRITE_STRIP,	/*  1	1   0  */
-		SCSI_PROT_WRITE_PASS,	/*  1	1   1  */
+	static const unsigned int ops[] = {	/* wrt dix dif */
+		SCSI_PROT_NORMAL,		/*  0	0   0  */
+		SCSI_PROT_READ_STRIP,		/*  0	0   1  */
+		SCSI_PROT_READ_INSERT,		/*  0	1   0  */
+		SCSI_PROT_READ_PASS,		/*  0	1   1  */
+		SCSI_PROT_NORMAL,		/*  1	0   0  */
+		SCSI_PROT_WRITE_INSERT,		/*  1	0   1  */
+		SCSI_PROT_WRITE_STRIP,		/*  1	1   0  */
+		SCSI_PROT_WRITE_PASS,		/*  1	1   1  */
 	};
 
 	return ops[write << 2 | dix << 1 | dif];
@@ -215,7 +215,7 @@ static inline unsigned int sd_prot_op(bool write, bool dix, bool dif)
  */
 static inline unsigned int sd_prot_flag_mask(unsigned int prot_op)
 {
-	const unsigned int flag_mask[] = {
+	static const unsigned int flag_mask[] = {
 		[SCSI_PROT_NORMAL]		= 0,
 
 		[SCSI_PROT_READ_STRIP]		= SCSI_PROT_TRANSFER_PI |
