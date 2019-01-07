@@ -3,3 +3,4 @@
 #
 obj-$(CONFIG_GOLDFISH_PIPE)	+= goldfish_pipe.o
 obj-$(CONFIG_GOLDFISH_ADDRESS_SPACE) += goldfish_address_space.o
+obj-$(CONFIG_GOLDFISH_SYNC)	+= goldfish_sync.o

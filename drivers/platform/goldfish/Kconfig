@@ -25,4 +25,11 @@ config GOLDFISH_ADDRESS_SPACE
 	  populate them later in the host. This allows sharing host's memory
 	  with the guest.
 
+config GOLDFISH_SYNC
+	tristate "Goldfish AVD Sync Driver"
+	depends on SW_SYNC
+	depends on SYNC_FILE
+	help
+	  Emulated sync fences for the Goldfish Android Virtual Device.
+
 endif # GOLDFISH
