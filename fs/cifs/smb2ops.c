@@ -2238,8 +2238,10 @@ get_smb2_acl_by_fid(struct cifs_sb_info *cifs_sb,
 	cifs_put_tlink(tlink);
 
 	cifs_dbg(FYI, "%s: rc = %d ACL len %d\n", __func__, rc, *pacllen);
-	if (rc)
+	if (rc) {
+		kfree(pntsd);
 		return ERR_PTR(rc);
+	}
 	return pntsd;
 
 }
