@@ -1174,8 +1174,8 @@ void __init setup_arch(char **cmdline_p)
 
 	reserve_initrd();
 
-	acpi_table_upgrade();
 
+	acpi_table_upgrade((void *)initrd_start, initrd_end - initrd_start);
 	vsmp_init();
 
 	io_delay_init();

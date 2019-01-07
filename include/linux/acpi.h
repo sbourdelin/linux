@@ -1272,9 +1272,9 @@ acpi_graph_get_remote_endpoint(const struct fwnode_handle *fwnode,
 #endif
 
 #ifdef CONFIG_ACPI_TABLE_UPGRADE
-void acpi_table_upgrade(void);
+void acpi_table_upgrade(void *data, size_t size);
 #else
-static inline void acpi_table_upgrade(void) { }
+static inline void acpi_table_upgrade(void *data, size_t size) { }
 #endif
 
 #if defined(CONFIG_ACPI) && defined(CONFIG_ACPI_WATCHDOG)

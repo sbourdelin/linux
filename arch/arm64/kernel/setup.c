@@ -315,7 +315,7 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 	efi_apply_persistent_mem_reservations();
 
-	acpi_table_upgrade();
+	acpi_table_upgrade((void *)initrd_start, initrd_end - initrd_start);
 
 	/* Parse the ACPI tables for possible boot-time configuration */
 	acpi_boot_table_init();
