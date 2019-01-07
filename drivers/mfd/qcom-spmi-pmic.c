@@ -12,10 +12,10 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/spmi.h>
 #include <linux/regmap.h>
-#include <linux/of_platform.h>
 
 #define PMIC_REV2		0x101
 #define PMIC_REV3		0x102
@@ -124,6 +124,61 @@ static const struct regmap_config spmi_regmap_config = {
 	.fast_io	= true,
 };
 
+static const struct mfd_cell pmic_spmi_cells[] = {
+	{
+		.name = "spmi-mpp",
+		.of_compatible = "qcom,spmi-mpp",
+	},
+	{
+		.name = "spmi-temp-alarm",
+		.of_compatible = "qcom,spmi-temp-alarm",
+	},
+	{
+		.name = "pm8941-rtc",
+		.of_compatible = "qcom,pm8941-rtc",
+	},
+	{
+		.name = "pm8941-pwrkey",
+		.of_compatible = "qcom,pm8941-pwrkey",
+	},
+	{
+		.name = "pm8941-misc",
+		.of_compatible = "qcom,pm8941-misc",
+	},
+	{
+		.name = "pm8941-charger",
+		.of_compatible = "qcom,pm8941-charger",
+	},
+	{
+		.name = "spmi-gpio",
+		.of_compatible = "qcom,spmi-gpio",
+	},
+	{
+		.name = "spmi-mpp",
+		.of_compatible = "qcom,spmi-mpp",
+	},
+	{
+		.name = "spmi-vadc",
+		.of_compatible = "qcom,spmi-vadc",
+	},
+	{
+		.name = "spmi-iadc",
+		.of_compatible = "qcom,spmi-iadc",
+	},
+	{
+		.name = "pm8941-coincell",
+		.of_compatible = "qcom,pm8941-coincell",
+	},
+	{
+		.name = "pm8941-wled",
+		.of_compatible = "qcom,pm8941-wled",
+	},
+	{
+		.name = "pm8941-regulators",
+		.of_compatible = "qcom,pm8941-regulators",
+	},
+};
+
 static int pmic_spmi_probe(struct spmi_device *sdev)
 {
 	struct regmap *regmap;
@@ -136,7 +191,9 @@ static int pmic_spmi_probe(struct spmi_device *sdev)
 	if (sdev->usid % 2 == 0)
 		pmic_spmi_show_revid(regmap, &sdev->dev);
 
-	return devm_of_platform_populate(&sdev->dev);
+	return devm_mfd_add_devices(&sdev->dev, PLATFORM_DEVID_AUTO,
+				    pmic_spmi_cells,
+				    ARRAY_SIZE(pmic_spmi_cells), NULL, 0, NULL);
 }
 
 MODULE_DEVICE_TABLE(of, pmic_spmi_id_table);

@@ -959,6 +959,7 @@ config MFD_SPMI_PMIC
 	depends on ARCH_QCOM || COMPILE_TEST
 	depends on OF
 	depends on SPMI
+	select MFD_CORE
 	select REGMAP_SPMI
 	help
 	  This enables support for the Qualcomm SPMI PMICs.
