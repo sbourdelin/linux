@@ -491,6 +491,10 @@ static void intel_hdmi_set_drm_infoframe(struct intel_encoder *encoder,
 	struct hdr_static_metadata *hdr_metadata;
 	int ret;
 
+	if (!conn_state->hdr_output_metadata_blob_ptr ||
+		conn_state->hdr_output_metadata_blob_ptr->length == 0)
+		return;
+
 	hdr_metadata = (struct hdr_static_metadata *)
 		conn_state->hdr_output_metadata_blob_ptr->data;
 
