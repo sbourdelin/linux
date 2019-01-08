@@ -66,7 +66,7 @@ struct drm_printer;
 	/* leave bools at the end to not create holes */ \
 	param(bool, alpha_support, IS_ENABLED(CONFIG_DRM_I915_ALPHA_SUPPORT)) \
 	param(bool, enable_hangcheck, true) \
-	param(bool, fastboot, false) \
+	param(bool, fastboot, true) \
 	param(bool, prefault_disable, false) \
 	param(bool, load_detect_test, false) \
 	param(bool, force_reset_modeset_test, false) \
