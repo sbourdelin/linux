@@ -524,12 +524,16 @@ static void io_fill_cq_error(struct io_ring_ctx *ctx, unsigned ki_index,
 static void io_complete_scqring_rw(struct kiocb *kiocb, long res, long res2)
 {
 	struct io_kiocb *iocb = container_of(kiocb, struct io_kiocb, rw);
+	unsigned ev_flags = 0;
 
 	kiocb_end_write(kiocb);
 
 	fput(kiocb->ki_filp);
 
-	io_complete_scqring(iocb, res, 0);
+	if (res > 0 && test_bit(KIOCB_F_FORCE_NONBLOCK, &iocb->ki_flags))
+		ev_flags = IOEV_FLAG_CACHEHIT;
+
+	io_complete_scqring(iocb, res, ev_flags);
 }
 
 static void io_complete_scqring_iopoll(struct kiocb *kiocb, long res, long res2)

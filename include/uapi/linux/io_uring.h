@@ -57,6 +57,11 @@ struct io_uring_event {
 };
 
 /*
+ * io_uring_event->flags
+ */
+#define IOEV_FLAG_CACHEHIT	(1 << 0)	/* IO did not hit media */
+
+/*
  * Magic offsets for the application to mmap the data it needs
  */
 #define IORING_OFF_SQ_RING		0ULL
