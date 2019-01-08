@@ -2341,13 +2341,28 @@ u32 gen8_make_rpcs(struct drm_i915_private *i915, struct intel_sseu *req_sseu)
 
 	/*
 	 * If i915/perf is active, we want a stable powergating configuration
-	 * on the system. The most natural configuration to take in that case
-	 * is the default (i.e maximum the hardware can do).
+	 * on the system.
+	 *
+	 * We could choose full enablement, but on ICL we know there are use
+	 * cases which disable slices for functional, apart for performance
+	 * reasons. So in this case we select a known stable subset.
 	 */
-	if (unlikely(i915->perf.oa.exclusive_stream))
-		ctx_sseu = intel_device_default_sseu(i915);
-	else
+	if (!i915->perf.oa.exclusive_stream) {
 		ctx_sseu = *req_sseu;
+	} else {
+		ctx_sseu = intel_device_default_sseu(i915);
+
+		if (IS_GEN(i915, 11)) {
+			/*
+			 * We only need subslice count so it doesn't matter
+			 * which ones we select - just turn off low bits in the
+			 * amount of half of all available subslices per slice.
+			 */
+			ctx_sseu.subslice_mask =
+				~(~0 << (hweight8(ctx_sseu.subslice_mask) / 2));
+			ctx_sseu.slice_mask = 0x1;
+		}
+	}
 
 	slices = hweight8(ctx_sseu.slice_mask);
 	subslices = hweight8(ctx_sseu.subslice_mask);
