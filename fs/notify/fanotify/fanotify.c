@@ -62,13 +62,19 @@ static int fanotify_get_response(struct fsnotify_group *group,
 				 struct fsnotify_iter_info *iter_info)
 {
 	int ret;
+	unsigned int response;
 
+	BUILD_BUG_ON(FAN_EVENT_STATE_MASK & (FAN_AUDIT | FAN_ALLOW | FAN_DENY));
 	pr_debug("%s: group=%p event=%p\n", __func__, group, event);
 
-	wait_event(group->fanotify_data.access_waitq, event->response);
+	wait_event(group->fanotify_data.access_waitq,
+		   (event->response & FAN_EVENT_STATE_MASK) ==
+							FAN_EVENT_ANSWERED);
+
+	response = event->response & ~FAN_EVENT_STATE_MASK;
 
 	/* userspace responded, convert to something usable */
-	switch (event->response & ~FAN_AUDIT) {
+	switch (response & ~FAN_AUDIT) {
 	case FAN_ALLOW:
 		ret = 0;
 		break;
@@ -78,10 +84,8 @@ static int fanotify_get_response(struct fsnotify_group *group,
 	}
 
 	/* Check if the response should be audited */
-	if (event->response & FAN_AUDIT)
-		audit_fanotify(event->response & ~FAN_AUDIT);
-
-	event->response = 0;
+	if (response & FAN_AUDIT)
+		audit_fanotify(response & ~FAN_AUDIT);
 
 	pr_debug("%s: group=%p event=%p about to return ret=%d\n", __func__,
 		 group, event, ret);

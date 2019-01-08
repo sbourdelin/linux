@@ -22,6 +22,12 @@ struct fanotify_event_info {
 	struct pid *pid;
 };
 
+/* State of permission event we store inside response field */
+#define FAN_EVENT_STATE_MASK 0xc0000000
+
+#define FAN_EVENT_REPORTED 0x40000000	/* Event reported to userspace */
+#define FAN_EVENT_ANSWERED 0x80000000	/* Event answered by userspace */
+
 /*
  * Structure for permission fanotify events. It gets allocated and freed in
  * fanotify_handle_event() since we wait there for user response. When the
@@ -31,7 +37,9 @@ struct fanotify_event_info {
  */
 struct fanotify_perm_event_info {
 	struct fanotify_event_info fae;
-	int response;	/* userspace answer to question */
+	unsigned int response;	/* userspace answer to the event. We also use
+				 * high bits of this field for recording state
+				 * of the event. */
 	int fd;		/* fd we passed to userspace for this event */
 };
 
