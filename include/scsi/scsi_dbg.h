@@ -2,6 +2,11 @@
 #ifndef _SCSI_SCSI_DBG_H
 #define _SCSI_SCSI_DBG_H
 
+#ifdef CONFIG_BLK_DEBUG_FS
+extern struct dentry *scsi_debugfs_uld;
+extern struct dentry *scsi_debugfs_lld;
+#endif
+
 struct scsi_cmnd;
 struct scsi_device;
 struct scsi_sense_hdr;

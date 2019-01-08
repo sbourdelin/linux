@@ -1,8 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/seq_file.h>
+#include <linux/debugfs.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_dbg.h>
-#include "scsi_debugfs.h"
+#include "scsi_priv.h"
+
+struct dentry *scsi_debugfs_root;
+
+struct dentry *scsi_debugfs_uld;
+EXPORT_SYMBOL(scsi_debugfs_uld);
+
+struct dentry *scsi_debugfs_lld;
+EXPORT_SYMBOL(scsi_debugfs_lld);
+
 
 #define SCSI_CMD_FLAG_NAME(name)[const_ilog2(SCMD_##name)] = #name
 static const char *const scsi_cmd_flags[] = {
@@ -49,4 +59,24 @@ void scsi_show_rq(struct seq_file *m, struct request *rq)
 	seq_printf(m, ", .timeout=%d.%03d, allocated %d.%03d s ago",
 		   timeout_ms / 1000, timeout_ms % 1000,
 		   alloc_ms / 1000, alloc_ms % 1000);
+}
+
+void scsi_debugfs_init(void)
+{
+	scsi_debugfs_root = debugfs_create_dir("scsi", NULL);
+	if (!scsi_debugfs_root)
+		return;
+	scsi_debugfs_uld = debugfs_create_dir("uld", scsi_debugfs_root);
+	if (!scsi_debugfs_uld) {
+		scsi_debugfs_exit();
+		return;
+	}
+	scsi_debugfs_lld = debugfs_create_dir("lld", scsi_debugfs_root);
+	if (!scsi_debugfs_lld)
+		scsi_debugfs_exit();
+}
+
+void scsi_debugfs_exit(void)
+{
+	debugfs_remove_recursive(scsi_debugfs_root);
 }
