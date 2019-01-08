@@ -551,6 +551,14 @@ struct i2c_lock_operations {
 	void (*unlock_bus)(struct i2c_adapter *, unsigned int flags);
 };
 
+struct i2c_attach_operations {
+	int  (*attach_client)(struct i2c_adapter *,
+			      const struct i2c_board_info *,
+			      struct i2c_client *);
+	void (*detach_client)(struct i2c_adapter *,
+			      struct i2c_client *);
+};
+
 /**
  * struct i2c_timings - I2C timing information
  * @bus_freq_hz: the bus frequency in Hz
@@ -674,6 +682,7 @@ struct i2c_adapter {
 
 	/* data fields that are valid for all devices	*/
 	const struct i2c_lock_operations *lock_ops;
+	const struct i2c_attach_operations *attach_ops;
 	struct rt_mutex bus_lock;
 	struct rt_mutex mux_lock;
 
