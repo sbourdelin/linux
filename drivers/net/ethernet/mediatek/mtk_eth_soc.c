@@ -356,6 +356,7 @@ static int mtk_phy_connect(struct net_device *dev)
 	linkmode_copy(dev->phydev->advertising, dev->phydev->supported);
 	linkmode_set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
 			 dev->phydev->advertising);
+	phy_start(dev->phydev);
 	phy_start_aneg(dev->phydev);
 
 	of_node_put(np);
@@ -1821,7 +1822,6 @@ static int mtk_open(struct net_device *dev)
 	else
 		refcount_inc(&eth->dma_refcnt);
 
-	phy_start(dev->phydev);
 	netif_start_queue(dev);
 
 	return 0;
