@@ -636,3 +636,41 @@ u32 cros_ec_get_host_event(struct cros_ec_device *ec_dev)
 	return host_event;
 }
 EXPORT_SYMBOL(cros_ec_get_host_event);
+
+int cros_ec_readmem(struct cros_ec_device *ec, unsigned int offset,
+		    unsigned int bytes, void *dest)
+{
+	int ret;
+	struct ec_params_read_memmap *params;
+	struct cros_ec_command *msg;
+
+	if (offset >= EC_MEMMAP_SIZE - bytes)
+		return -EINVAL;
+
+	msg = kzalloc(sizeof(*msg) + max(sizeof(*params), bytes), GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	msg->version = 0;
+	msg->command = EC_CMD_READ_MEMMAP;
+	msg->insize = bytes;
+	msg->outsize = sizeof(*params);
+
+	params = (struct ec_params_read_memmap *)msg->data;
+	params->offset = offset;
+	params->size = bytes;
+
+	ret = cros_ec_cmd_xfer_status(ec, msg);
+	if (ret < 0) {
+		dev_warn(ec->dev, "cannot read mapped reg: %d/%d\n",
+			 ret, msg->result);
+		goto out_free;
+	}
+
+	memcpy(dest, msg->data, bytes);
+
+out_free:
+	kfree(msg);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cros_ec_readmem);

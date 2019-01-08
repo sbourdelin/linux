@@ -335,6 +335,18 @@ int cros_ec_get_next_event(struct cros_ec_device *ec_dev, bool *wake_event);
  */
 u32 cros_ec_get_host_event(struct cros_ec_device *ec_dev);
 
+/**
+ * cros_ec_readmem - Read mapped memory in the ChromeOS EC
+ *
+ * @ec: Device to read from
+ * @offset: Offset to read within the mapped region
+ * @bytes: number of bytes to read
+ * @data: Return data
+ * @return: 0 if Ok, -ve on error
+ */
+int cros_ec_readmem(struct cros_ec_device *ec, unsigned int offset,
+		    unsigned int bytes, void *dest);
+
 /* sysfs stuff */
 extern struct attribute_group cros_ec_attr_group;
 extern struct attribute_group cros_ec_lightbar_attr_group;
