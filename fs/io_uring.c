@@ -136,6 +136,13 @@ struct io_submit_state {
 	unsigned int req_count;
 
 	/*
+	 * io_kiocb alloc cache
+	 */
+	void *iocbs[IO_IOPOLL_BATCH];
+	unsigned int free_iocbs;
+	unsigned int cur_iocb;
+
+	/*
 	 * File reference cache
 	 */
 	struct file *file;
@@ -210,15 +217,33 @@ static void io_req_init(struct io_ring_ctx *ctx, struct io_kiocb *req)
 	req->ki_flags = 0;
 }
 
-static struct io_kiocb *io_get_req(struct io_ring_ctx *ctx)
+static struct io_kiocb *io_get_req(struct io_ring_ctx *ctx,
+				   struct io_submit_state *state)
 {
 	struct io_kiocb *req;
 
-	req = kmem_cache_alloc(kiocb_cachep, GFP_KERNEL);
-	if (!req)
-		return NULL;
+	if (!state)
+		req = kmem_cache_alloc(kiocb_cachep, GFP_KERNEL);
+	else if (!state->free_iocbs) {
+		size_t size;
+		int ret;
 
-	io_req_init(ctx, req);
+		size = min_t(size_t, state->ios_left, ARRAY_SIZE(state->iocbs));
+		ret = kmem_cache_alloc_bulk(kiocb_cachep, GFP_KERNEL, size,
+						state->iocbs);
+		if (ret <= 0)
+			return ERR_PTR(-ENOMEM);
+		state->free_iocbs = ret - 1;
+		state->cur_iocb = 1;
+		req = state->iocbs[0];
+	} else {
+		req = state->iocbs[state->cur_iocb];
+		state->free_iocbs--;
+		state->cur_iocb++;
+	}
+
+	if (req)
+		io_req_init(ctx, req);
 	return req;
 }
 
@@ -773,7 +798,7 @@ static int __io_submit_one(struct io_ring_ctx *ctx,
 	if (unlikely(iocb->flags))
 		return -EINVAL;
 
-	req = io_get_req(ctx);
+	req = io_get_req(ctx, state);
 	if (unlikely(!req))
 		return -EAGAIN;
 
@@ -844,6 +869,9 @@ static void io_submit_state_end(struct io_submit_state *state)
 	if (!list_empty(&state->req_list))
 		io_flush_state_reqs(state->ctx, state);
 	io_file_put(state, NULL);
+	if (state->free_iocbs)
+		kmem_cache_free_bulk(kiocb_cachep, state->free_iocbs,
+					&state->iocbs[state->cur_iocb]);
 }
 
 /*
@@ -855,6 +883,7 @@ static void io_submit_state_start(struct io_submit_state *state,
 	state->ctx = ctx;
 	INIT_LIST_HEAD(&state->req_list);
 	state->req_count = 0;
+	state->free_iocbs = 0;
 	state->file = NULL;
 	state->ios_left = max_ios;
 #ifdef CONFIG_BLOCK
