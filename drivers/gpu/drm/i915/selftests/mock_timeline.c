@@ -19,6 +19,8 @@ void mock_timeline_init(struct i915_timeline *timeline, u64 context)
 
 	i915_syncmap_init(&timeline->sync);
 
+	init_request_active(&timeline->barrier, NULL);
+
 	INIT_LIST_HEAD(&timeline->link);
 }
 
