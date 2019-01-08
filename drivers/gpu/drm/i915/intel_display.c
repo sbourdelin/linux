@@ -9699,9 +9699,6 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 	intel_get_pipe_src_size(crtc, pipe_config);
 	intel_get_crtc_ycbcr_config(crtc, pipe_config);
 
-	pipe_config->gamma_mode =
-		I915_READ(GAMMA_MODE(crtc->pipe)) & GAMMA_MODE_MODE_MASK;
-
 	power_domain = POWER_DOMAIN_PIPE_PANEL_FITTER(crtc->pipe);
 	if (intel_display_power_get_if_enabled(dev_priv, power_domain)) {
 		power_domain_mask |= BIT_ULL(power_domain);

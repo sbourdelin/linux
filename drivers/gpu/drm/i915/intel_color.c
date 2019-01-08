@@ -363,25 +363,10 @@ static void haswell_load_luts(struct intel_crtc_state *crtc_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
-	bool reenable_ips = false;
 
-	/*
-	 * Workaround : Do not read or write the pipe palette/gamma data while
-	 * GAMMA_MODE is configured for split gamma and IPS_CTL has IPS enabled.
-	 */
-	if (IS_HASWELL(dev_priv) && crtc_state->ips_enabled &&
-	    (crtc_state->gamma_mode == GAMMA_MODE_MODE_SPLIT)) {
-		hsw_disable_ips(crtc_state);
-		reenable_ips = true;
-	}
-
-	crtc_state->gamma_mode = GAMMA_MODE_MODE_8BIT;
 	I915_WRITE(GAMMA_MODE(crtc->pipe), GAMMA_MODE_MODE_8BIT);
 
 	i9xx_load_luts(crtc_state);
-
-	if (reenable_ips)
-		hsw_enable_ips(crtc_state);
 }
 
 static void bdw_load_degamma_lut(struct intel_crtc_state *crtc_state)
@@ -476,7 +461,6 @@ static void broadwell_load_luts(struct intel_crtc_state *crtc_state)
 	bdw_load_gamma_lut(crtc_state,
 			   INTEL_INFO(dev_priv)->color.degamma_lut_size);
 
-	crtc_state->gamma_mode = GAMMA_MODE_MODE_SPLIT;
 	I915_WRITE(GAMMA_MODE(pipe), GAMMA_MODE_MODE_SPLIT);
 	POSTING_READ(GAMMA_MODE(pipe));
 
@@ -532,7 +516,6 @@ static void glk_load_luts(struct intel_crtc_state *crtc_state)
 
 	bdw_load_gamma_lut(crtc_state, 0);
 
-	crtc_state->gamma_mode = GAMMA_MODE_MODE_10BIT;
 	I915_WRITE(GAMMA_MODE(pipe), GAMMA_MODE_MODE_10BIT);
 	POSTING_READ(GAMMA_MODE(pipe));
 }
