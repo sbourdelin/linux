@@ -38,6 +38,7 @@
 #include <linux/kdebug.h>
 #include <linux/ratelimit.h>
 #include <linux/context_tracking.h>
+#include <linux/seq_buf.h>
 #include <linux/smp.h>
 #include <linux/console.h>
 #include <linux/kmsg_dump.h>
@@ -255,26 +256,34 @@ NOKPROBE_SYMBOL(oops_end);
 
 static int __die(const char *str, struct pt_regs *regs, long err)
 {
+	char buf[128]; /* enough for all flags and a long platform name */
+	struct seq_buf s;
+
+	seq_buf_init(&s, buf, sizeof(buf));
+
 	printk("Oops: %s, sig: %ld [#%d]\n", str, err, ++die_counter);
 
 	if (IS_ENABLED(CONFIG_CPU_LITTLE_ENDIAN))
-		printk("LE ");
+		seq_buf_puts(&s, "LE ");
 	else
-		printk("BE ");
+		seq_buf_puts(&s, "BE ");
 
 	if (IS_ENABLED(CONFIG_PREEMPT))
-		pr_cont("PREEMPT ");
+		seq_buf_puts(&s, "PREEMPT ");
 
 	if (IS_ENABLED(CONFIG_SMP))
-		pr_cont("SMP NR_CPUS=%d ", NR_CPUS);
+		seq_buf_printf(&s, "SMP NR_CPUS=%d ", NR_CPUS);
 
 	if (debug_pagealloc_enabled())
-		pr_cont("DEBUG_PAGEALLOC ");
+		seq_buf_puts(&s, "DEBUG_PAGEALLOC ");
 
 	if (IS_ENABLED(CONFIG_NUMA))
-		pr_cont("NUMA ");
+		seq_buf_puts(&s, "NUMA ");
 
-	pr_cont("%s\n", ppc_md.name ? ppc_md.name : "");
+	if (ppc_md.name)
+		seq_buf_puts(&s, ppc_md.name);
+
+	printk("%s\n", buf);
 
 	if (notify_die(DIE_OOPS, str, regs, err, 255, SIGSEGV) == NOTIFY_STOP)
 		return 1;
