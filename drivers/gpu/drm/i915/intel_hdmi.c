@@ -2154,6 +2154,8 @@ intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi, struct drm_connector *c
 	intel_attach_aspect_ratio_property(connector);
 	drm_connector_attach_content_type_property(connector);
 	connector->state->picture_aspect_ratio = HDMI_PICTURE_ASPECT_NONE;
+	drm_object_attach_property(&connector->base,
+		connector->dev->mode_config.hdr_output_metadata_property, 0);
 
 	if (!HAS_GMCH_DISPLAY(dev_priv))
 		drm_connector_attach_max_bpc_property(connector, 8, 12);
