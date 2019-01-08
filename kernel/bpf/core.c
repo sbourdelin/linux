@@ -1228,11 +1228,26 @@ select_insn:
 	ALU(SUB,  -)
 	ALU(AND,  &)
 	ALU(OR,   |)
-	ALU(LSH, <<)
-	ALU(RSH, >>)
 	ALU(XOR,  ^)
 	ALU(MUL,  *)
 #undef ALU
+#define ALU_SHIFT(OPCODE, OP)			\
+	ALU64_##OPCODE##_X: 		\
+		DST = DST OP (SRC & 0x3F);	\
+		CONT;			\
+	ALU_##OPCODE##_X:		\
+		DST = (u32) DST OP (SRC & 0x1F);\
+		CONT;			\
+	ALU64_##OPCODE##_K: 		\
+		DST = DST OP (IMM & 0x3F);	\
+		CONT;			\
+	ALU_##OPCODE##_K:		\
+		DST = (u32) DST OP (IMM & 0x1F);\
+		CONT;
+
+	ALU_SHIFT(LSH, <<)
+	ALU_SHIFT(RSH, >>)
+#undef ALU_SHIFT
 	ALU_NEG:
 		DST = (u32) -DST;
 		CONT;
