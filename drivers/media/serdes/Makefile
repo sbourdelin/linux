@@ -1,0 +1,1 @@
+obj-$(CONFIG_SERDES_DS90UB954) += ds90ub954.o

@@ -1,0 +1,13 @@
+menu "Video serializers and deserializers"
+
+config SERDES_DS90UB954
+	tristate "TI DS90UB954-Q1 deserializer"
+	help
+	  Device driver for the Texas Instruments "DS90UB954-Q1 Dual
+	  4.16 Gbps FPD-Link III Deserializer Hub With MIPI CSI-2
+	  Outputs for 2MP/60fps Cameras and RADAR".
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ds90ub954.
+
+endmenu
