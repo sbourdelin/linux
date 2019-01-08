@@ -241,6 +241,8 @@ static int syscon_probe(struct platform_device *pdev)
 	syscon_config.max_register = res->end - res->start - 3;
 	if (pdata)
 		syscon_config.name = pdata->label;
+	else
+		syscon_config.name = dev_name(dev);
 	syscon->regmap = devm_regmap_init_mmio(dev, base, &syscon_config);
 	if (IS_ERR(syscon->regmap)) {
 		dev_err(dev, "regmap init failed\n");
