@@ -475,6 +475,30 @@ static void intel_write_infoframe(struct intel_encoder *encoder,
 					frame->any.type, buffer, len);
 }
 
+/* Set Dynamic Range and Mastering Infoframe */
+static void intel_hdmi_set_drm_infoframe(struct intel_encoder *encoder,
+					 const struct intel_crtc_state
+					 *crtc_state,
+					 const struct drm_connector_state
+					 *conn_state)
+{
+	union hdmi_infoframe frame;
+	struct hdr_static_metadata *hdr_metadata;
+	int ret;
+
+	hdr_metadata = (struct hdr_static_metadata *)
+		conn_state->hdr_output_metadata_blob_ptr->data;
+
+	ret = drm_hdmi_infoframe_set_hdr_metadata(&frame.drm, hdr_metadata);
+	if (ret < 0) {
+		DRM_ERROR("couldn't set HDR metadata in infoframe\n");
+		return;
+	}
+
+	/* Todo: Need to extend support for LSPCON devices as well */
+	intel_write_infoframe(encoder, crtc_state, &frame);
+}
+
 static void intel_hdmi_set_avi_infoframe(struct intel_encoder *encoder,
 					 const struct intel_crtc_state *crtc_state,
 					 const struct drm_connector_state *conn_state)
@@ -883,6 +907,10 @@ static void hsw_set_infoframes(struct intel_encoder *encoder,
 	intel_hdmi_set_avi_infoframe(encoder, crtc_state, conn_state);
 	intel_hdmi_set_spd_infoframe(encoder, crtc_state);
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state, conn_state);
+
+	/* Set Dynamic Range and Mastering Infoframe if supported and changed */
+	if (conn_state->hdr_metadata_changed)
+		intel_hdmi_set_drm_infoframe(encoder, crtc_state, conn_state);
 }
 
 void intel_dp_dual_mode_set_tmds_output(struct intel_hdmi *hdmi, bool enable)
