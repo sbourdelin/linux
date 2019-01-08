@@ -27,8 +27,18 @@ typedef void (*scp_ipi_handler_t) (void *data,
 
 enum scp_ipi_id {
 	SCP_IPI_INIT = 0,
-	SCP_IPI_CROS_HOST_CMD,
+	/*
+	 * TODO: Should this just be part of the response of IPI_SCP_INIT
+	 * instead? e.g. the initial IPI_SCP_INIT from SCP sends a list of
+	 * channels.
+	 */
+	SCP_IPI_NS_SERVICE,
 	SCP_IPI_MDP,
+	/*
+	 * TODO: Since we'll not be having all IPI numbers here after the name
+	 * service & rpmsg, this IPI_MAX need to be manually specified and sync
+	 * with the firmware.
+	 */
 	SCP_IPI_MAX,
 };
 

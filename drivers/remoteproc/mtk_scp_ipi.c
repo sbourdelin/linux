@@ -49,7 +49,7 @@ int scp_ipi_send(struct platform_device *pdev,
 	unsigned long timeout;
 	int ret;
 
-	if (WARN(id <= SCP_IPI_INIT || id >= SCP_IPI_MAX ||
+	if (WARN(id <= SCP_IPI_NS_SERVICE || id >= SCP_IPI_MAX ||
 	    len > sizeof(send_obj->share_buf) || !buf,
 	    "failed to send ipi message\n"))
 		return -EINVAL;
