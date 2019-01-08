@@ -144,6 +144,7 @@ static int intel_security_change_key(struct nvdimm *nvdimm,
 	}
 }
 
+#ifdef CONFIG_X86
 static void nvdimm_invalidate_cache(void);
 
 static int intel_security_unlock(struct nvdimm *nvdimm,
@@ -186,6 +187,7 @@ static int intel_security_unlock(struct nvdimm *nvdimm,
 
 	return 0;
 }
+#endif
 
 static int intel_security_disable(struct nvdimm *nvdimm,
 		const struct nvdimm_key_data *key_data)
@@ -227,6 +229,7 @@ static int intel_security_disable(struct nvdimm *nvdimm,
 	return 0;
 }
 
+#ifdef CONFIG_X86
 static int intel_security_erase(struct nvdimm *nvdimm,
 		const struct nvdimm_key_data *key,
 		enum nvdimm_passphrase_type ptype)
@@ -360,15 +363,9 @@ static int intel_security_overwrite(struct nvdimm *nvdimm,
  * TODO: define a cross arch wbinvd equivalent when/if
  * NVDIMM_FAMILY_INTEL command support arrives on another arch.
  */
-#ifdef CONFIG_X86
 static void nvdimm_invalidate_cache(void)
 {
 	wbinvd_on_all_cpus();
-}
-#else
-static void nvdimm_invalidate_cache(void)
-{
-	WARN_ON_ONCE("cache invalidation required after unlock\n");
 }
 #endif
 
