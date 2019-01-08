@@ -123,6 +123,8 @@ static u32 hsw_infoframe_enable(unsigned int type)
 		return VIDEO_DIP_ENABLE_SPD_HSW;
 	case HDMI_INFOFRAME_TYPE_VENDOR:
 		return VIDEO_DIP_ENABLE_VS_HSW;
+	case HDMI_INFOFRAME_TYPE_DRM:
+		return VIDEO_DIP_ENABLE_DRM_GLK;
 	default:
 		MISSING_CASE(type);
 		return 0;
@@ -146,6 +148,8 @@ hsw_dip_data_reg(struct drm_i915_private *dev_priv,
 		return HSW_TVIDEO_DIP_SPD_DATA(cpu_transcoder, i);
 	case HDMI_INFOFRAME_TYPE_VENDOR:
 		return HSW_TVIDEO_DIP_VS_DATA(cpu_transcoder, i);
+	case HDMI_INFOFRAME_TYPE_DRM:
+		return GLK_TVIDEO_DIP_DRM_DATA(cpu_transcoder, i);
 	default:
 		MISSING_CASE(type);
 		return INVALID_MMIO_REG;
@@ -432,7 +436,8 @@ static bool hsw_infoframe_enabled(struct intel_encoder *encoder,
 
 	return val & (VIDEO_DIP_ENABLE_VSC_HSW | VIDEO_DIP_ENABLE_AVI_HSW |
 		      VIDEO_DIP_ENABLE_GCP_HSW | VIDEO_DIP_ENABLE_VS_HSW |
-		      VIDEO_DIP_ENABLE_GMP_HSW | VIDEO_DIP_ENABLE_SPD_HSW);
+		      VIDEO_DIP_ENABLE_GMP_HSW | VIDEO_DIP_ENABLE_SPD_HSW |
+		      VIDEO_DIP_ENABLE_DRM_GLK);
 }
 
 /*
@@ -890,7 +895,8 @@ static void hsw_set_infoframes(struct intel_encoder *encoder,
 
 	val &= ~(VIDEO_DIP_ENABLE_VSC_HSW | VIDEO_DIP_ENABLE_AVI_HSW |
 		 VIDEO_DIP_ENABLE_GCP_HSW | VIDEO_DIP_ENABLE_VS_HSW |
-		 VIDEO_DIP_ENABLE_GMP_HSW | VIDEO_DIP_ENABLE_SPD_HSW);
+		 VIDEO_DIP_ENABLE_GMP_HSW | VIDEO_DIP_ENABLE_SPD_HSW |
+		 VIDEO_DIP_ENABLE_DRM_GLK);
 
 	if (!enable) {
 		I915_WRITE(reg, val);
@@ -909,7 +915,8 @@ static void hsw_set_infoframes(struct intel_encoder *encoder,
 	intel_hdmi_set_hdmi_infoframe(encoder, crtc_state, conn_state);
 
 	/* Set Dynamic Range and Mastering Infoframe if supported and changed */
-	if (conn_state->hdr_metadata_changed)
+	if ((INTEL_GEN(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) &&
+		conn_state->hdr_metadata_changed)
 		intel_hdmi_set_drm_infoframe(encoder, crtc_state, conn_state);
 }
 
