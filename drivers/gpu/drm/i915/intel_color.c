@@ -602,7 +602,8 @@ void intel_color_load_luts(struct intel_crtc_state *crtc_state)
 	struct drm_device *dev = crtc_state->base.crtc->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
-	dev_priv->display.load_luts(crtc_state);
+	if (dev_priv->display.load_luts)
+		dev_priv->display.load_luts(crtc_state);
 }
 
 int intel_color_check(struct intel_crtc_state *crtc_state)
