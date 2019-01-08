@@ -31,6 +31,11 @@ struct io_uring_iocb {
 	};
 };
 
+/*
+ * io_uring_setup() flags
+ */
+#define IORING_SETUP_IOPOLL	(1 << 0)	/* io_context is polled */
+
 #define IORING_OP_READ		1
 #define IORING_OP_WRITE		2
 #define IORING_OP_FSYNC		3
@@ -44,11 +49,6 @@ struct io_uring_event {
 	__s32	res;		/* result code for this event */
 	__u32	flags;
 };
-
-/*
- * io_uring_event->flags
- */
-#define IOEV_FLAG_CACHEHIT	(1 << 0)	/* IO did not hit media */
 
 /*
  * Magic offsets for the application to mmap the data it needs
