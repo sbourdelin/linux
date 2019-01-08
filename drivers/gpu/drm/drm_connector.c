@@ -1031,7 +1031,7 @@ int drm_connector_create_standard_properties(struct drm_device *dev)
 				   "HDR_OUTPUT_METADATA", 0);
 	if (!prop)
 		return -ENOMEM;
-	dev->mode_config.hdr_source_metadata_property = prop;
+	dev->mode_config.hdr_output_metadata_property = prop;
 
 	return 0;
 }
