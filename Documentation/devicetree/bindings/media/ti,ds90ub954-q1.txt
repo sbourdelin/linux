@@ -1,0 +1,151 @@
+Texas Instruments DS90UB954-Q1 dual video Deserializer
+======================================================
+
+Required properties:
+
+ - compatible: must be "ti,ds90ub954-q1"
+ - reg: I2C bus address of the chip (0x30..0xdd, based on strapping options)
+ - reset-gpios: chip reset GPIO, active low (connected to PDB pin of the chip)
+ - i2c-alias-pool: list of I2C addresses that are known to be available on the
+                   "local" (SoC-to-deser) I2C bus; they will be picked at
+		   runtime and used as aliases to reach remove I2C chips
+
+
+Required subnodes:
+ - ports: A ports node with one port child node per device input and output
+          port, in accordance with the video interface bindings defined in
+          Documentation/devicetree/bindings/media/video-interfaces.txt. The
+          port nodes are numbered as follows:
+
+          Port Description
+          -----------------------------
+          0    Input from FPD-Link 3 RX port 0
+          1    Input from FPD-Link 3 RX port 1
+          2    CSI-2 output
+ - gpios: *** this is a temporary test implementation, ignore it
+ - i2c-mux: contains one child per RX port, each generates an I2C adapter
+            representing the I2C bus on the remote side
+ - rxports: contains one child per RX port, each describes one FPD-Link 3 port
+            with these fields:
+	    - reg: the RX port index
+	    - ser-i2c-alias: the alias to access the remore serializer from
+	      the local bus
+	    - bc-gpio-map: maps backchannel GPIO numbers to local GPIO inputs
+	                   with pairs <fpd_gpio_number gpio_node>
+			   (TODO change when reimplementing the gpios subnode)
+
+
+Device node example
+-------------------
+
+&i2c0 {
+	deser@3d {
+		reg = <0x3d>;
+		compatible = "ti,ds90ub954-q1";
+		reset-gpios = <&gpio1 2 0>;
+
+		i2c-alias-pool = /bits/ 16 <0x20 0x21 0x22 0x23 0x24 0x25>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				ds90ub954_fpd3_in0: endpoint {
+					remote-endpoint = <&remote_sensor_0_out>;
+				};
+			};
+
+			// TODO enable both ports (and s/1/2/g in th MIPI port below)
+			// port@1 {
+			// 	reg = <1>;
+			// 	ds90ub954_fpd3_in1: endpoint {
+			// 		remote-endpoint = <&remote_sensor_1_out>;
+			// 	};
+			// };
+
+			port@1 {
+				reg = <1>;
+				ds90ub954_mipi_out0: endpoint {
+					data-lanes = <1 2 3 4>;
+					remote-endpoint = <&csirx_0_in>;
+				};
+			};
+		};
+
+		gpios {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			// From sensor to CPU
+			gpio@0 {
+				reg = <0>;
+				output;
+				source = <0>; // RX port 0
+				function = <0>;
+			};
+
+			// CPU to sensor reset, active low
+			remote_sensor1_reset: gpio@1 {
+				reg = <1>;
+				input;
+			};
+		};
+
+		i2c-mux {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			remote_i2c0: i2c@0 {
+				reg = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				clock-frequency = <400000>;
+			};
+
+			remote_i2c1: i2c@1 {
+				reg = <1>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				clock-frequency = <400000>;
+			};
+		};
+
+		rxports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			rxport@0 {
+				reg = <0>;
+				ser-i2c-alias = <0x3e>;
+
+				/* Map BC GPIO numbers to local GPIO inputs */
+				bc-gpio-map = <1 &remote_sensor1_reset>;
+			};
+
+			rxport@1 {
+				reg = <1>;
+				ser-i2c-alias = <0x3f>;
+			};
+		};
+	};
+};
+
+&remote_i2c0 {
+	remote_sensor0@1a {
+		reg = <0x1a>;
+		compatible = "sony,imx274";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reset-gpios = <&gpio1 4 0>;
+
+		port@0 {
+			reg = <0>;
+			remote_sensor_0_out: endpoint {
+				remote-endpoint = <&ds90ub954_fpd3_in0>;
+			};
+		};
+	};
+};
