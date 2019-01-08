@@ -22,6 +22,8 @@
 #include <linux/workqueue.h>
 #include <linux/blkdev.h>
 #include <linux/anon_inodes.h>
+#include <linux/sizes.h>
+#include <linux/nospec.h>
 
 #include <linux/uaccess.h>
 #include <linux/nospec.h>
@@ -65,6 +67,13 @@ struct io_event_ring {
 	unsigned		ring_mask;
 };
 
+struct io_mapped_ubuf {
+	u64		ubuf;
+	size_t		len;
+	struct		bio_vec *bvec;
+	unsigned int	nr_bvecs;
+};
+
 struct io_ring_ctx {
 	struct percpu_ref	refs;
 
@@ -73,6 +82,9 @@ struct io_ring_ctx {
 
 	struct io_iocb_ring	sq_ring;
 	struct io_event_ring	cq_ring;
+
+	/* if used, fixed mapped user buffers */
+	struct io_mapped_ubuf	*user_bufs;
 
 	struct work_struct	work;
 
@@ -581,13 +593,45 @@ out_fput:
 	return ret;
 }
 
-static int io_setup_rw(int rw, const struct io_uring_iocb *iocb,
-		       struct iovec **iovec, struct iov_iter *iter)
+static int io_setup_rw(int rw, struct io_kiocb *kiocb,
+		       const struct io_uring_iocb *iocb, struct iovec **iovec,
+		       struct iov_iter *iter, bool kaddr)
 {
 	void __user *buf = (void __user *)(uintptr_t)iocb->addr;
 	size_t ret;
 
-	ret = import_single_range(rw, buf, iocb->len, *iovec, iter);
+	if (!kaddr) {
+		ret = import_single_range(rw, buf, iocb->len, *iovec, iter);
+	} else {
+		struct io_ring_ctx *ctx = kiocb->ki_ctx;
+		struct io_mapped_ubuf *imu;
+		size_t len = iocb->len;
+		size_t offset;
+		int index;
+
+		/* __io_submit_one() already validated the index */
+		index = array_index_nospec(kiocb->ki_index,
+						ctx->max_reqs);
+		imu = &ctx->user_bufs[index];
+		if ((unsigned long) iocb->addr < imu->ubuf ||
+		    (unsigned long) iocb->addr + len > imu->ubuf + imu->len) {
+			ret = -EFAULT;
+			goto err;
+		}
+
+		/*
+		 * May not be a start of buffer, set size appropriately
+		 * and advance us to the beginning.
+		 */
+		offset = (unsigned long) iocb->addr - imu->ubuf;
+		iov_iter_bvec(iter, rw, imu->bvec, imu->nr_bvecs,
+				offset + len);
+		if (offset)
+			iov_iter_advance(iter, offset);
+		ret = 0;
+
+	}
+err:
 	*iovec = NULL;
 	return ret;
 }
@@ -672,7 +716,7 @@ static void io_iopoll_iocb_issued(struct io_submit_state *state,
 }
 
 static ssize_t io_read(struct io_kiocb *kiocb, const struct io_uring_iocb *iocb,
-		       struct io_submit_state *state)
+		       struct io_submit_state *state, bool kaddr)
 {
 	struct iovec inline_vecs[UIO_FASTIOV], *iovec = inline_vecs;
 	struct kiocb *req = &kiocb->rw;
@@ -692,7 +736,7 @@ static ssize_t io_read(struct io_kiocb *kiocb, const struct io_uring_iocb *iocb,
 	if (unlikely(!file->f_op->read_iter))
 		goto out_fput;
 
-	ret = io_setup_rw(READ, iocb, &iovec, &iter);
+	ret = io_setup_rw(READ, kiocb, iocb, &iovec, &iter, kaddr);
 	if (ret)
 		goto out_fput;
 
@@ -708,7 +752,7 @@ out_fput:
 
 static ssize_t io_write(struct io_kiocb *kiocb,
 			const struct io_uring_iocb *iocb,
-			struct io_submit_state *state)
+			struct io_submit_state *state, bool kaddr)
 {
 	struct iovec inline_vecs[UIO_FASTIOV], *iovec = inline_vecs;
 	struct kiocb *req = &kiocb->rw;
@@ -728,7 +772,7 @@ static ssize_t io_write(struct io_kiocb *kiocb,
 	if (unlikely(!file->f_op->write_iter))
 		goto out_fput;
 
-	ret = io_setup_rw(WRITE, iocb, &iovec, &iter);
+	ret = io_setup_rw(WRITE, kiocb, iocb, &iovec, &iter, kaddr);
 	if (ret)
 		goto out_fput;
 	ret = rw_verify_area(WRITE, file, &req->ki_pos, iov_iter_count(&iter));
@@ -810,10 +854,16 @@ static int __io_submit_one(struct io_ring_ctx *ctx,
 	ret = -EINVAL;
 	switch (iocb->opcode) {
 	case IORING_OP_READ:
-		ret = io_read(req, iocb, state);
+		ret = io_read(req, iocb, state, false);
+		break;
+	case IORING_OP_READ_FIXED:
+		ret = io_read(req, iocb, state, true);
 		break;
 	case IORING_OP_WRITE:
-		ret = io_write(req, iocb, state);
+		ret = io_write(req, iocb, state, false);
+		break;
+	case IORING_OP_WRITE_FIXED:
+		ret = io_write(req, iocb, state, true);
 		break;
 	case IORING_OP_FSYNC:
 		if (ctx->flags & IORING_SETUP_IOPOLL)
@@ -1021,6 +1071,127 @@ static int __io_uring_enter(struct io_ring_ctx *ctx, unsigned to_submit,
 	return ret;
 }
 
+static void io_iocb_buffer_unmap(struct io_ring_ctx *ctx)
+{
+	int i, j;
+
+	if (!ctx->user_bufs)
+		return;
+
+	for (i = 0; i < ctx->max_reqs; i++) {
+		struct io_mapped_ubuf *imu = &ctx->user_bufs[i];
+
+		for (j = 0; j < imu->nr_bvecs; j++)
+			put_page(imu->bvec[j].bv_page);
+
+		kfree(imu->bvec);
+		imu->nr_bvecs = 0;
+	}
+
+	kfree(ctx->user_bufs);
+	ctx->user_bufs = NULL;
+}
+
+static int io_iocb_buffer_map(struct io_ring_ctx *ctx,
+			      struct iovec __user *iovecs)
+{
+	unsigned long total_pages, page_limit;
+	struct page **pages = NULL;
+	int i, j, got_pages = 0;
+	int ret = -EINVAL;
+
+	ctx->user_bufs = kcalloc(ctx->max_reqs, sizeof(struct io_mapped_ubuf),
+					GFP_KERNEL);
+	if (!ctx->user_bufs)
+		return -ENOMEM;
+
+	/* Don't allow more pages than we can safely lock */
+	total_pages = 0;
+	page_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+
+	for (i = 0; i < ctx->max_reqs; i++) {
+		struct io_mapped_ubuf *imu = &ctx->user_bufs[i];
+		unsigned long off, start, end, ubuf;
+		int pret, nr_pages;
+		struct iovec iov;
+		size_t size;
+
+		ret = -EFAULT;
+		if (copy_from_user(&iov, &iovecs[i], sizeof(iov)))
+			goto err;
+
+		/*
+		 * Don't impose further limits on the size and buffer
+		 * constraints here, we'll -EINVAL later when IO is
+		 * submitted if they are wrong.
+		 */
+		ret = -EFAULT;
+		if (!iov.iov_base)
+			goto err;
+
+		/* arbitrary limit, but we need something */
+		if (iov.iov_len > SZ_4M)
+			goto err;
+
+		ubuf = (unsigned long) iov.iov_base;
+		end = (ubuf + iov.iov_len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		start = ubuf >> PAGE_SHIFT;
+		nr_pages = end - start;
+
+		ret = -ENOMEM;
+		if (total_pages + nr_pages > page_limit)
+			goto err;
+
+		if (!pages || nr_pages > got_pages) {
+			kfree(pages);
+			pages = kmalloc(nr_pages * sizeof(struct page *),
+					GFP_KERNEL);
+			if (!pages)
+				goto err;
+			got_pages = nr_pages;
+		}
+
+		imu->bvec = kmalloc(nr_pages * sizeof(struct bio_vec),
+					GFP_KERNEL);
+		if (!imu->bvec)
+			goto err;
+
+		down_write(&current->mm->mmap_sem);
+		pret = get_user_pages(ubuf, nr_pages, 1, pages, NULL);
+		up_write(&current->mm->mmap_sem);
+
+		if (pret < nr_pages) {
+			if (pret < 0)
+				ret = pret;
+			goto err;
+		}
+
+		off = ubuf & ~PAGE_MASK;
+		size = iov.iov_len;
+		for (j = 0; j < nr_pages; j++) {
+			size_t vec_len;
+
+			vec_len = min_t(size_t, size, PAGE_SIZE - off);
+			imu->bvec[j].bv_page = pages[j];
+			imu->bvec[j].bv_len = vec_len;
+			imu->bvec[j].bv_offset = off;
+			off = 0;
+			size -= vec_len;
+		}
+		/* store original address for later verification */
+		imu->ubuf = ubuf;
+		imu->len = iov.iov_len;
+		imu->nr_bvecs = nr_pages;
+		total_pages += nr_pages;
+	}
+	kfree(pages);
+	return 0;
+err:
+	kfree(pages);
+	io_iocb_buffer_unmap(ctx);
+	return ret;
+}
+
 static void io_free_scq_urings(struct io_ring_ctx *ctx)
 {
 	if (ctx->sq_ring.ring) {
@@ -1043,6 +1214,7 @@ static void io_ring_ctx_free(struct work_struct *work)
 
 	io_iopoll_reap_events(ctx);
 	io_free_scq_urings(ctx);
+	io_iocb_buffer_unmap(ctx);
 	percpu_ref_exit(&ctx->refs);
 	kmem_cache_free(ioctx_cachep, ctx);
 }
@@ -1191,10 +1363,18 @@ static void io_fill_offsets(struct io_uring_params *p)
 	p->cq_off.events = offsetof(struct io_cq_ring, events);
 }
 
-static int io_uring_create(unsigned entries, struct io_uring_params *p)
+static int io_uring_create(unsigned entries, struct io_uring_params *p,
+			   struct iovec __user *iovecs)
 {
 	struct io_ring_ctx *ctx;
 	int ret;
+
+	/*
+	 * We don't use the iovecs without fixed buffers being asked for.
+	 * Error out if they don't match.
+	 */
+	if (!(p->flags & IORING_SETUP_FIXEDBUFS) && iovecs)
+		return -EINVAL;
 
 	/*
 	 * Use twice as many entries for the CQ ring. It's possible for the
@@ -1212,6 +1392,12 @@ static int io_uring_create(unsigned entries, struct io_uring_params *p)
 	ret = io_allocate_scq_urings(ctx, p);
 	if (ret)
 		goto err;
+
+	if (p->flags & IORING_SETUP_FIXEDBUFS) {
+		ret = io_iocb_buffer_map(ctx, iovecs);
+		if (ret)
+			goto err;
+	}
 
 	ret = anon_inode_getfd("[io_uring]", &io_scqring_fops, ctx,
 				O_RDWR | O_CLOEXEC);
@@ -1245,12 +1431,10 @@ SYSCALL_DEFINE3(io_uring_setup, u32, entries, struct iovec __user *, iovecs,
 			return -EINVAL;
 	}
 
-	if (p.flags & ~IORING_SETUP_IOPOLL)
-		return -EINVAL;
-	if (iovecs)
+	if (p.flags & ~(IORING_SETUP_IOPOLL | IORING_SETUP_FIXEDBUFS))
 		return -EINVAL;
 
-	ret = io_uring_create(entries, &p);
+	ret = io_uring_create(entries, &p, iovecs);
 	if (ret < 0)
 		return ret;
 
