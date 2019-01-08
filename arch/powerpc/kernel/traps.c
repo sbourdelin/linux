@@ -268,6 +268,18 @@ static int __die(const char *str, struct pt_regs *regs, long err)
 	else
 		seq_buf_puts(&s, "BE ");
 
+	seq_buf_puts(&s, "PAGE_SIZE=");
+	if (IS_ENABLED(CONFIG_PPC_4K_PAGES))
+		seq_buf_puts(&s, "4K ");
+	else if (IS_ENABLED(CONFIG_PPC_16K_PAGES))
+		seq_buf_puts(&s, "16K ");
+	else if (IS_ENABLED(CONFIG_PPC_64K_PAGES))
+		seq_buf_puts(&s, "64K ");
+	else if (IS_ENABLED(CONFIG_PPC_256K_PAGES))
+		seq_buf_puts(&s, "256K ");
+	else
+		BUILD_BUG_ON(1);
+
 	if (IS_ENABLED(CONFIG_PREEMPT))
 		seq_buf_puts(&s, "PREEMPT ");
 
