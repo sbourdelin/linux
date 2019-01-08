@@ -732,7 +732,9 @@ static int simple_probe(struct platform_device *pdev)
 	for (i = 0; i < li.link; i++) {
 		dai_link[i].codecs	= &dai_props[i].codecs;
 		dai_link[i].num_codecs	= 1;
-		dai_link[i].platform	= &dai_props[i].platform;
+		dai_link[i].platform.name = dai_props[i].platform.name;
+		dai_link[i].platform.of_node = dai_props[i].platform.of_node;
+		dai_link[i].platform.dai_name = dai_props[i].platform.dai_name;
 	}
 
 	priv->dai_props		= dai_props;
@@ -782,7 +784,7 @@ static int simple_probe(struct platform_device *pdev)
 		codecs->name		= cinfo->codec;
 		codecs->dai_name	= cinfo->codec_dai.name;
 
-		platform		= dai_link->platform;
+		platform		= &dai_link->platform;
 		platform->name		= cinfo->platform;
 
 		card->name		= (cinfo->card) ? cinfo->card : cinfo->name;
