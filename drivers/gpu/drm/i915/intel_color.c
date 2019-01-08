@@ -520,6 +520,69 @@ static void glk_load_luts(struct intel_crtc_state *crtc_state)
 	POSTING_READ(GAMMA_MODE(pipe));
 }
 
+static void icl_load_degamma_lut(struct intel_crtc_state *crtc_state)
+{
+	struct drm_device *dev = crtc_state->base.crtc->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	enum pipe pipe = to_intel_crtc(crtc_state->base.crtc)->pipe;
+	const uint32_t lut_size = INTEL_INFO(dev_priv)->color.degamma_lut_size;
+	uint32_t i;
+
+	/*
+	 * When setting the auto-increment bit, the hardware seems to
+	 * ignore the index bits, so we need to reset it to index 0
+	 * separately.
+	 */
+	I915_WRITE(PRE_CSC_GAMC_INDEX(pipe), 0);
+	I915_WRITE(PRE_CSC_GAMC_INDEX(pipe), PRE_CSC_GAMC_AUTO_INCREMENT);
+
+	if (crtc_state->base.degamma_lut) {
+		struct drm_color_lut *lut = crtc_state->base.degamma_lut->data;
+
+		for (i = 0; i < lut_size; i++) {
+			/*
+			 * First 33 entries represent range from 0 to 1.0
+			 * 34th and 35th entry will represent extended range
+			 * inputs 3.0 and 7.0 respectively, currently clamped
+			 * at 1.0. Since the precision is 16bit, the user value
+			 * can be directly filled to register.
+			 * ToDo: Extend to max 7.0.
+			 */
+			I915_WRITE(PRE_CSC_GAMC_DATA(pipe), lut[i].green);
+		}
+	} else {
+		/* load a linear table. */
+		for (i = 0; i < lut_size; i++) {
+			uint32_t v = (i * (1 << 16)) / (lut_size - 1);
+
+			I915_WRITE(PRE_CSC_GAMC_DATA(pipe), v);
+		}
+	}
+
+	/* Clamp values > 1.0. */
+	while (i++ < 35)
+		I915_WRITE(PRE_CSC_GAMC_DATA(pipe), (1 << 16));
+}
+
+static void icl_load_luts(struct intel_crtc_state *crtc_state)
+{
+	struct drm_crtc *crtc = crtc_state->base.crtc;
+	struct drm_device *dev = crtc_state->base.crtc->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	enum pipe pipe = to_intel_crtc(crtc)->pipe;
+
+	if (crtc_state_is_legacy_gamma(crtc_state)) {
+		haswell_load_luts(crtc_state);
+		return;
+	}
+
+	icl_load_degamma_lut(crtc_state);
+	bdw_load_gamma_lut(crtc_state, 0);
+
+	I915_WRITE(GAMMA_MODE(pipe), GAMMA_MODE_MODE_10BIT |
+		   PRE_CSC_GAMMA_ENABLE | POST_CSC_GAMMA_ENABLE);
+}
+
 /* Loads the palette/gamma unit for the CRTC on CherryView. */
 static void cherryview_load_luts(struct intel_crtc_state *crtc_state)
 {
@@ -636,6 +699,8 @@ void intel_color_init(struct intel_crtc *crtc)
 	} else if (IS_GEMINILAKE(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 		dev_priv->display.load_csc_matrix = ilk_load_csc_matrix;
 		dev_priv->display.load_luts = glk_load_luts;
+	} else if (IS_ICELAKE(dev_priv)) {
+		dev_priv->display.load_luts = icl_load_luts;
 	} else {
 		dev_priv->display.load_luts = i9xx_load_luts;
 	}
