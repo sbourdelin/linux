@@ -27,6 +27,7 @@ struct fanotify_event_info {
 
 #define FAN_EVENT_REPORTED 0x40000000	/* Event reported to userspace */
 #define FAN_EVENT_ANSWERED 0x80000000	/* Event answered by userspace */
+#define FAN_EVENT_CANCELED 0xc0000000	/* Event got canceled by a signal */
 
 /*
  * Structure for permission fanotify events. It gets allocated and freed in

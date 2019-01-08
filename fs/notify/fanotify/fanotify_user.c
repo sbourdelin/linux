@@ -146,6 +146,21 @@ static int fill_event_metadata(struct fsnotify_group *group,
 	return ret;
 }
 
+static void set_event_response(struct fsnotify_group *group,
+			       struct fanotify_perm_event_info *event,
+			       unsigned int response)
+{
+	spin_lock(&group->notification_lock);
+	/* Waiter got aborted by a signal? Free the event. */
+	if (unlikely(event->response == FAN_EVENT_CANCELED)) {
+		spin_unlock(&group->notification_lock);
+		fsnotify_destroy_event(group, &event->fae.fse);
+		return;
+	}
+	event->response = response | FAN_EVENT_ANSWERED;
+	spin_unlock(&group->notification_lock);
+}
+
 static int process_access_response(struct fsnotify_group *group,
 				   struct fanotify_response *response_struct)
 {
@@ -181,8 +196,8 @@ static int process_access_response(struct fsnotify_group *group,
 			continue;
 
 		list_del_init(&event->fae.fse.list);
-		event->response = response | FAN_EVENT_ANSWERED;
 		spin_unlock(&group->notification_lock);
+		set_event_response(group, event, response);
 		wake_up(&group->fanotify_data.access_waitq);
 		return 0;
 	}
@@ -304,10 +319,8 @@ static ssize_t fanotify_read(struct file *file, char __user *buf,
 			fsnotify_destroy_event(group, kevent);
 		} else {
 			if (ret <= 0) {
-				spin_lock(&group->notification_lock);
-				FANOTIFY_PE(kevent)->response =
-						FAN_DENY | FAN_EVENT_ANSWERED;
-				spin_unlock(&group->notification_lock);
+				set_event_response(group, FANOTIFY_PE(kevent),
+						   FAN_DENY);
 				wake_up(&group->fanotify_data.access_waitq);
 			} else {
 				spin_lock(&group->notification_lock);
@@ -357,7 +370,7 @@ static ssize_t fanotify_write(struct file *file, const char __user *buf, size_t 
 static int fanotify_release(struct inode *ignored, struct file *file)
 {
 	struct fsnotify_group *group = file->private_data;
-	struct fanotify_perm_event_info *event, *next;
+	struct fanotify_perm_event_info *event;
 	struct fsnotify_event *fsn_event;
 
 	/*
@@ -372,13 +385,13 @@ static int fanotify_release(struct inode *ignored, struct file *file)
 	 * and simulate reply from userspace.
 	 */
 	spin_lock(&group->notification_lock);
-	list_for_each_entry_safe(event, next, &group->fanotify_data.access_list,
-				 fae.fse.list) {
-		pr_debug("%s: found group=%p event=%p\n", __func__, group,
-			 event);
-
+	while (!list_empty(&group->fanotify_data.access_list)) {
+		event = list_first_entry(&group->fanotify_data.access_list,
+				struct fanotify_perm_event_info, fae.fse.list);
 		list_del_init(&event->fae.fse.list);
-		event->response = FAN_ALLOW | FAN_EVENT_ANSWERED;
+		spin_unlock(&group->notification_lock);
+		set_event_response(group, event, FAN_ALLOW);
+		spin_lock(&group->notification_lock);
 	}
 
 	/*
@@ -388,14 +401,14 @@ static int fanotify_release(struct inode *ignored, struct file *file)
 	 */
 	while (!fsnotify_notify_queue_is_empty(group)) {
 		fsn_event = fsnotify_remove_first_event(group);
+		spin_unlock(&group->notification_lock);
 		if (!(fsn_event->mask & FANOTIFY_PERM_EVENTS)) {
-			spin_unlock(&group->notification_lock);
 			fsnotify_destroy_event(group, fsn_event);
-			spin_lock(&group->notification_lock);
 		} else {
-			FANOTIFY_PE(fsn_event)->response =
-					FAN_ALLOW | FAN_EVENT_ANSWERED;
+			set_event_response(group, FANOTIFY_PE(fsn_event),
+					   FAN_ALLOW);
 		}
+		spin_lock(&group->notification_lock);
 	}
 	spin_unlock(&group->notification_lock);
 
