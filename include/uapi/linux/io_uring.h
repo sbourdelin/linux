@@ -38,6 +38,7 @@ struct io_uring_iocb {
 #define IORING_SETUP_FIXEDBUFS	(1 << 1)	/* IO buffers are fixed */
 #define IORING_SETUP_SQTHREAD	(1 << 2)	/* Use SQ thread */
 #define IORING_SETUP_SQWQ	(1 << 3)	/* Use SQ workqueue */
+#define IORING_SETUP_SQPOLL	(1 << 4)	/* SQ thread polls */
 
 #define IORING_OP_READ		1
 #define IORING_OP_WRITE		2
@@ -75,6 +76,8 @@ struct io_sqring_offsets {
 	__u32 array;
 	__u32 resv[3];
 };
+
+#define IORING_SQ_NEED_WAKEUP	(1 << 0) /* needs io_uring_enter wakeup */
 
 struct io_cqring_offsets {
 	__u32 head;
