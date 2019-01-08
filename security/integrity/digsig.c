@@ -176,3 +176,10 @@ int __init integrity_load_cert(const unsigned int id, const char *source,
 	pr_info("Loading X.509 certificate: %s\n", source);
 	return integrity_add_key(id, data, len, perm);
 }
+
+#ifdef CONFIG_INTEGRITY_PLATFORM_KEYRING
+struct key* __init integrity_get_platform_keyring(void)
+{
+	return keyring[INTEGRITY_KEYRING_PLATFORM];
+}
+#endif

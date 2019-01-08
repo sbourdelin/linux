@@ -18,12 +18,14 @@
 #include <linux/verification.h>
 #include <keys/asymmetric-type.h>
 #include <keys/system_keyring.h>
+#include <keys/platform_keyring.h>
 #include <crypto/pkcs7.h>
 
 static struct key *builtin_trusted_keys;
 #ifdef CONFIG_SECONDARY_TRUSTED_KEYRING
 static struct key *secondary_trusted_keys;
 #endif
+static struct key *platform_keys = NULL;
 
 extern __initconst const u8 system_certificate_list[];
 extern __initconst const unsigned long system_certificate_list_size;
@@ -65,6 +67,12 @@ int restrict_link_by_builtin_and_secondary_trusted(
 	    dest_keyring == secondary_trusted_keys &&
 	    payload == &builtin_trusted_keys->payload)
 		/* Allow the builtin keyring to be added to the secondary */
+		return 0;
+
+	if (type == &key_type_keyring &&
+	    dest_keyring == secondary_trusted_keys &&
+	    payload == &platform_keys->payload)
+		/* Allow the platform keyring to be added to the secondary */
 		return 0;
 
 	return restrict_link_by_signature(dest_keyring, type, payload,
@@ -187,6 +195,28 @@ dodgy_cert:
 	return 0;
 }
 late_initcall(load_system_certificate_list);
+
+#if defined(CONFIG_INTEGRITY_PLATFORM_KEYRING) && defined(CONFIG_SECONDARY_TRUSTED_KEYRING)
+
+/*
+ * Link .platform keyring to .secondary_trusted_key keyring
+ */
+static __init int load_platform_certificate_list(void)
+{
+	int ret = 0;
+	platform_keys = integrity_get_platform_keyring();
+	if (!platform_keys) {
+		return 0;
+	}
+	ret = key_link(secondary_trusted_keys, platform_keys);
+	if (ret < 0) {
+		pr_err("Failed to link platform keyring: %d", ret);
+	}
+	return 0;
+}
+late_initcall(load_platform_certificate_list);
+
+#endif
 
 #ifdef CONFIG_SYSTEM_DATA_VERIFICATION
 
