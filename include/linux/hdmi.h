@@ -137,6 +137,16 @@ enum hdmi_content_type {
 	HDMI_CONTENT_TYPE_GAME,
 };
 
+enum hdmi_metadata_type {
+	HDMI_STATIC_METADATA_TYPE1 = 1,
+};
+
+enum hdmi_eotf {
+	HDMI_EOTF_TRADITIONAL_GAMMA_SDR,
+	HDMI_EOTF_TRADITIONAL_GAMMA_HDR,
+	HDMI_EOTF_SMPTE_ST2084,
+};
+
 struct hdmi_avi_infoframe {
 	enum hdmi_infoframe_type type;
 	unsigned char version;

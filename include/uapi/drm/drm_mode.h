@@ -630,6 +630,22 @@ struct drm_color_lut {
 	__u16 reserved;
 };
 
+/* HDR Metadata */
+struct hdr_static_metadata {
+	uint8_t eotf;
+	uint8_t metadata_type;
+	struct {
+		uint16_t x, y;
+		} display_primaries[3];
+	struct {
+		uint16_t x, y;
+		} white_point;
+	uint16_t max_mastering_display_luminance;
+	uint16_t min_mastering_display_luminance;
+	uint16_t max_fall;
+	uint16_t max_cll;
+};
+
 #define DRM_MODE_PAGE_FLIP_EVENT 0x01
 #define DRM_MODE_PAGE_FLIP_ASYNC 0x02
 #define DRM_MODE_PAGE_FLIP_TARGET_ABSOLUTE 0x4
