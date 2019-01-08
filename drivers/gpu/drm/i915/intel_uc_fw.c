@@ -310,3 +310,11 @@ void intel_uc_fw_dump(const struct intel_uc_fw *uc_fw, struct drm_printer *p)
 	drm_printf(p, "\tRSA: offset %u, size %u\n",
 		   uc_fw->rsa_offset, uc_fw->rsa_size);
 }
+
+void intel_uc_fw_unknown(struct drm_i915_private *i915, struct intel_uc_fw *fw)
+{
+	dev_info(i915->drm.dev,
+		 "%s: No firmware known for %s!\n",
+		 intel_uc_fw_type_repr(fw->type),
+		 intel_platform_name(INTEL_INFO(i915)->platform));
+}

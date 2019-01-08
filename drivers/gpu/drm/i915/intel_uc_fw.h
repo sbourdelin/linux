@@ -150,4 +150,6 @@ int intel_uc_fw_upload(struct intel_uc_fw *uc_fw,
 void intel_uc_fw_fini(struct intel_uc_fw *uc_fw);
 void intel_uc_fw_dump(const struct intel_uc_fw *uc_fw, struct drm_printer *p);
 
+void intel_uc_fw_unknown(struct drm_i915_private *i915, struct intel_uc_fw *fw);
+
 #endif
