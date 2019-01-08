@@ -255,6 +255,10 @@ struct ib_pd *__ib_alloc_pd(struct ib_device *device, unsigned int flags,
 	struct ib_pd *pd;
 	int mr_access_flags = 0;
 
+	if (!device->ops.alloc_pd ||
+	    (mr_access_flags && !pd->device->ops.get_dma_mr))
+		return ERR_PTR(-EOPNOTSUPP);
+
 	pd = device->ops.alloc_pd(device, NULL, NULL);
 	if (IS_ERR(pd))
 		return pd;
@@ -317,6 +321,10 @@ EXPORT_SYMBOL(__ib_alloc_pd);
 void ib_dealloc_pd(struct ib_pd *pd)
 {
 	int ret;
+
+	if (!pd->device->ops.dealloc_pd ||
+	    (pd->__internal_mr && !pd->device->ops.dereg_mr))
+		return;
 
 	if (pd->__internal_mr) {
 		ret = pd->device->ops.dereg_mr(pd->__internal_mr);
@@ -1122,10 +1130,12 @@ static struct ib_qp *ib_create_xrc_qp(struct ib_qp *qp,
 
 	qp = __ib_open_qp(real_qp, qp_init_attr->event_handler,
 			  qp_init_attr->qp_context);
-	if (!IS_ERR(qp))
+	if (!IS_ERR(qp)) {
 		__ib_insert_xrcd_qp(qp_init_attr->xrcd, real_qp);
-	else
-		real_qp->device->ops.destroy_qp(real_qp);
+	} else {
+		if (real_qp->device->ops.destroy_qp)
+			real_qp->device->ops.destroy_qp(real_qp);
+	}
 	return qp;
 }
 
@@ -1602,6 +1612,9 @@ static int _ib_modify_qp(struct ib_qp *qp, struct ib_qp_attr *attr,
 	const struct ib_gid_attr *old_sgid_attr_alt_av;
 	int ret;
 
+	if (!qp->device->ops.modify_qp)
+		return -EOPNOTSUPP;
+
 	if (attr_mask & IB_QP_AV) {
 		ret = rdma_fill_sgid_attr(qp->device, &attr->ah_attr,
 					  &old_sgid_attr_av);
@@ -1839,6 +1852,9 @@ int ib_destroy_qp(struct ib_qp *qp)
 	struct ib_qp_security *sec;
 	int ret;
 
+	if (!qp->device->ops.destroy_qp)
+		return -EOPNOTSUPP;
+
 	WARN_ON_ONCE(qp->mrs_used > 0);
 
 	if (atomic_read(&qp->usecnt))
@@ -1926,6 +1942,9 @@ EXPORT_SYMBOL(rdma_set_cq_moderation);
 
 int ib_destroy_cq(struct ib_cq *cq)
 {
+	if (!cq->device->ops.destroy_cq)
+		return -EOPNOTSUPP;
+
 	if (atomic_read(&cq->usecnt))
 		return -EBUSY;
 
@@ -1948,6 +1967,9 @@ int ib_dereg_mr(struct ib_mr *mr)
 	struct ib_pd *pd = mr->pd;
 	struct ib_dm *dm = mr->dm;
 	int ret;
+
+	if (!mr->device->ops.dereg_mr)
+		return -EOPNOTSUPP;
 
 	rdma_restrack_del(&mr->res);
 	ret = mr->device->ops.dereg_mr(mr);
