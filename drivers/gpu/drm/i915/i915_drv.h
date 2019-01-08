@@ -45,6 +45,7 @@
 #include <linux/pm_qos.h>
 #include <linux/reservation.h>
 #include <linux/shmem_fs.h>
+#include <linux/stackdepot.h>
 
 #include <drm/drmP.h>
 #include <drm/intel-gtt.h>
@@ -1156,6 +1157,12 @@ struct i915_runtime_pm {
 	atomic_t wakeref_count;
 	bool suspended;
 	bool irqs_enabled;
+
+#if IS_ENABLED(CONFIG_DRM_I915_DEBUG_RUNTIME_PM)
+	spinlock_t debug_lock;
+	depot_stack_handle_t *debug_owners;
+	unsigned long debug_count;
+#endif
 };
 
 enum intel_pipe_crc_source {
