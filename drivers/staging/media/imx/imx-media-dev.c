@@ -318,12 +318,36 @@ static int imx_media_probe_complete(struct v4l2_async_notifier *notifier)
 		goto unlock;
 
 	ret = v4l2_device_register_subdev_nodes(&imxmd->v4l2_dev);
+	if (ret)
+		goto unlock;
+
+	imxmd->m2m_vdev = imx_media_csc_scaler_device_init(imxmd);
+	if (IS_ERR(imxmd->m2m_vdev)) {
+		ret = PTR_ERR(imxmd->m2m_vdev);
+		goto unlock;
+	}
+
+	ret = imx_media_csc_scaler_device_register(imxmd->m2m_vdev);
+	if (ret)
+		goto m2m_remove;
+
+	mutex_unlock(&imxmd->mutex);
+
+	ret = media_device_register(&imxmd->md);
+	if (ret) {
+		mutex_lock(&imxmd->mutex);
+		goto m2m_unreg;
+	}
+
+	return 0;
+
+m2m_unreg:
+	imx_media_csc_scaler_device_unregister(imxmd->m2m_vdev);
+m2m_remove:
+	imx_media_csc_scaler_device_remove(imxmd->m2m_vdev);
 unlock:
 	mutex_unlock(&imxmd->mutex);
-	if (ret)
-		return ret;
-
-	return media_device_register(&imxmd->md);
+	return ret;
 }
 
 static const struct v4l2_async_notifier_operations imx_media_subdev_ops = {
@@ -532,6 +556,8 @@ static int imx_media_remove(struct platform_device *pdev)
 	v4l2_async_notifier_unregister(&imxmd->notifier);
 	imx_media_remove_internal_subdevs(imxmd);
 	v4l2_async_notifier_cleanup(&imxmd->notifier);
+	imx_media_csc_scaler_device_unregister(imxmd->m2m_vdev);
+	imx_media_csc_scaler_device_remove(imxmd->m2m_vdev);
 	v4l2_device_unregister(&imxmd->v4l2_dev);
 	media_device_unregister(&imxmd->md);
 	media_device_cleanup(&imxmd->md);
