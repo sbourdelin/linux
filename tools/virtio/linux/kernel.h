@@ -65,6 +65,8 @@ static inline void *kzalloc(size_t s, gfp_t gfp)
 {
 	void *p = kmalloc(s, gfp);
 
+	if (!p)
+		return -ENOMEM;
 	memset(p, 0, s);
 	return p;
 }
