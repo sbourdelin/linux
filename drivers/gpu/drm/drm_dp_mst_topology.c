@@ -2214,7 +2214,8 @@ EXPORT_SYMBOL(drm_dp_mst_topology_mgr_suspend);
  * if the device fails this returns -1, and the driver should do
  * a full MST reprobe, in case we were undocked.
  */
-int drm_dp_mst_topology_mgr_resume(struct drm_dp_mst_topology_mgr *mgr)
+int __must_check
+drm_dp_mst_topology_mgr_resume(struct drm_dp_mst_topology_mgr *mgr)
 {
 	int ret = 0;
 
