@@ -362,7 +362,7 @@ static int pca954x_probe(struct i2c_client *client,
 		return -ENODEV;
 
 	muxc = i2c_mux_alloc(adap, dev, PCA954X_MAX_NCHANS, sizeof(*data), 0,
-			     pca954x_select_chan, pca954x_deselect_mux);
+			     pca954x_select_chan, pca954x_deselect_mux, NULL);
 	if (!muxc)
 		return -ENOMEM;
 	data = i2c_mux_priv(muxc);

@@ -24,8 +24,18 @@
 #include <linux/i2c-mux.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/slab.h>
+
+/**
+ * Hold the alias that as been assigned to a client.
+ */
+struct i2c_mux_cli2alias_pair {
+	struct list_head node;
+	struct i2c_client *client;
+	u16 alias;
+};
 
 /* multiplexer per channel data */
 struct i2c_mux_priv {
@@ -33,7 +43,111 @@ struct i2c_mux_priv {
 	struct i2c_algorithm algo;
 	struct i2c_mux_core *muxc;
 	u32 chan_id;
+
+	/* ATR */
+	struct list_head alias_list;
+	struct mutex atr_lock; /* Locks orig_addrs during ATR operation */
+	u16 *orig_addrs;
+	unsigned orig_addrs_size;
 };
+
+static struct i2c_mux_cli2alias_pair *
+i2c_mux_find_mapping_by_client(struct list_head *list,
+			       struct i2c_client *client)
+{
+	struct i2c_mux_cli2alias_pair *c2a;
+
+	list_for_each_entry(c2a, list, node) {
+		if (c2a->client == client)
+			return c2a;
+	}
+
+	return NULL;
+}
+
+static struct i2c_mux_cli2alias_pair *
+i2c_mux_find_mapping_by_addr(struct list_head *list,
+			     u16 phys_addr)
+{
+	struct i2c_mux_cli2alias_pair *c2a;
+
+	list_for_each_entry(c2a, list, node) {
+		if (c2a->client->addr == phys_addr)
+			return c2a;
+	}
+
+	return NULL;
+}
+
+/**
+ * Replace all message addresses with their aliases, saving the
+ * original addresses.
+ *
+ * This function is internal for use in i2c_mux_master_xfer() and
+ * similar. It must be followed by i2c_mux_unmap_msgs() to restore the
+ * original addresses.
+ */
+static int i2c_mux_map_msgs(struct i2c_mux_priv *priv,
+			    struct i2c_msg msgs[], int num)
+
+{
+	struct i2c_mux_core *muxc = priv->muxc;
+	static struct i2c_mux_cli2alias_pair *c2a;
+	int i;
+
+	if (list_empty(&priv->alias_list))
+		return 0;
+
+	/* Ensure we have enough room to save the original addresses */
+	if (unlikely(priv->orig_addrs_size < num)) {
+		void *new_buf = kmalloc(num * sizeof(priv->orig_addrs[0]),
+					GFP_KERNEL);
+		if (new_buf == NULL) {
+			dev_err(muxc->dev,
+				"Cannot allocate %d orig_addrs array", num);
+			return -ENOMEM;
+		}
+
+		kfree(priv->orig_addrs);
+		priv->orig_addrs = new_buf;
+		priv->orig_addrs_size = num;
+	}
+
+	for (i = 0; i < num; i++) {
+		priv->orig_addrs[i] = msgs[i].addr;
+
+		c2a = i2c_mux_find_mapping_by_addr(&priv->alias_list,
+						   msgs[i].addr);
+		if (c2a) {
+			msgs[i].addr = c2a->alias;
+		} else {
+			dev_warn(muxc->dev, "client 0x%02x not mapped!\n",
+				 msgs[i].addr);
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Restore all message addres aliases with the original addresses.
+ *
+ * This function is internal for use in i2c_mux_master_xfer() and
+ * similar.
+ *
+ * @see i2c_mux_map_msgs()
+ */
+static void i2c_mux_unmap_msgs(struct i2c_mux_priv *priv,
+			       struct i2c_msg msgs[], int num)
+{
+	int i;
+
+	if (list_empty(&priv->alias_list))
+		return;
+
+	for (i = 0; i < num; i++)
+		msgs[i].addr = priv->orig_addrs[i];
+}
 
 static int __i2c_mux_master_xfer(struct i2c_adapter *adap,
 				 struct i2c_msg msgs[], int num)
@@ -62,11 +176,31 @@ static int i2c_mux_master_xfer(struct i2c_adapter *adap,
 	struct i2c_adapter *parent = muxc->parent;
 	int ret;
 
-	/* Switch to the right mux port and perform the transfer. */
-
+	/* Switch to the right mux port */
 	ret = muxc->select(muxc, priv->chan_id);
-	if (ret >= 0)
-		ret = i2c_transfer(parent, msgs, num);
+	if (ret < 0)
+		goto out;
+
+	/* Translate addresses if ATR enabled */
+	if (muxc->atr) {
+		mutex_lock(&priv->atr_lock);
+		ret = i2c_mux_map_msgs(priv, msgs, num);
+		if (ret < 0) {
+			mutex_unlock(&priv->atr_lock);
+			goto out;
+		}
+	}
+
+	/* Perform the transfer */
+	ret = i2c_transfer(parent, msgs, num);
+
+	/* Restore addresses if ATR enabled */
+	if (muxc->atr) {
+		i2c_mux_unmap_msgs(priv, msgs, num);
+		mutex_unlock(&priv->atr_lock);
+	}
+
+out:
 	if (muxc->deselect)
 		muxc->deselect(muxc, priv->chan_id);
 
@@ -235,11 +369,73 @@ struct i2c_adapter *i2c_root_adapter(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(i2c_root_adapter);
 
+static int i2c_mux_attach_client(struct i2c_adapter *adapter,
+				 const struct i2c_board_info *info,
+				 struct i2c_client *client)
+{
+	struct i2c_mux_priv *priv = adapter->algo_data;
+	struct i2c_mux_core *muxc = priv->muxc;
+	const struct i2c_mux_attach_operations *ops = muxc->attach_ops;
+	struct i2c_mux_cli2alias_pair *c2a;
+	u16 alias_id = 0;
+	int err = 0;
+
+	if (ops && ops->i2c_mux_attach_client)
+		err = ops->i2c_mux_attach_client(muxc, priv->chan_id,
+						 info, client, &alias_id);
+	if (err)
+		goto err_attach;
+
+	if (alias_id != 0) {
+		c2a = kzalloc(sizeof(struct i2c_mux_cli2alias_pair), GFP_KERNEL);
+		if (!c2a) {
+			err = -ENOMEM;
+			goto err_alloc;
+		}
+
+		c2a->client = client;
+		c2a->alias = alias_id;
+		list_add(&c2a->node, &priv->alias_list);
+	}
+
+	return 0;
+
+err_alloc:
+	if (ops && ops->i2c_mux_detach_client)
+		ops->i2c_mux_detach_client(muxc, priv->chan_id, client);
+err_attach:
+	return err;
+}
+
+static void i2c_mux_detach_client(struct i2c_adapter *adapter,
+				  struct i2c_client *client)
+{
+	struct i2c_mux_priv *priv = adapter->algo_data;
+	struct i2c_mux_core *muxc = priv->muxc;
+	const struct i2c_mux_attach_operations *ops = muxc->attach_ops;
+	struct i2c_mux_cli2alias_pair *c2a;
+
+	if (ops && ops->i2c_mux_detach_client)
+		ops->i2c_mux_detach_client(muxc, priv->chan_id, client);
+
+	c2a = i2c_mux_find_mapping_by_client(&priv->alias_list, client);
+	if (c2a != NULL) {
+		list_del(&c2a->node);
+		kfree(c2a);
+	}
+}
+
+static const struct i2c_attach_operations i2c_mux_attach_operations = {
+	.attach_client = i2c_mux_attach_client,
+	.detach_client = i2c_mux_detach_client,
+};
+
 struct i2c_mux_core *i2c_mux_alloc(struct i2c_adapter *parent,
 				   struct device *dev, int max_adapters,
 				   int sizeof_priv, u32 flags,
 				   int (*select)(struct i2c_mux_core *, u32),
-				   int (*deselect)(struct i2c_mux_core *, u32))
+				   int (*deselect)(struct i2c_mux_core *, u32),
+				   const struct i2c_mux_attach_operations *attach_ops)
 {
 	struct i2c_mux_core *muxc;
 
@@ -259,8 +455,11 @@ struct i2c_mux_core *i2c_mux_alloc(struct i2c_adapter *parent,
 		muxc->arbitrator = true;
 	if (flags & I2C_MUX_GATE)
 		muxc->gate = true;
+	if (flags & I2C_MUX_ATR)
+		muxc->atr = true;
 	muxc->select = select;
 	muxc->deselect = deselect;
+	muxc->attach_ops = attach_ops;
 	muxc->max_adapters = max_adapters;
 
 	return muxc;
@@ -300,6 +499,8 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 	/* Set up private adapter data */
 	priv->muxc = muxc;
 	priv->chan_id = chan_id;
+	INIT_LIST_HEAD(&priv->alias_list);
+	mutex_init(&priv->atr_lock);
 
 	/* Need to do algo dynamically because we don't know ahead
 	 * of time what sort of physical adapter we'll be dealing with.
@@ -328,6 +529,11 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 	priv->adap.retries = parent->retries;
 	priv->adap.timeout = parent->timeout;
 	priv->adap.quirks = parent->quirks;
+
+	if (muxc->attach_ops) {
+		priv->adap.attach_ops = &i2c_mux_attach_operations;
+	}
+
 	if (muxc->mux_locked)
 		priv->adap.lock_ops = &i2c_mux_lock_ops;
 	else
@@ -426,6 +632,7 @@ int i2c_mux_add_adapter(struct i2c_mux_core *muxc,
 	return 0;
 
 err_free_priv:
+	mutex_destroy(&priv->atr_lock);
 	kfree(priv);
 	return ret;
 }
@@ -449,6 +656,7 @@ void i2c_mux_del_adapters(struct i2c_mux_core *muxc)
 		sysfs_remove_link(&priv->adap.dev.kobj, "mux_device");
 		i2c_del_adapter(adap);
 		of_node_put(np);
+		mutex_destroy(&priv->atr_lock);
 		kfree(priv);
 	}
 }

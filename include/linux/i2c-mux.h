@@ -28,6 +28,20 @@
 #ifdef __KERNEL__
 
 #include <linux/bitops.h>
+#include <linux/i2c.h>
+
+struct i2c_mux_core;
+
+struct i2c_mux_attach_operations {
+	int  (*i2c_mux_attach_client)(struct i2c_mux_core *muxc,
+				      u32 chan_id,
+				      const struct i2c_board_info *info,
+				      struct i2c_client *client,
+				      u16 *alias_id);
+	void (*i2c_mux_detach_client)(struct i2c_mux_core *muxc,
+				      u32 chan_id,
+				      struct i2c_client *client);
+};
 
 struct i2c_mux_core {
 	struct i2c_adapter *parent;
@@ -35,11 +49,13 @@ struct i2c_mux_core {
 	unsigned int mux_locked:1;
 	unsigned int arbitrator:1;
 	unsigned int gate:1;
+	unsigned int atr:1;
 
 	void *priv;
 
 	int (*select)(struct i2c_mux_core *, u32 chan_id);
 	int (*deselect)(struct i2c_mux_core *, u32 chan_id);
+	const struct i2c_mux_attach_operations *attach_ops;
 
 	int num_adapters;
 	int max_adapters;
@@ -50,12 +66,14 @@ struct i2c_mux_core *i2c_mux_alloc(struct i2c_adapter *parent,
 				   struct device *dev, int max_adapters,
 				   int sizeof_priv, u32 flags,
 				   int (*select)(struct i2c_mux_core *, u32),
-				   int (*deselect)(struct i2c_mux_core *, u32));
+				   int (*deselect)(struct i2c_mux_core *, u32),
+				   const struct i2c_mux_attach_operations *attach_ops);
 
 /* flags for i2c_mux_alloc */
 #define I2C_MUX_LOCKED     BIT(0)
 #define I2C_MUX_ARBITRATOR BIT(1)
 #define I2C_MUX_GATE       BIT(2)
+#define I2C_MUX_ATR        BIT(3) /* Address translator */
 
 static inline void *i2c_mux_priv(struct i2c_mux_core *muxc)
 {
