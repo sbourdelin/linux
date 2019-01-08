@@ -202,6 +202,14 @@ static struct io_uring_event *io_peek_cqring(struct io_ring_ctx *ctx)
 	return &ring->events[tail & ctx->cq_ring.ring_mask];
 }
 
+static void io_req_init(struct io_ring_ctx *ctx, struct io_kiocb *req)
+{
+	percpu_ref_get(&ctx->refs);
+	req->ki_ctx = ctx;
+	INIT_LIST_HEAD(&req->ki_list);
+	req->ki_flags = 0;
+}
+
 static struct io_kiocb *io_get_req(struct io_ring_ctx *ctx)
 {
 	struct io_kiocb *req;
@@ -210,10 +218,7 @@ static struct io_kiocb *io_get_req(struct io_ring_ctx *ctx)
 	if (!req)
 		return NULL;
 
-	percpu_ref_get(&ctx->refs);
-	req->ki_ctx = ctx;
-	INIT_LIST_HEAD(&req->ki_list);
-	req->ki_flags = 0;
+	io_req_init(ctx, req);
 	return req;
 }
 
