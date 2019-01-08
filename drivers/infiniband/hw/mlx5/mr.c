@@ -1323,8 +1323,8 @@ struct ib_mr *mlx5_ib_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	mlx5_ib_dbg(dev, "start 0x%llx, virt_addr 0x%llx, length 0x%llx, access_flags 0x%x\n",
 		    start, virt_addr, length, access_flags);
 
-#ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
-	if (!start && length == U64_MAX) {
+	if (IS_ENABLED(CONFIG_INFINIBAND_ON_DEMAND_PAGING) && !start &&
+	    length == U64_MAX) {
 		if (!(access_flags & IB_ACCESS_ON_DEMAND) ||
 		    !(dev->odp_caps.general_caps & IB_ODP_SUPPORT_IMPLICIT))
 			return ERR_PTR(-EINVAL);
@@ -1334,7 +1334,6 @@ struct ib_mr *mlx5_ib_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 			return ERR_CAST(mr);
 		return &mr->ibmr;
 	}
-#endif
 
 	err = mr_umem_get(pd, start, length, access_flags, &umem, &npages,
 			   &page_shift, &ncont, &order);
@@ -1395,9 +1394,9 @@ struct ib_mr *mlx5_ib_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 		}
 	}
 
-#ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
-	mr->live = 1;
-#endif
+	if (IS_ENABLED(CONFIG_INFINIBAND_ON_DEMAND_PAGING))
+		mr->live = 1;
+
 	return &mr->ibmr;
 error:
 	ib_umem_release(umem);
@@ -1512,9 +1511,8 @@ int mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 		}
 
 		mr->allocated_from_cache = 0;
-#ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
-		mr->live = 1;
-#endif
+		if (IS_ENABLED(CONFIG_INFINIBAND_ON_DEMAND_PAGING))
+			mr->live = 1;
 	} else {
 		/*
 		 * Send a UMR WQE
