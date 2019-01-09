@@ -69,14 +69,9 @@ err1:
 static void rxe_send_complete(unsigned long data)
 {
 	struct rxe_cq *cq = (struct rxe_cq *)data;
-	unsigned long flags;
 
-	spin_lock_irqsave(&cq->cq_lock, flags);
-	if (cq->is_dying) {
-		spin_unlock_irqrestore(&cq->cq_lock, flags);
+	if (test_bit(RXE_CQ_IS_DYING, &cq->is_dying))
 		return;
-	}
-	spin_unlock_irqrestore(&cq->cq_lock, flags);
 
 	cq->ibcq.comp_handler(&cq->ibcq, cq->ibcq.cq_context);
 }
@@ -105,7 +100,7 @@ int rxe_cq_from_init(struct rxe_dev *rxe, struct rxe_cq *cq, int cqe,
 	if (uresp)
 		cq->is_user = 1;
 
-	cq->is_dying = false;
+	clear_bit(RXE_CQ_IS_DYING, &cq->is_dying);
 
 	tasklet_init(&cq->comp_task, rxe_send_complete, (unsigned long)cq);
 
@@ -169,11 +164,8 @@ int rxe_cq_post(struct rxe_cq *cq, struct rxe_cqe *cqe, int solicited)
 
 void rxe_cq_disable(struct rxe_cq *cq)
 {
-	unsigned long flags;
 
-	spin_lock_irqsave(&cq->cq_lock, flags);
-	cq->is_dying = true;
-	spin_unlock_irqrestore(&cq->cq_lock, flags);
+	set_bit(RXE_CQ_IS_DYING, &cq->is_dying);
 }
 
 void rxe_cq_cleanup(struct rxe_pool_entry *arg)

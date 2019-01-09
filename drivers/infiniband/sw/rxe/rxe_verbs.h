@@ -84,13 +84,15 @@ struct rxe_cqe {
 	};
 };
 
+#define	RXE_CQ_IS_DYING		0
+
 struct rxe_cq {
 	struct rxe_pool_entry	pelem;
 	struct ib_cq		ibcq;
 	struct rxe_queue	*queue;
 	spinlock_t		cq_lock;
 	u8			notify;
-	bool			is_dying;
+	unsigned long		is_dying;
 	int			is_user;
 	struct tasklet_struct	comp_task;
 };
