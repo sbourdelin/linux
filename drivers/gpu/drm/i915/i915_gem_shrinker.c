@@ -114,36 +114,11 @@ static bool unsafe_drop_pages(struct drm_i915_gem_object *obj)
 	return !i915_gem_object_has_pages(obj);
 }
 
-/**
- * i915_gem_shrink - Shrink buffer object caches
- * @i915: i915 device
- * @target: amount of memory to make available, in pages
- * @nr_scanned: optional output for number of pages scanned (incremental)
- * @flags: control flags for selecting cache types
- *
- * This function is the main interface to the shrinker. It will try to release
- * up to @target pages of main memory backing storage from buffer objects.
- * Selection of the specific caches can be done with @flags. This is e.g. useful
- * when purgeable objects should be removed from caches preferentially.
- *
- * Note that it's not guaranteed that released amount is actually available as
- * free system memory - the pages might still be in-used to due to other reasons
- * (like cpu mmaps) or the mm core has reused them before we could grab them.
- * Therefore code that needs to explicitly shrink buffer objects caches (e.g. to
- * avoid deadlocks in memory reclaim) must fall back to i915_gem_shrink_all().
- *
- * Also note that any kind of pinning (both per-vma address space pins and
- * backing storage pins at the buffer object level) result in the shrinker code
- * having to skip the object.
- *
- * Returns:
- * The number of pages of backing storage actually released.
- */
-unsigned long
-i915_gem_shrink(struct drm_i915_private *i915,
-		unsigned long target,
-		unsigned long *nr_scanned,
-		unsigned flags)
+static unsigned long
+__i915_gem_shrink(struct drm_i915_private *i915,
+		  unsigned long target,
+		  unsigned long *nr_scanned,
+		  unsigned int flags)
 {
 	const struct {
 		struct list_head *list;
@@ -155,10 +130,8 @@ i915_gem_shrink(struct drm_i915_private *i915,
 	}, *phase;
 	unsigned long count = 0;
 	unsigned long scanned = 0;
-	bool unlock;
 
-	if (!shrinker_lock(i915, flags, &unlock))
-		return 0;
+	lockdep_assert_held(&i915->drm.struct_mutex);
 
 	/*
 	 * When shrinking the active list, also consider active contexts.
@@ -174,17 +147,7 @@ i915_gem_shrink(struct drm_i915_private *i915,
 				       I915_WAIT_LOCKED,
 				       MAX_SCHEDULE_TIMEOUT);
 
-	trace_i915_gem_shrink(i915, target, flags);
 	i915_retire_requests(i915);
-
-	/*
-	 * Unbinding of objects will require HW access; Let us not wake the
-	 * device just to recover a little memory. If absolutely necessary,
-	 * we will force the wake during oom-notifier.
-	 */
-	if ((flags & I915_SHRINK_BOUND) &&
-	    !intel_runtime_pm_get_if_in_use(i915))
-		flags &= ~I915_SHRINK_BOUND;
 
 	/*
 	 * As we may completely rewrite the (un)bound list whilst unbinding
@@ -264,15 +227,70 @@ i915_gem_shrink(struct drm_i915_private *i915,
 		spin_unlock(&i915->mm.obj_lock);
 	}
 
-	if (flags & I915_SHRINK_BOUND)
-		intel_runtime_pm_put(i915);
-
 	i915_retire_requests(i915);
-
-	shrinker_unlock(i915, unlock);
 
 	if (nr_scanned)
 		*nr_scanned += scanned;
+
+	return count;
+}
+
+/**
+ * i915_gem_shrink - Shrink buffer object caches
+ * @i915: i915 device
+ * @target: amount of memory to make available, in pages
+ * @nr_scanned: optional output for number of pages scanned (incremental)
+ * @flags: control flags for selecting cache types
+ *
+ * This function is the main interface to the shrinker. It will try to release
+ * up to @target pages of main memory backing storage from buffer objects.
+ * Selection of the specific caches can be done with @flags. This is e.g. useful
+ * when purgeable objects should be removed from caches preferentially.
+ *
+ * Note that it's not guaranteed that released amount is actually available as
+ * free system memory - the pages might still be in-used to due to other reasons
+ * (like cpu mmaps) or the mm core has reused them before we could grab them.
+ * Therefore code that needs to explicitly shrink buffer objects caches (e.g. to
+ * avoid deadlocks in memory reclaim) must fall back to i915_gem_shrink_all().
+ *
+ * Also note that any kind of pinning (both per-vma address space pins and
+ * backing storage pins at the buffer object level) result in the shrinker code
+ * having to skip the object.
+ *
+ * Returns:
+ * The number of pages of backing storage actually released.
+ */
+unsigned long
+i915_gem_shrink(struct drm_i915_private *i915,
+		unsigned long target,
+		unsigned long *nr_scanned,
+		unsigned int flags)
+{
+	unsigned long count = 0;
+	bool unlock;
+
+	trace_i915_gem_shrink(i915, target, flags);
+
+	/*
+	 * Unbinding of objects will require HW access; Let us not wake the
+	 * device just to recover a little memory. If absolutely necessary,
+	 * we will force the wake during oom-notifier.
+	 */
+	if ((flags & I915_SHRINK_BOUND) &&
+	    !intel_runtime_pm_get_if_in_use(i915))
+		flags &= ~I915_SHRINK_BOUND;
+
+	if (!shrinker_lock(i915, flags, &unlock))
+		goto out;
+
+	count = __i915_gem_shrink(i915, target, nr_scanned, flags);
+
+	shrinker_unlock(i915, unlock);
+
+out:
+	if (flags & I915_SHRINK_BOUND)
+		intel_runtime_pm_put(i915);
+
 	return count;
 }
 
@@ -349,6 +367,7 @@ i915_gem_shrinker_scan(struct shrinker *shrinker, struct shrink_control *sc)
 {
 	struct drm_i915_private *i915 =
 		container_of(shrinker, struct drm_i915_private, mm.shrinker);
+	const unsigned int flags = I915_SHRINK_BOUND | I915_SHRINK_UNBOUND;
 	unsigned long freed;
 	bool unlock;
 
@@ -357,26 +376,21 @@ i915_gem_shrinker_scan(struct shrinker *shrinker, struct shrink_control *sc)
 	if (!shrinker_lock(i915, 0, &unlock))
 		return SHRINK_STOP;
 
-	freed = i915_gem_shrink(i915,
-				sc->nr_to_scan,
-				&sc->nr_scanned,
-				I915_SHRINK_BOUND |
-				I915_SHRINK_UNBOUND |
-				I915_SHRINK_PURGEABLE);
+	freed = __i915_gem_shrink(i915,
+				  sc->nr_to_scan,
+				  &sc->nr_scanned,
+				  flags | I915_SHRINK_PURGEABLE);
 	if (sc->nr_scanned < sc->nr_to_scan)
-		freed += i915_gem_shrink(i915,
-					 sc->nr_to_scan - sc->nr_scanned,
-					 &sc->nr_scanned,
-					 I915_SHRINK_BOUND |
-					 I915_SHRINK_UNBOUND);
+		freed += __i915_gem_shrink(i915,
+					   sc->nr_to_scan - sc->nr_scanned,
+					   &sc->nr_scanned,
+					   flags);
 	if (sc->nr_scanned < sc->nr_to_scan && current_is_kswapd()) {
 		intel_runtime_pm_get(i915);
-		freed += i915_gem_shrink(i915,
-					 sc->nr_to_scan - sc->nr_scanned,
-					 &sc->nr_scanned,
-					 I915_SHRINK_ACTIVE |
-					 I915_SHRINK_BOUND |
-					 I915_SHRINK_UNBOUND);
+		freed += __i915_gem_shrink(i915,
+					   sc->nr_to_scan - sc->nr_scanned,
+					   &sc->nr_scanned,
+					   flags | I915_SHRINK_ACTIVE);
 		intel_runtime_pm_put(i915);
 	}
 
@@ -474,10 +488,10 @@ i915_gem_shrinker_vmap(struct notifier_block *nb, unsigned long event, void *ptr
 		goto out;
 
 	intel_runtime_pm_get(i915);
-	freed_pages += i915_gem_shrink(i915, -1UL, NULL,
-				       I915_SHRINK_BOUND |
-				       I915_SHRINK_UNBOUND |
-				       I915_SHRINK_VMAPS);
+	freed_pages += __i915_gem_shrink(i915, -1UL, NULL,
+					 I915_SHRINK_BOUND |
+					 I915_SHRINK_UNBOUND |
+					 I915_SHRINK_VMAPS);
 	intel_runtime_pm_put(i915);
 
 	/* We also want to clear any cached iomaps as they wrap vmap */

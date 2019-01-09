@@ -3178,7 +3178,7 @@ i915_gem_object_create_internal(struct drm_i915_private *dev_priv,
 unsigned long i915_gem_shrink(struct drm_i915_private *i915,
 			      unsigned long target,
 			      unsigned long *nr_scanned,
-			      unsigned flags);
+			      unsigned int flags);
 #define I915_SHRINK_PURGEABLE 0x1
 #define I915_SHRINK_UNBOUND 0x2
 #define I915_SHRINK_BOUND 0x4
