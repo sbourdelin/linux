@@ -887,7 +887,7 @@ static pageout_t pageout(struct page *page, struct address_space *mapping,
  * gets returned with a refcount of 0.
  */
 static int __remove_mapping(struct address_space *mapping, struct page *page,
-			    bool reclaimed)
+			    bool reclaimed, bool memcg_reclaim)
 {
 	unsigned long flags;
 	int refcount;
@@ -963,7 +963,20 @@ static int __remove_mapping(struct address_space *mapping, struct page *page,
 		if (reclaimed && page_is_file_cache(page) &&
 		    !mapping_exiting(mapping) && !dax_mapping(mapping))
 			shadow = workingset_eviction(mapping, page);
-		__delete_from_page_cache(page, shadow);
+#ifdef CONFIG_MEMCG
+		if (memcg_reclaim &&
+		    test_bit(AS_KEEP_MEMCG_RECLAIM, &mapping->flags)) {
+			/*
+			 * Page is not dirty/writeback/mapped, so we may avoid
+			 * taking mem_cgroup::move_lock for changing its memcg.
+			 * See mem_cgroup_move_account() for details.
+			 */
+			mem_cgroup_uncharge(page);
+			page_ref_unfreeze(page, refcount);
+			goto cannot_free;
+		} else
+#endif
+			__delete_from_page_cache(page, shadow);
 		xa_unlock_irqrestore(&mapping->i_pages, flags);
 
 		if (freepage != NULL)
@@ -985,7 +998,7 @@ cannot_free:
  */
 int remove_mapping(struct address_space *mapping, struct page *page)
 {
-	if (__remove_mapping(mapping, page, false)) {
+	if (__remove_mapping(mapping, page, false, false)) {
 		/*
 		 * Unfreezing the refcount with 1 rather than 2 effectively
 		 * drops the pagecache ref for us without requiring another
@@ -1458,7 +1471,8 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 			count_vm_event(PGLAZYFREED);
 			count_memcg_page_event(page, PGLAZYFREED);
-		} else if (!mapping || !__remove_mapping(mapping, page, true))
+		} else if (!mapping || !__remove_mapping(mapping, page, true,
+							!global_reclaim(sc)))
 			goto keep_locked;
 
 		unlock_page(page);
