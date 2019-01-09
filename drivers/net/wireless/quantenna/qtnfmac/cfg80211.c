@@ -139,7 +139,8 @@ qtnf_change_virtual_intf(struct wiphy *wiphy,
 
 	qtnf_scan_done(vif->mac, true);
 
-	ret = qtnf_cmd_send_change_intf_type(vif, type, mac_addr);
+	ret = qtnf_cmd_send_change_intf_type(vif, type, params->use_4addr,
+					     mac_addr);
 	if (ret) {
 		pr_err("VIF%u.%u: failed to change type to %d\n",
 		       vif->mac->macid, vif->vifid, type);
@@ -228,7 +229,7 @@ static struct wireless_dev *qtnf_add_virtual_intf(struct wiphy *wiphy,
 	if (params)
 		mac_addr = params->macaddr;
 
-	ret = qtnf_cmd_send_add_intf(vif, type, mac_addr);
+	ret = qtnf_cmd_send_add_intf(vif, type, params->use_4addr, mac_addr);
 	if (ret) {
 		pr_err("VIF%u.%u: failed to add VIF %pM\n",
 		       mac->macid, vif->vifid, mac_addr);
@@ -1107,7 +1108,8 @@ int qtnf_wiphy_register(struct qtnf_hw_info *hw_info, struct qtnf_wmac *mac)
 	wiphy->flags |= WIPHY_FLAG_HAVE_AP_SME |
 			WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD |
 			WIPHY_FLAG_AP_UAPSD |
-			WIPHY_FLAG_HAS_CHANNEL_SWITCH;
+			WIPHY_FLAG_HAS_CHANNEL_SWITCH |
+			WIPHY_FLAG_4ADDR_STATION;
 	wiphy->flags &= ~WIPHY_FLAG_PS_ON_BY_DEFAULT;
 
 	if (hw_info->hw_capab & QLINK_HW_CAPAB_DFS_OFFLOAD)
