@@ -2051,6 +2051,11 @@ static void shrink_readahead_size_eio(struct file *filp,
 	ra->ra_pages /= 4;
 }
 
+static int kiocb_fgp_flags(struct kiocb *iocb)
+{
+	return (iocb->ki_flags & IOCB_NOWAIT) ? FGP_NOWAIT : 0;
+}
+
 /**
  * generic_file_buffered_read - generic file read routine
  * @iocb:	the iocb to read
@@ -2101,7 +2106,8 @@ find_page:
 			goto out;
 		}
 
-		page = find_get_page(mapping, index);
+		page = find_get_page_flags(mapping, index,
+					   kiocb_fgp_flags(iocb));
 		if (!page) {
 			if (iocb->ki_flags & IOCB_NOWAIT)
 				goto would_block;
