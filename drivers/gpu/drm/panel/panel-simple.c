@@ -1335,6 +1335,7 @@ static const struct panel_desc innolux_at070tn92 = {
 		.height = 86,
 	},
 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
 };
 
 static const struct display_timing innolux_g070y2_l01_timing = {
