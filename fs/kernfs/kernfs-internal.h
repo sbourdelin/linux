@@ -92,6 +92,10 @@ int kernfs_iop_getattr(const struct path *path, struct kstat *stat,
 ssize_t kernfs_iop_listxattr(struct dentry *dentry, char *buf, size_t size);
 int __kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr);
 
+struct kernfs_iattrs *kernfs_iattrs(struct kernfs_node *kn);
+void kernfs_node_setsecdata(struct kernfs_iattrs *attrs, void **secdata,
+			    u32 *secdata_len);
+
 /*
  * dir.c
  */

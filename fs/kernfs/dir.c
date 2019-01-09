@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/security.h>
 #include <linux/hash.h>
+#include <linux/stringhash.h>
 
 #include "kernfs-internal.h"
 
@@ -617,7 +618,43 @@ struct kernfs_node *kernfs_node_from_dentry(struct dentry *dentry)
 	return NULL;
 }
 
-static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
+static int kernfs_node_init_security(struct kernfs_node *parent,
+				     struct kernfs_node *kn, umode_t mode)
+{
+	struct kernfs_iattrs *attrs;
+	struct qstr q;
+	void *ctx;
+	u32 ctxlen;
+	int ret;
+
+	/* If parent has no explicit context set, leave child unset as well */
+	if (!parent->iattr)
+		return 0;
+	if (!parent->iattr->ia_secdata || !parent->iattr->ia_secdata_len)
+		return 0;
+
+	q.name = kn->name;
+	q.hash_len = hashlen_string(parent, kn->name);
+
+	ret = security_object_init_security(parent->iattr->ia_secdata,
+					    parent->iattr->ia_secdata_len,
+					    &q, (u16)mode, &ctx, &ctxlen);
+	if (ret)
+		return ret;
+
+	attrs = kernfs_iattrs(kn);
+	if (!attrs) {
+		security_release_secctx(ctx, ctxlen);
+		return -ENOMEM;
+	}
+
+	kernfs_node_setsecdata(attrs, &ctx, &ctxlen);
+	/* The inode is fresh, so the returned ctx is always NULL. */
+	return 0;
+}
+
+static struct kernfs_node *__kernfs_new_node(struct kernfs_node *parent,
+					     struct kernfs_root *root,
 					     const char *name, umode_t mode,
 					     kuid_t uid, kgid_t gid,
 					     unsigned flags)
@@ -674,6 +711,12 @@ static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 			goto err_out3;
 	}
 
+	if (parent) {
+		ret = kernfs_node_init_security(parent, kn, mode);
+		if (ret)
+			goto err_out3;
+	}
+
 	return kn;
 
  err_out3:
@@ -692,7 +735,7 @@ struct kernfs_node *kernfs_new_node(struct kernfs_node *parent,
 {
 	struct kernfs_node *kn;
 
-	kn = __kernfs_new_node(kernfs_root(parent),
+	kn = __kernfs_new_node(parent, kernfs_root(parent),
 			       name, mode, uid, gid, flags);
 	if (kn) {
 		kernfs_get(parent);
@@ -962,7 +1005,7 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 	INIT_LIST_HEAD(&root->supers);
 	root->next_generation = 1;
 
-	kn = __kernfs_new_node(root, "", S_IFDIR | S_IRUGO | S_IXUGO,
+	kn = __kernfs_new_node(NULL, root, "", S_IFDIR | S_IRUGO | S_IXUGO,
 			       GLOBAL_ROOT_UID, GLOBAL_ROOT_GID,
 			       KERNFS_DIR);
 	if (!kn) {
