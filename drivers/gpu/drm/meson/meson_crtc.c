@@ -82,13 +82,11 @@ static const struct drm_crtc_funcs meson_crtc_funcs = {
 
 };
 
-static void meson_crtc_enable(struct drm_crtc *crtc)
+static void meson_crtc_setup(struct drm_crtc *crtc)
 {
 	struct meson_crtc *meson_crtc = to_meson_crtc(crtc);
 	struct drm_crtc_state *crtc_state = crtc->state;
 	struct meson_drm *priv = meson_crtc->priv;
-
-	DRM_DEBUG_DRIVER("\n");
 
 	if (!crtc_state) {
 		DRM_ERROR("Invalid crtc_state\n");
@@ -98,6 +96,16 @@ static void meson_crtc_enable(struct drm_crtc *crtc)
 	/* Enable VPP Postblend */
 	writel(crtc_state->mode.hdisplay,
 	       priv->io_base + _REG(VPP_POSTBLEND_H_SIZE));
+}
+
+static void meson_crtc_enable(struct drm_crtc *crtc)
+{
+	struct meson_crtc *meson_crtc = to_meson_crtc(crtc);
+	struct meson_drm *priv = meson_crtc->priv;
+
+	DRM_DEBUG_DRIVER("\n");
+
+	meson_crtc_setup(crtc);
 
 	/* VD1 Preblend vertical start/end */
 	writel(FIELD_PREP(GENMASK(11, 0), 2303),
@@ -121,6 +129,8 @@ static void meson_crtc_atomic_enable(struct drm_crtc *crtc,
 
 	if (!meson_crtc->enabled)
 		meson_crtc_enable(crtc);
+	else
+		meson_crtc_setup(crtc);
 
 	priv->viu.osd1_enabled = true;
 }
