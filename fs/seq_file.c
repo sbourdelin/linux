@@ -421,21 +421,13 @@ EXPORT_SYMBOL(seq_printf);
  */
 char *mangle_path(char *s, const char *p, const char *esc)
 {
-	while (s <= p) {
-		char c = *p++;
-		if (!c) {
-			return s;
-		} else if (!strchr(esc, c)) {
-			*s++ = c;
-		} else if (s + 4 > p) {
-			break;
-		} else {
-			*s++ = '\\';
-			*s++ = '0' + ((c & 0300) >> 6);
-			*s++ = '0' + ((c & 070) >> 3);
-			*s++ = '0' + (c & 07);
-		}
-	}
+	size_t len = p + strlen(p) - s;
+	int ret;
+
+	ret = string_escape_str(p, NULL, 0, ESCAPE_OCTAL, esc);
+	if (ret < len)
+		return s + string_escape_str(p, s, len, ESCAPE_OCTAL, esc);
+
 	return NULL;
 }
 EXPORT_SYMBOL(mangle_path);
