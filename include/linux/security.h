@@ -291,6 +291,9 @@ int security_inode_listsecurity(struct inode *inode, char *buffer, size_t buffer
 void security_inode_getsecid(struct inode *inode, u32 *secid);
 int security_inode_copy_up(struct dentry *src, struct cred **new);
 int security_inode_copy_up_xattr(const char *name);
+int security_object_init_security(void *parent_ctx, u32 parent_ctxlen,
+				  const struct qstr *qstr, u16 mode,
+				  void **ctx, u32 *ctxlen);
 int security_file_permission(struct file *file, int mask);
 int security_file_alloc(struct file *file);
 void security_file_free(struct file *file);
@@ -786,6 +789,17 @@ static inline int security_inode_copy_up(struct dentry *src, struct cred **new)
 static inline int security_inode_copy_up_xattr(const char *name)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline int security_object_init_security(void *parent_ctx,
+						u32 parent_ctxlen,
+						const struct qstr *qstr,
+						u16 mode, void **ctx,
+						u32 *ctxlen)
+{
+	*ctx = NULL;
+	*ctxlen = 0;
+	return 0;
 }
 
 static inline int security_file_permission(struct file *file, int mask)

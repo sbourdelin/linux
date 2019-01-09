@@ -429,6 +429,31 @@
  *	to abort the copy up. Note that the caller is responsible for reading
  *	and writing the xattrs as this hook is merely a filter.
  *
+ * Security hooks for special file-like objects
+ *
+ * @object_init_security:
+ *	Obtain the security context for a newly created filesystem object
+ *	based on the security context of the parent node.  The purpose is
+ *	similar to @inode_init_security, but this hook is intended for
+ *	non-inode objects that need to behave like a directory tree (e.g.
+ *	kernfs nodes).  In this case it is assumed that the LSM assigns some
+ *	default context to the node by default and the object internally stores
+ *	a copy of the security context if (and only if) it has been set to a
+ *	non-default value explicitly (e.g. via *setxattr(2)).
+ *
+ *	@parent_ctx contains the security context of the parent directory
+ *	(must not be NULL -- if the parent has no explicit context set,
+ *	the child should also keep the default context and the hook should
+ *	not be called).
+ *	@parent_ctxlen contains the length of @parent_ctx data.
+ *	@qstr contains the last path component of the new object.
+ *	@mode contanis the file mode of the object.
+ *	@ctx is a pointer in which to place the allocated security context.
+ *	@ctxlen points to the place to put the length of @ctx.
+ *
+ *	Returns 0 if @ctx and @ctxlen have been successfully set or
+ *	-ENOMEM on memory allocation failure.
+ *
  * Security hooks for file operations
  *
  * @file_permission:
@@ -1558,6 +1583,10 @@ union security_list_options {
 	int (*inode_copy_up)(struct dentry *src, struct cred **new);
 	int (*inode_copy_up_xattr)(const char *name);
 
+	int (*object_init_security)(void *parent_ctx, u32 parent_ctxlen,
+				    const struct qstr *qstr, u16 mode,
+				    void **ctx, u32 *ctxlen);
+
 	int (*file_permission)(struct file *file, int mask);
 	int (*file_alloc_security)(struct file *file);
 	void (*file_free_security)(struct file *file);
@@ -1858,6 +1887,7 @@ struct security_hook_heads {
 	struct hlist_head inode_getsecid;
 	struct hlist_head inode_copy_up;
 	struct hlist_head inode_copy_up_xattr;
+	struct hlist_head object_init_security;
 	struct hlist_head file_permission;
 	struct hlist_head file_alloc_security;
 	struct hlist_head file_free_security;
