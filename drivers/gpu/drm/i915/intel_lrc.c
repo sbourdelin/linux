@@ -2303,9 +2303,17 @@ int logical_render_ring_init(struct intel_engine_cs *engine)
 
 int logical_xcs_ring_init(struct intel_engine_cs *engine)
 {
+	int ret;
+
 	logical_ring_setup(engine);
 
-	return logical_ring_init(engine);
+	ret = logical_ring_init(engine);
+	if (ret)
+		return ret;
+
+	intel_engine_init_workarounds(engine);
+
+	return 0;
 }
 
 static u32
