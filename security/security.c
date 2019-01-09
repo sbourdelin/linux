@@ -892,6 +892,14 @@ int security_inode_copy_up_xattr(const char *name)
 }
 EXPORT_SYMBOL(security_inode_copy_up_xattr);
 
+int security_object_init_security(void *parent_ctx, u32 parent_ctxlen,
+				  const struct qstr *qstr, u16 mode,
+				  void **ctx, u32 *ctxlen)
+{
+	return call_int_hook(object_init_security, 0, parent_ctx, parent_ctxlen,
+			     qstr, mode, ctx, ctxlen);
+}
+
 int security_file_permission(struct file *file, int mask)
 {
 	int ret;
