@@ -568,7 +568,10 @@ struct request_queue {
 
 	struct work_struct	release_work;
 
-#define BLK_MAX_WRITE_HINTS	5
+#define BLK_MAX_USER_WRITE_HINTS	5
+#define BLK_MAX_KERNEL_WRITE_HINTS	4
+#define BLK_MAX_WRITE_HINTS	(BLK_MAX_USER_WRITE_HINTS + \
+				BLK_MAX_KERNEL_WRITE_HINTS)
 	u64			write_hints[BLK_MAX_WRITE_HINTS];
 };
 
