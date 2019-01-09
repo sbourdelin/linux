@@ -965,8 +965,11 @@ xfs_sync_sb(
 	struct xfs_trans	*tp;
 	int			error;
 
+	/* Silence lockdep false positives in the freeze path. */
+	lockdep_off();
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_sb, 0, 0,
 			XFS_TRANS_NO_WRITECOUNT, &tp);
+	lockdep_on();
 	if (error)
 		return error;
 
