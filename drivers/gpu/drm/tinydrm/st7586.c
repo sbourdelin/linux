@@ -17,6 +17,7 @@
 #include <linux/spi/spi.h>
 #include <video/mipi_display.h>
 
+#include <drm/drm_damage_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
@@ -111,23 +112,15 @@ static int st7586_buf_copy(void *dst, struct drm_framebuffer *fb,
 	return ret;
 }
 
-static int st7586_fb_dirty(struct drm_framebuffer *fb,
-			   struct drm_file *file_priv, unsigned int flags,
-			   unsigned int color, struct drm_clip_rect *clips,
-			   unsigned int num_clips)
+static void st7586_fb_dirty(struct drm_framebuffer *fb, struct drm_rect *rect)
 {
 	struct tinydrm_device *tdev = fb->dev->dev_private;
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
-	struct drm_rect clip;
-	struct drm_rect *rect = &clip;
 	int start, end;
 	int ret = 0;
 
 	if (!mipi->enabled)
-		return 0;
-
-	tinydrm_merge_clips(&clip, clips, num_clips, flags, fb->width,
-			    fb->height);
+		return;
 
 	/* 3 pixels per byte, so grow clip to nearest multiple of 3 */
 	rect->x1 = rounddown(rect->x1, 3);
@@ -137,7 +130,7 @@ static int st7586_fb_dirty(struct drm_framebuffer *fb,
 
 	ret = st7586_buf_copy(mipi->tx_buf, fb, rect);
 	if (ret)
-		return ret;
+		goto err_msg;
 
 	/* Pixels are packed 3 per byte */
 	start = rect->x1 / 3;
@@ -153,15 +146,28 @@ static int st7586_fb_dirty(struct drm_framebuffer *fb,
 	ret = mipi_dbi_command_buf(mipi, MIPI_DCS_WRITE_MEMORY_START,
 				   (u8 *)mipi->tx_buf,
 				   (end - start) * (rect->y2 - rect->y1));
-
-	return ret;
+err_msg:
+	if (ret)
+		dev_err_once(fb->dev->dev, "Failed to update display %d\n", ret);
 }
 
-static const struct drm_framebuffer_funcs st7586_fb_funcs = {
-	.destroy	= drm_gem_fb_destroy,
-	.create_handle	= drm_gem_fb_create_handle,
-	.dirty		= tinydrm_fb_dirty,
-};
+static void st7586_pipe_update(struct drm_simple_display_pipe *pipe,
+			       struct drm_plane_state *old_state)
+{
+	struct drm_plane_state *state = pipe->plane.state;
+	struct drm_crtc *crtc = &pipe->crtc;
+	struct drm_rect rect;
+
+	if (drm_atomic_helper_damage_merged(old_state, state, &rect))
+		st7586_fb_dirty(state->fb, &rect);
+
+	if (crtc->state->event) {
+		spin_lock_irq(&crtc->dev->event_lock);
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+		spin_unlock_irq(&crtc->dev->event_lock);
+		crtc->state->event = NULL;
+	}
+}
 
 static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 			       struct drm_crtc_state *crtc_state,
@@ -263,11 +269,9 @@ static int st7586_init(struct device *dev, struct mipi_dbi *mipi,
 	if (!mipi->tx_buf)
 		return -ENOMEM;
 
-	ret = devm_tinydrm_init(dev, tdev, &st7586_fb_funcs, driver);
+	ret = devm_tinydrm_init(dev, tdev, driver);
 	if (ret)
 		return ret;
-
-	tdev->fb_dirty = st7586_fb_dirty;
 
 	ret = tinydrm_display_pipe_init(tdev, pipe_funcs,
 					DRM_MODE_CONNECTOR_VIRTUAL,
@@ -276,6 +280,8 @@ static int st7586_init(struct device *dev, struct mipi_dbi *mipi,
 					mode, rotation);
 	if (ret)
 		return ret;
+
+	drm_plane_enable_fb_damage_clips(&tdev->pipe.plane);
 
 	tdev->drm->mode_config.preferred_depth = 32;
 	mipi->rotation = rotation;
@@ -291,7 +297,7 @@ static int st7586_init(struct device *dev, struct mipi_dbi *mipi,
 static const struct drm_simple_display_pipe_funcs st7586_pipe_funcs = {
 	.enable		= st7586_pipe_enable,
 	.disable	= st7586_pipe_disable,
-	.update		= tinydrm_display_pipe_update,
+	.update		= st7586_pipe_update,
 	.prepare_fb	= drm_gem_fb_simple_display_pipe_prepare_fb,
 };
 
