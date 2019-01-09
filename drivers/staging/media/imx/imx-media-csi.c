@@ -41,7 +41,7 @@
 #define MIN_H       144
 #define MAX_W      4096
 #define MAX_H      4096
-#define W_ALIGN    4 /* multiple of 16 pixels */
+#define W_ALIGN    1 /* multiple of 2 pixels */
 #define H_ALIGN    1 /* multiple of 2 lines */
 #define S_ALIGN    1 /* multiple of 2 */
 
@@ -1130,6 +1130,20 @@ __csi_get_compose(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
 		return &priv->compose;
 }
 
+static bool csi_src_pad_enabled(struct media_pad *pad)
+{
+	struct media_link *link;
+
+	list_for_each_entry(link, &pad->entity->links, list) {
+		if (link->source->entity == pad->entity &&
+		    link->source->index == pad->index &&
+		    link->flags & MEDIA_LNK_FL_ENABLED)
+			return true;
+	}
+
+	return false;
+}
+
 static void csi_try_crop(struct csi_priv *priv,
 			 struct v4l2_rect *crop,
 			 struct v4l2_subdev_pad_config *cfg,
@@ -1141,7 +1155,10 @@ static void csi_try_crop(struct csi_priv *priv,
 		crop->left = infmt->width - crop->width;
 	/* adjust crop left/width to h/w alignment restrictions */
 	crop->left &= ~0x3;
-	crop->width &= ~0x7;
+	if (csi_src_pad_enabled(&priv->pad[CSI_SRC_PAD_DIRECT]))
+		crop->width &= ~0x7; /* multiple of 8 pixels (IC burst) */
+	else
+		crop->width &= ~0x1; /* multiple of 2 pixels */
 
 	/*
 	 * FIXME: not sure why yet, but on interlaced bt.656,
