@@ -295,7 +295,7 @@ static void padata_reorder_timer(struct timer_list *t)
 	unsigned int weight;
 	int target_cpu, cpu;
 
-	cpu = get_cpu();
+	cpu = get_cpu_light();
 
 	/* We don't lock pd here to not interfere with parallel processing
 	 * padata_reorder() calls on other CPUs. We just need any CPU out of
@@ -321,7 +321,7 @@ static void padata_reorder_timer(struct timer_list *t)
 		padata_reorder(pd);
 	}
 
-	put_cpu();
+	put_cpu_light();
 }
 
 static void padata_serial_worker(struct work_struct *serial_work)
@@ -369,7 +369,7 @@ void padata_do_serial(struct padata_priv *padata)
 
 	pd = padata->pd;
 
-	cpu = get_cpu();
+	cpu = get_cpu_light();
 
 	/* We need to run on the same CPU padata_do_parallel(.., padata, ..)
 	 * was called on -- or, at least, enqueue the padata object into the
@@ -387,7 +387,7 @@ void padata_do_serial(struct padata_priv *padata)
 	list_add_tail(&padata->list, &pqueue->reorder.list);
 	spin_unlock(&pqueue->reorder.lock);
 
-	put_cpu();
+	put_cpu_light();
 
 	/* If we're running on the wrong CPU, call padata_reorder() via a
 	 * kernel worker.
