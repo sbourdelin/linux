@@ -3583,6 +3583,15 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	if (oo_objects(s->oo) > oo_objects(s->max))
 		s->max = s->oo;
 
+#ifdef CONFIG_SLAB_FREELIST_RANDOM
+	if (unlikely(s->random_seq)) {
+		kfree(s->random_seq);
+		s->random_seq = NULL;
+		if (init_cache_random_seq(s))
+			return 0;
+	}
+#endif
+
 	return !!oo_objects(s->oo);
 }
 
