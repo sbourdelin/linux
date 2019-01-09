@@ -1573,15 +1573,18 @@ EXPORT_SYMBOL(find_lock_entry);
 struct page *pagecache_get_page(struct address_space *mapping, pgoff_t offset,
 	int fgp_flags, gfp_t gfp_mask)
 {
+	struct mem_cgroup *memcg;
 	struct page *page;
+	bool drop_lock;
 
 repeat:
+	drop_lock = false;
 	page = find_get_entry(mapping, offset);
 	if (xa_is_value(page))
 		page = NULL;
 	if (!page)
 		goto no_page;
-
+lock:
 	if (fgp_flags & FGP_LOCK) {
 		if (fgp_flags & FGP_NOWAIT) {
 			if (!trylock_page(page)) {
@@ -1600,6 +1603,31 @@ repeat:
 		}
 		VM_BUG_ON_PAGE(page->index != offset, page);
 	}
+
+	if (!mem_cgroup_disabled() && !PageHuge(page) &&
+	    !page_memcg(page) && !page_mapped(page) &&
+	    test_bit(AS_KEEP_MEMCG_RECLAIM, &mapping->flags)) {
+		if (!(fgp_flags & FGP_LOCK)) {
+			drop_lock = true;
+			fgp_flags |= FGP_LOCK;
+			goto lock;
+		}
+
+		if (!WARN_ON(PageDirty(page) || PageWriteback(page))) {
+			if (mem_cgroup_try_charge(page, current->mm,
+					gfp_mask, &memcg, false)) {
+				unlock_page(page);
+				put_page(page);
+				return NULL;
+			}
+			mem_cgroup_commit_charge(page, memcg, true, false);
+			if (!isolate_lru_page(page))
+				putback_lru_page(page);
+		}
+	}
+
+	if (drop_lock)
+		unlock_page(page);
 
 	if (fgp_flags & FGP_ACCESSED)
 		mark_page_accessed(page);
