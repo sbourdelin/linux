@@ -65,9 +65,16 @@ enum {
 	MLX5_DROP_NEW_RECOVERY_WORK,
 };
 
+enum  {
+	MLX5_SENSOR_NO_ERR		= 0,
+	MLX5_SENSOR_PCI_COMM_ERR	= 1,
+	MLX5_SENSOR_NIC_DISABLED	= 2,
+	MLX5_SENSOR_NIC_SW_RESET	= 3,
+};
+
 u8 mlx5_get_nic_state(struct mlx5_core_dev *dev)
 {
-	return (ioread32be(&dev->iseg->cmdq_addr_l_sz) >> 8) & 3;
+	return (ioread32be(&dev->iseg->cmdq_addr_l_sz) >> 8) & 7;
 }
 
 void mlx5_set_nic_state(struct mlx5_core_dev *dev, u8 state)
@@ -80,18 +87,25 @@ void mlx5_set_nic_state(struct mlx5_core_dev *dev, u8 state)
 		    &dev->iseg->cmdq_addr_l_sz);
 }
 
-static int in_fatal(struct mlx5_core_dev *dev)
+static bool sensor_pci_not_working(struct mlx5_core_dev *dev)
 {
 	struct mlx5_core_health *health = &dev->priv.health;
 	struct health_buffer __iomem *h = health->health;
 
+	/* Offline PCI reads return 0xffffffff */
+	return (ioread32be(&h->fw_ver) == 0xffffffff);
+}
+
+static u32 check_fatal_sensors(struct mlx5_core_dev *dev)
+{
+	if (sensor_pci_not_working(dev))
+		return MLX5_SENSOR_PCI_COMM_ERR;
 	if (mlx5_get_nic_state(dev) == MLX5_NIC_IFC_DISABLED)
-		return 1;
+		return MLX5_SENSOR_NIC_DISABLED;
+	if (mlx5_get_nic_state(dev) == MLX5_NIC_IFC_SW_RESET)
+		return MLX5_SENSOR_NIC_SW_RESET;
 
-	if (ioread32be(&h->fw_ver) == 0xffffffff)
-		return 1;
-
-	return 0;
+	return MLX5_SENSOR_NO_ERR;
 }
 
 void mlx5_enter_error_state(struct mlx5_core_dev *dev, bool force)
@@ -101,7 +115,8 @@ void mlx5_enter_error_state(struct mlx5_core_dev *dev, bool force)
 		goto unlock;
 
 	mlx5_core_err(dev, "start\n");
-	if (pci_channel_offline(dev->pdev) || in_fatal(dev) || force) {
+	if (pci_channel_offline(dev->pdev) ||
+	    dev->priv.health.fatal_error != MLX5_SENSOR_NO_ERR || force) {
 		dev->state = MLX5_DEVICE_STATE_INTERNAL_ERROR;
 		mlx5_cmd_trigger_completions(dev);
 	}
@@ -143,16 +158,14 @@ static void health_recover(struct work_struct *work)
 	struct delayed_work *dwork;
 	struct mlx5_core_dev *dev;
 	struct mlx5_priv *priv;
-	u8 nic_state;
 
 	dwork = container_of(work, struct delayed_work, work);
 	health = container_of(dwork, struct mlx5_core_health, recover_work);
 	priv = container_of(health, struct mlx5_priv, health);
 	dev = container_of(priv, struct mlx5_core_dev, priv);
 
-	nic_state = mlx5_get_nic_state(dev);
-	if (nic_state == MLX5_NIC_IFC_INVALID) {
-		dev_err(&dev->pdev->dev, "health recovery flow aborted since the nic state is invalid\n");
+	if (sensor_pci_not_working(dev)) {
+		dev_err(&dev->pdev->dev, "health recovery flow aborted, PCI reads still not working\n");
 		return;
 	}
 
@@ -162,10 +175,17 @@ static void health_recover(struct work_struct *work)
 
 /* How much time to wait until health resetting the driver (in msecs) */
 #define MLX5_RECOVERY_DELAY_MSECS 60000
+#define MLX5_RECOVERY_NO_DELAY 0
+static unsigned long get_recovery_delay(struct mlx5_core_dev *dev)
+{
+	return dev->priv.health.fatal_error == MLX5_SENSOR_PCI_COMM_ERR ?
+	       MLX5_RECOVERY_DELAY_MSECS : MLX5_RECOVERY_NO_DELAY;
+}
+
 static void health_care(struct work_struct *work)
 {
-	unsigned long recover_delay = msecs_to_jiffies(MLX5_RECOVERY_DELAY_MSECS);
 	struct mlx5_core_health *health;
+	unsigned long recover_delay;
 	struct mlx5_core_dev *dev;
 	struct mlx5_priv *priv;
 	unsigned long flags;
@@ -175,6 +195,7 @@ static void health_care(struct work_struct *work)
 	dev = container_of(priv, struct mlx5_core_dev, priv);
 	mlx5_core_warn(dev, "handling bad device here\n");
 	mlx5_handle_bad_state(dev);
+	recover_delay = msecs_to_jiffies(get_recovery_delay(dev));
 
 	spin_lock_irqsave(&health->wq_lock, flags);
 	if (!test_bit(MLX5_DROP_NEW_RECOVERY_WORK, &health->flags))
@@ -271,6 +292,7 @@ static void poll_health(struct timer_list *t)
 {
 	struct mlx5_core_dev *dev = from_timer(dev, t, priv.health.timer);
 	struct mlx5_core_health *health = &dev->priv.health;
+	u32 fatal_error;
 	u32 count;
 
 	if (dev->state == MLX5_DEVICE_STATE_INTERNAL_ERROR)
@@ -288,8 +310,11 @@ static void poll_health(struct timer_list *t)
 		print_health_info(dev);
 	}
 
-	if (in_fatal(dev) && !health->sick) {
-		health->sick = true;
+	fatal_error = check_fatal_sensors(dev);
+
+	if (fatal_error && !health->fatal_error) {
+		mlx5_core_err(dev, "Fatal error %u detected\n", fatal_error);
+		dev->priv.health.fatal_error = fatal_error;
 		print_health_info(dev);
 		mlx5_trigger_health_work(dev);
 	}
@@ -303,7 +328,7 @@ void mlx5_start_health_poll(struct mlx5_core_dev *dev)
 	struct mlx5_core_health *health = &dev->priv.health;
 
 	timer_setup(&health->timer, poll_health, 0);
-	health->sick = 0;
+	health->fatal_error = MLX5_SENSOR_NO_ERR;
 	clear_bit(MLX5_DROP_NEW_HEALTH_WORK, &health->flags);
 	clear_bit(MLX5_DROP_NEW_RECOVERY_WORK, &health->flags);
 	health->health = &dev->iseg->health;
