@@ -1632,6 +1632,8 @@ static inline int mi_set_context(struct i915_request *rq, u32 flags)
 		len += 2 + (num_rings ? 4*num_rings + 6 : 0);
 	else if (IS_GEN(i915, 5))
 		len += 2;
+	else if (IS_GEN(i915, 4))
+		len += 4;
 	if (flags & MI_FORCE_RESTORE) {
 		GEM_BUG_ON(flags & MI_RESTORE_INHIBIT);
 		flags &= ~MI_FORCE_RESTORE;
@@ -1668,6 +1670,21 @@ static inline int mi_set_context(struct i915_request *rq, u32 flags)
 		 * this should never take effect and so be a no-op!
 		 */
 		*cs++ = MI_SUSPEND_FLUSH | MI_SUSPEND_FLUSH_EN;
+	} else if (IS_GEN(i915, 4)) {
+		/*
+		 * Disable CONSTANT_BUFFER before it is loaded from the context
+		 * image. For as it is loaded, it is executed and the stored
+		 * address may no longer be valid, leading to a GPU hang.
+		 *
+		 * This imposes the requirement that userspace reload their
+		 * CONSTANT_BUFFER on every batch, fortunately a requirement
+		 * they are already accustomed to from before contexts were
+		 * enabled.
+		 */
+		*cs++ = MI_STORE_DWORD_IMM_GEN4 | MI_USE_GGTT;
+		*cs++ = 0;
+		*cs++ = i915_ggtt_offset(rq->hw_context->state) + 0x1d4;
+		*cs++ = GFX_OP_CONSTANT_BUFFER; /* inactive */
 	}
 
 	if (force_restore) {

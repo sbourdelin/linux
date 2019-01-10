@@ -266,6 +266,9 @@
 #define GFX_OP_3DSTATE_BINDING_TABLE_EDIT_PS \
 	((0x3<<29)|(0x3<<27)|(0x0<<24)|(0x47<<16))
 
+#define GFX_OP_CONSTANT_BUFFER \
+	(0x3 << 29 | 0x0 << 27 | 0x0 << 24 | 0x2 << 16)
+
 #define MFX_WAIT  ((0x3<<29)|(0x1<<27)|(0x0<<16))
 
 #define COLOR_BLT     ((0x2<<29)|(0x40<<22))
