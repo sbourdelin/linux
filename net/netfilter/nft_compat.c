@@ -29,6 +29,7 @@ struct nft_xt {
 	struct list_head	head;
 	struct nft_expr_ops	ops;
 	unsigned int		refcnt;
+	bool			use;
 
 	/* Unlike other expressions, ops doesn't have static storage duration.
 	 * nft core assumes they do.  We use kfree_rcu so that nft core can
@@ -48,7 +49,7 @@ struct nft_xt_match_priv {
 static bool nft_xt_put(struct nft_xt *xt)
 {
 	mutex_lock(&nft_xt_lock);
-	if (--xt->refcnt == 0) {
+	if (--xt->refcnt == 0 && !xt->use) {
 		list_del(&xt->head);
 		kfree_rcu(xt, rcu_head);
 		mutex_unlock(&nft_xt_lock);
@@ -280,6 +281,7 @@ nft_target_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 	mutex_lock(&nft_xt_lock);
 	nft_xt = container_of(expr->ops, struct nft_xt, ops);
 	nft_xt->refcnt++;
+	nft_xt->use = false;
 	mutex_unlock(&nft_xt_lock);
 	return 0;
 }
@@ -495,6 +497,7 @@ __nft_match_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 	mutex_lock(&nft_xt_lock);
 	nft_xt = container_of(expr->ops, struct nft_xt, ops);
 	nft_xt->refcnt++;
+	nft_xt->use = false;
 	mutex_unlock(&nft_xt_lock);
 	return 0;
 }
@@ -780,6 +783,7 @@ nft_match_select_ops(const struct nft_ctx *ctx,
 		struct xt_match *match = nft_match->ops.data;
 
 		if (nft_match_cmp(match, mt_name, rev, family)) {
+			nft_match->use = true;
 			mutex_unlock(&nft_xt_lock);
 			return &nft_match->ops;
 		}
@@ -803,6 +807,7 @@ nft_match_select_ops(const struct nft_ctx *ctx,
 	}
 
 	nft_match->refcnt = 0;
+	nft_match->use = true;
 	nft_match->ops.type = &nft_match_type;
 	nft_match->ops.eval = nft_match_eval;
 	nft_match->ops.init = nft_match_init;
@@ -885,6 +890,7 @@ nft_target_select_ops(const struct nft_ctx *ctx,
 			continue;
 
 		if (nft_target_cmp(target, tg_name, rev, family)) {
+			nft_target->use = true;
 			mutex_unlock(&nft_xt_lock);
 			return &nft_target->ops;
 		}
@@ -913,6 +919,7 @@ nft_target_select_ops(const struct nft_ctx *ctx,
 	}
 
 	nft_target->refcnt = 0;
+	nft_target->use = true;
 	nft_target->ops.type = &nft_target_type;
 	nft_target->ops.size = NFT_EXPR_SIZE(XT_ALIGN(target->targetsize));
 	nft_target->ops.init = nft_target_init;
