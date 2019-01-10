@@ -23,6 +23,8 @@
 #include <linux/netfilter_arp/arp_tables.h>
 #include <net/netfilter/nf_tables.h>
 
+static DEFINE_MUTEX(nft_xt_lock);
+
 struct nft_xt {
 	struct list_head	head;
 	struct nft_expr_ops	ops;
@@ -45,12 +47,15 @@ struct nft_xt_match_priv {
 
 static bool nft_xt_put(struct nft_xt *xt)
 {
+	mutex_lock(&nft_xt_lock);
 	if (--xt->refcnt == 0) {
 		list_del(&xt->head);
 		kfree_rcu(xt, rcu_head);
+		mutex_unlock(&nft_xt_lock);
 		return true;
 	}
 
+	mutex_unlock(&nft_xt_lock);
 	return false;
 }
 
@@ -272,8 +277,10 @@ nft_target_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 	if (!target->target)
 		return -EINVAL;
 
+	mutex_lock(&nft_xt_lock);
 	nft_xt = container_of(expr->ops, struct nft_xt, ops);
 	nft_xt->refcnt++;
+	mutex_unlock(&nft_xt_lock);
 	return 0;
 }
 
@@ -485,8 +492,10 @@ __nft_match_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 	if (ret < 0)
 		return ret;
 
+	mutex_lock(&nft_xt_lock);
 	nft_xt = container_of(expr->ops, struct nft_xt, ops);
 	nft_xt->refcnt++;
+	mutex_unlock(&nft_xt_lock);
 	return 0;
 }
 
@@ -766,12 +775,16 @@ nft_match_select_ops(const struct nft_ctx *ctx,
 	family = ctx->family;
 
 	/* Re-use the existing match if it's already loaded. */
+	mutex_lock(&nft_xt_lock);
 	list_for_each_entry(nft_match, &nft_match_list, head) {
 		struct xt_match *match = nft_match->ops.data;
 
-		if (nft_match_cmp(match, mt_name, rev, family))
+		if (nft_match_cmp(match, mt_name, rev, family)) {
+			mutex_unlock(&nft_xt_lock);
 			return &nft_match->ops;
+		}
 	}
+	mutex_unlock(&nft_xt_lock);
 
 	match = xt_request_find_match(family, mt_name, rev);
 	if (IS_ERR(match))
@@ -810,7 +823,9 @@ nft_match_select_ops(const struct nft_ctx *ctx,
 
 	nft_match->ops.size = matchsize;
 
+	mutex_lock(&nft_xt_lock);
 	list_add(&nft_match->head, &nft_match_list);
+	mutex_unlock(&nft_xt_lock);
 
 	return &nft_match->ops;
 err:
@@ -862,15 +877,19 @@ nft_target_select_ops(const struct nft_ctx *ctx,
 		return ERR_PTR(-EINVAL);
 
 	/* Re-use the existing target if it's already loaded. */
+	mutex_lock(&nft_xt_lock);
 	list_for_each_entry(nft_target, &nft_target_list, head) {
 		struct xt_target *target = nft_target->ops.data;
 
 		if (!target->target)
 			continue;
 
-		if (nft_target_cmp(target, tg_name, rev, family))
+		if (nft_target_cmp(target, tg_name, rev, family)) {
+			mutex_unlock(&nft_xt_lock);
 			return &nft_target->ops;
+		}
 	}
+	mutex_unlock(&nft_xt_lock);
 
 	target = xt_request_find_target(family, tg_name, rev);
 	if (IS_ERR(target))
@@ -907,7 +926,9 @@ nft_target_select_ops(const struct nft_ctx *ctx,
 	else
 		nft_target->ops.eval = nft_target_eval_xt;
 
+	mutex_lock(&nft_xt_lock);
 	list_add(&nft_target->head, &nft_target_list);
+	mutex_unlock(&nft_xt_lock);
 
 	return &nft_target->ops;
 err:
@@ -961,6 +982,7 @@ static void __exit nft_compat_module_exit(void)
 	 * In this case, the lists contain 0-refcount entries that still
 	 * hold module reference.
 	 */
+	mutex_lock(&nft_xt_lock);
 	list_for_each_entry_safe(xt, next, &nft_target_list, head) {
 		struct xt_target *target = xt->ops.data;
 
@@ -975,9 +997,11 @@ static void __exit nft_compat_module_exit(void)
 
 		if (WARN_ON_ONCE(xt->refcnt))
 			continue;
+
 		module_put(match->me);
 		kfree(xt);
 	}
+	mutex_unlock(&nft_xt_lock);
 	nfnetlink_subsys_unregister(&nfnl_compat_subsys);
 	nft_unregister_expr(&nft_target_type);
 	nft_unregister_expr(&nft_match_type);
