@@ -731,7 +731,7 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 		evt_struct->ext_list = (struct srp_direct_buf *)
 			dma_alloc_coherent(dev,
 					   SG_ALL * sizeof(struct srp_direct_buf),
-					   &evt_struct->ext_list_token, 0);
+					   &evt_struct->ext_list_token, GFP_ATOMIC);
 		if (!evt_struct->ext_list) {
 			if (!firmware_has_feature(FW_FEATURE_CMO))
 				sdev_printk(KERN_ERR, cmd->device,
