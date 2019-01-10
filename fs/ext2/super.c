@@ -960,6 +960,21 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	blocksize = BLOCK_SIZE << le32_to_cpu(sbi->s_es->s_log_block_size);
+	if (blocksize < EXT2_MIN_BLOCK_SIZE ||
+		blocksize > EXT2_MAX_BLOCK_SIZE) {
+		ext2_msg(sb, KERN_ERR,
+				"Unsupported filesystem blocksize %d (%d log_block_size)",
+				blocksize, le32_to_cpu(es->s_log_block_size));
+		goto failed_mount;
+	}
+
+	if (le32_to_cpu(es->s_log_block_size) >
+		(EXT2_MAX_BLOCK_LOG_SIZE - EXT2_MIN_BLOCK_LOG_SIZE)) {
+			ext2_msg(sb, KERN_ERR,
+				"Invalid log block size: %u",
+				le32_to_cpu(es->s_log_block_size));
+			goto failed_mount;
+		}
 
 	if (sbi->s_mount_opt & EXT2_MOUNT_DAX) {
 		if (!bdev_dax_supported(sb->s_bdev, blocksize)) {
