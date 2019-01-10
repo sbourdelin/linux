@@ -3361,7 +3361,8 @@ static int l2cap_parse_conf_req(struct l2cap_chan *chan, void *data, size_t data
 			break;
 
 		case L2CAP_CONF_RFC:
-			if (olen == sizeof(rfc))
+			if ((olen == sizeof(rfc)) &&
+			    (endptr - ptr >= L2CAP_CONF_OPT_SIZE + sizeof(rfc)))
 				memcpy(&rfc, (void *) val, olen);
 			break;
 
@@ -3371,7 +3372,8 @@ static int l2cap_parse_conf_req(struct l2cap_chan *chan, void *data, size_t data
 			break;
 
 		case L2CAP_CONF_EFS:
-			if (olen == sizeof(efs)) {
+			if ((olen == sizeof(efs)) &&
+			    (endptr - ptr >= L2CAP_CONF_OPT_SIZE + sizeof(efs))) {
 				remote_efs = 1;
 				memcpy(&efs, (void *) val, olen);
 			}
@@ -3576,7 +3578,8 @@ static int l2cap_parse_conf_rsp(struct l2cap_chan *chan, void *rsp, int len,
 			break;
 
 		case L2CAP_CONF_RFC:
-			if (olen == sizeof(rfc))
+			if ((olen == sizeof(rfc)) &&
+			    (endptr - ptr >= L2CAP_CONF_OPT_SIZE + sizeof(rfc)))
 				memcpy(&rfc, (void *)val, olen);
 
 			if (test_bit(CONF_STATE2_DEVICE, &chan->conf_state) &&
@@ -3596,7 +3599,8 @@ static int l2cap_parse_conf_rsp(struct l2cap_chan *chan, void *rsp, int len,
 			break;
 
 		case L2CAP_CONF_EFS:
-			if (olen == sizeof(efs)) {
+			if ((olen == sizeof(efs)) &&
+			    (endptr - ptr >= L2CAP_CONF_OPT_SIZE + sizeof(efs))) {
 				memcpy(&efs, (void *)val, olen);
 
 				if (chan->local_stype != L2CAP_SERV_NOTRAFIC &&
