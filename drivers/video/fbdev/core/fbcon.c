@@ -649,11 +649,14 @@ static void fbcon_prepare_logo(struct vc_data *vc, struct fb_info *info,
 		kfree(save);
 	}
 
+	if (logo_shown == FBCON_LOGO_DONTSHOW)
+		return;
+
 	if (logo_lines > vc->vc_bottom) {
 		logo_shown = FBCON_LOGO_CANSHOW;
 		printk(KERN_INFO
 		       "fbcon_init: disable boot-logo (boot-logo bigger than screen).\n");
-	} else if (logo_shown != FBCON_LOGO_DONTSHOW) {
+	} else {
 		logo_shown = FBCON_LOGO_DRAW;
 		vc->vc_top = logo_lines;
 	}
@@ -1059,9 +1062,11 @@ static void fbcon_init(struct vc_data *vc, int init)
 
 	cap = info->flags;
 
-	if (vc != svc || logo_shown == FBCON_LOGO_DONTSHOW ||
-	    (info->fix.type == FB_TYPE_TEXT))
+	if (vc != svc || console_loglevel <= CONSOLE_LOGLEVEL_QUIET ||
+	    (info->fix.type == FB_TYPE_TEXT)) {
 		logo = 0;
+		logo_shown = FBCON_LOGO_DONTSHOW;
+	}
 
 	if (var_to_display(p, &info->var, info))
 		return;
