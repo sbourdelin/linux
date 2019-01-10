@@ -1625,6 +1625,12 @@ int jbd2_journal_forget (handle_t *handle, struct buffer_head *bh)
 			if (was_modified)
 				drop_reserve = 1;
 		}
+
+		/*
+		 * Mark buffer as freed so that commit code know it should
+		 * clear dirty bits when it is done with the buffer.
+		 */
+		set_buffer_freed(bh);
 	}
 
 not_jbd:
