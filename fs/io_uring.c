@@ -67,6 +67,7 @@ struct io_mapped_ubuf {
 
 struct io_sq_offload {
 	struct task_struct	*thread;	/* if using a thread */
+	bool			thread_poll;
 	struct workqueue_struct	*wq;		/* wq offload */
 	struct mm_struct	*mm;
 	struct files_struct	*files;
@@ -1145,17 +1146,35 @@ static int io_submit_sqes(struct io_ring_ctx *ctx, struct sqe_submit *sqes,
 {
 	struct io_submit_state state, *statep = NULL;
 	int ret, i, submitted = 0;
+	bool nonblock;
 
 	if (nr > IO_PLUG_THRESHOLD) {
 		io_submit_state_start(&state, ctx, nr);
 		statep = &state;
 	}
 
+	/*
+	 * Having both a thread and a workqueue only makes sense for buffered
+	 * IO, where we can't submit in an async fashion. Use the NOWAIT
+	 * trick from the SQ thread, and punt to the workqueue if we can't
+	 * satisfy this iocb without blocking. This is only necessary
+	 * for buffered IO with sqthread polled submission.
+	 */
+	nonblock = (ctx->flags & IORING_SETUP_SQWQ) != 0;
+
 	for (i = 0; i < nr; i++) {
-		if (unlikely(mm_fault))
+		if (unlikely(mm_fault)) {
 			ret = -EFAULT;
-		else
-			ret = io_submit_sqe(ctx, &sqes[i], statep, false);
+		} else {
+			ret = io_submit_sqe(ctx, &sqes[i], statep, nonblock);
+			/* nogo, submit to workqueue */
+			if (nonblock && ret == -EAGAIN)
+				ret = io_queue_async_work(ctx, &sqes[i]);
+			if (!ret) {
+				submitted++;
+				continue;
+			}
+		}
 		if (!ret) {
 			submitted++;
 			continue;
@@ -1171,7 +1190,10 @@ static int io_submit_sqes(struct io_ring_ctx *ctx, struct sqe_submit *sqes,
 }
 
 /*
- * sq thread only supports O_DIRECT or FIXEDBUFS IO
+ * SQ thread is woken if the app asked for offloaded submission. This can
+ * be either O_DIRECT, in which case we do submissions directly, or it can
+ * be buffered IO, in which case we do them inline if we can do so without
+ * blocking. If we can't, then we punt to a workqueue.
  */
 static int io_sq_thread(void *data)
 {
@@ -1182,6 +1204,8 @@ static int io_sq_thread(void *data)
 	struct files_struct *old_files;
 	mm_segment_t old_fs;
 	DEFINE_WAIT(wait);
+	unsigned inflight;
+	unsigned long timeout;
 
 	old_files = current->files;
 	current->files = sqo->files;
@@ -1189,11 +1213,49 @@ static int io_sq_thread(void *data)
 	old_fs = get_fs();
 	set_fs(USER_DS);
 
+	timeout = inflight = 0;
 	while (!kthread_should_stop()) {
 		bool mm_fault = false;
 		int i;
 
+		if (sqo->thread_poll && inflight) {
+			unsigned int nr_events = 0;
+
+			/*
+			 * Normal IO, just pretend everything completed.
+			 * We don't have to poll completions for that.
+			 */
+			if (ctx->flags & IORING_SETUP_IOPOLL) {
+				/*
+				 * App should not use IORING_ENTER_GETEVENTS
+				 * with thread polling, but if it does, then
+				 * ensure we are mutually exclusive.
+				 */
+				if (mutex_trylock(&ctx->uring_lock)) {
+					io_iopoll_check(ctx, &nr_events, 0);
+					mutex_unlock(&ctx->uring_lock);
+				}
+			} else {
+				nr_events = inflight;
+			}
+
+			inflight -= nr_events;
+			if (!inflight)
+				timeout = jiffies + HZ;
+		}
+
 		if (!io_peek_sqring(ctx, &sqes[0])) {
+			/*
+			 * If we're polling, let us spin for a second without
+			 * work before going to sleep.
+			 */
+			if (sqo->thread_poll) {
+				if (inflight || !time_after(jiffies, timeout)) {
+					cpu_relax();
+					continue;
+				}
+			}
+
 			/*
 			 * Drop cur_mm before scheduling, we can't hold it for
 			 * long periods (or over schedule()). Do this before
@@ -1207,6 +1269,13 @@ static int io_sq_thread(void *data)
 			}
 
 			prepare_to_wait(&sqo->wait, &wait, TASK_INTERRUPTIBLE);
+
+			/* Tell userspace we may need a wakeup call */
+			if (sqo->thread_poll) {
+				ctx->sq_ring->flags |= IORING_SQ_NEED_WAKEUP;
+				smp_wmb();
+			}
+
 			if (!io_peek_sqring(ctx, &sqes[0])) {
 				if (kthread_should_park())
 					kthread_parkme();
@@ -1218,6 +1287,13 @@ static int io_sq_thread(void *data)
 					flush_signals(current);
 				schedule();
 				finish_wait(&sqo->wait, &wait);
+
+				if (sqo->thread_poll) {
+					struct io_sq_ring *ring;
+
+					ring = ctx->sq_ring;
+					ring->flags &= ~IORING_SQ_NEED_WAKEUP;
+				}
 				continue;
 			}
 			finish_wait(&sqo->wait, &wait);
@@ -1240,7 +1316,7 @@ static int io_sq_thread(void *data)
 			io_inc_sqring(ctx);
 		} while (io_peek_sqring(ctx, &sqes[i]));
 
-		io_submit_sqes(ctx, sqes, i, cur_mm, mm_fault);
+		inflight += io_submit_sqes(ctx, sqes, i, cur_mm, mm_fault);
 	}
 	current->files = old_files;
 	set_fs(old_fs);
@@ -1483,6 +1559,9 @@ static int io_sq_thread_start(struct io_ring_ctx *ctx)
 	if (!sqo->files)
 		goto err;
 
+	if (ctx->flags & IORING_SETUP_SQPOLL)
+		sqo->thread_poll = true;
+
 	if (ctx->flags & IORING_SETUP_SQTHREAD) {
 		sqo->thread = kthread_create_on_cpu(io_sq_thread, ctx,
 							ctx->sq_thread_cpu,
@@ -1493,7 +1572,8 @@ static int io_sq_thread_start(struct io_ring_ctx *ctx)
 			goto err;
 		}
 		wake_up_process(sqo->thread);
-	} else if (ctx->flags & IORING_SETUP_SQWQ) {
+	}
+	if (ctx->flags & IORING_SETUP_SQWQ) {
 		int concurrency;
 
 		/* Do QD, or 2 * CPUS, whatever is smallest */
@@ -1524,7 +1604,8 @@ static void io_sq_thread_stop(struct io_ring_ctx *ctx)
 		kthread_park(sqo->thread);
 		kthread_stop(sqo->thread);
 		sqo->thread = NULL;
-	} else if (sqo->wq) {
+	}
+	if (sqo->wq) {
 		destroy_workqueue(sqo->wq);
 		sqo->wq = NULL;
 	}
@@ -1738,6 +1819,11 @@ static int io_uring_create(unsigned entries, struct io_uring_params *p,
 		if (ret)
 			goto err;
 	}
+	if ((p->flags & IORING_SETUP_SQPOLL) &&
+	   !(p->flags & IORING_SETUP_SQTHREAD)) {
+		ret = -EINVAL;
+		goto err;
+	}
 	if (p->flags & (IORING_SETUP_SQTHREAD | IORING_SETUP_SQWQ)) {
 		ctx->sq_thread_cpu = p->sq_thread_cpu;
 
@@ -1778,7 +1864,7 @@ SYSCALL_DEFINE3(io_uring_setup, u32, entries, struct iovec __user *, iovecs,
 	}
 
 	if (p.flags & ~(IORING_SETUP_IOPOLL | IORING_SETUP_SQTHREAD |
-			IORING_SETUP_SQWQ))
+			IORING_SETUP_SQWQ | IORING_SETUP_SQPOLL))
 		return -EINVAL;
 
 	ret = io_uring_create(entries, &p, iovecs);
