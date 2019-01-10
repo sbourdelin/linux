@@ -45,6 +45,7 @@ int mlx5_crdump_init(struct mlx5_core_dev *dev);
 void mlx5_crdump_cleanup(struct mlx5_core_dev *dev);
 bool mlx5_crdump_is_snapshot_enabled(struct mlx5_core_dev *dev);
 int mlx5_crdump_set_snapshot_enabled(struct mlx5_core_dev *dev, bool value);
+int mlx5_crdump_collect(struct mlx5_core_dev *dev);
 
 /* TODO move to lib/events.h */
 

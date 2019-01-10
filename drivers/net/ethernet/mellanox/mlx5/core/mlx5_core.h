@@ -99,6 +99,7 @@ enum {
 
 enum mlx5_semaphore_space_address {
 	MLX5_SEMAPHORE_SPACE_DOMAIN     = 0xA,
+	MLX5_SEMAPHORE_SW_RESET         = 0x20,
 };
 
 int mlx5_query_hca_caps(struct mlx5_core_dev *dev);
