@@ -419,7 +419,11 @@ archheaders:
 ifdef CONFIG_STACKPROTECTOR
 prepare: stack_protector_prepare
 
+ifeq ($(KBUILD_EXTMOD),)
 stack_protector_prepare: prepare0
+else
+stack_protector_prepare:
+endif
 ifdef CONFIG_PPC64
 	$(eval KBUILD_CFLAGS += -mstack-protector-guard-offset=$(shell awk '{if ($$2 == "PACA_CANARY") print $$3;}' include/generated/asm-offsets.h))
 else
