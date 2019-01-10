@@ -170,18 +170,15 @@ static void vbox_accel_fini(struct vbox_private *vbox)
 static bool have_hgsmi_mode_hints(struct vbox_private *vbox)
 {
 	u32 have_hints, have_cursor;
-	int ret;
 
-	ret = hgsmi_query_conf(vbox->guest_pool,
-			       VBOX_VBVA_CONF32_MODE_HINT_REPORTING,
-			       &have_hints);
-	if (ret)
+	if (hgsmi_query_conf(vbox->guest_pool,
+			     VBOX_VBVA_CONF32_MODE_HINT_REPORTING,
+			     &have_hints))
 		return false;
 
-	ret = hgsmi_query_conf(vbox->guest_pool,
-			       VBOX_VBVA_CONF32_GUEST_CURSOR_REPORTING,
-			       &have_cursor);
-	if (ret)
+	if (hgsmi_query_conf(vbox->guest_pool,
+			     VBOX_VBVA_CONF32_GUEST_CURSOR_REPORTING,
+			     &have_cursor))
 		return false;
 
 	return have_hints == VINF_SUCCESS && have_cursor == VINF_SUCCESS;
