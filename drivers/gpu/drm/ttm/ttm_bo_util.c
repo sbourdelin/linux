@@ -532,6 +532,11 @@ pgprot_t ttm_io_prot(uint32_t caching_flags, pgprot_t tmp)
 	if (caching_flags & TTM_PL_FLAG_CACHED)
 		return tmp;
 
+#if defined(__arm__) || defined(__aarch64__)
+	/* ARM only permits cached mappings of system memory */
+	if (caching_flags & TTM_PL_SYSTEM)
+		return tmp;
+#endif
 #if defined(__i386__) || defined(__x86_64__)
 	if (caching_flags & TTM_PL_FLAG_WC)
 		tmp = pgprot_writecombine(tmp);
