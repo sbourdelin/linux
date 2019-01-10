@@ -2075,10 +2075,6 @@ s32 ixgbe_update_mc_addr_list_generic(struct ixgbe_hw *hw,
 	hw->addr_ctrl.num_mc_addrs = netdev_mc_count(netdev);
 	hw->addr_ctrl.mta_in_use = 0;
 
-	/* Clear mta_shadow */
-	hw_dbg(hw, " Clearing MTA\n");
-	memset(&hw->mac.mta_shadow, 0, sizeof(hw->mac.mta_shadow));
-
 	/* Update mta shadow */
 	netdev_for_each_mc_addr(ha, netdev) {
 		hw_dbg(hw, " Adding the multicast addresses:\n");

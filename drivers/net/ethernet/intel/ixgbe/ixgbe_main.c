@@ -4698,7 +4698,7 @@ static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
  *                0 on no addresses written
  *                X on writing X addresses to MTA
  **/
-static int ixgbe_write_mc_addr_list(struct net_device *netdev)
+int ixgbe_write_mc_addr_list(struct net_device *netdev)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	struct ixgbe_hw *hw = &adapter->hw;
@@ -4706,14 +4706,14 @@ static int ixgbe_write_mc_addr_list(struct net_device *netdev)
 	if (!netif_running(netdev))
 		return 0;
 
+#ifdef CONFIG_PCI_IOV
+	ixgbe_restore_vf_multicasts(adapter);
+#endif
+
 	if (hw->mac.ops.update_mc_addr_list)
 		hw->mac.ops.update_mc_addr_list(hw, netdev);
 	else
 		return -ENOMEM;
-
-#ifdef CONFIG_PCI_IOV
-	ixgbe_restore_vf_multicasts(adapter);
-#endif
 
 	return netdev_mc_count(netdev);
 }
