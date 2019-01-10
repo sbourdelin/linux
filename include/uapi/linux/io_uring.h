@@ -35,6 +35,8 @@ struct io_uring_sqe {
  * io_uring_setup() flags
  */
 #define IORING_SETUP_IOPOLL	(1 << 0)	/* io_context is polled */
+#define	IORING_SETUP_SQTHREAD	(1 << 1)	/* Use SQ thread */
+#define IORING_SETUP_SQWQ	(1 << 2)	/* Use SQ workqueue */
 
 #define IORING_OP_READV		1
 #define IORING_OP_WRITEV	2
@@ -95,7 +97,8 @@ struct io_uring_params {
 	__u32 sq_entries;
 	__u32 cq_entries;
 	__u32 flags;
-	__u16 resv[10];
+	__u16 sq_thread_cpu;
+	__u16 resv[9];
 	struct io_sqring_offsets sq_off;
 	struct io_cqring_offsets cq_off;
 };
