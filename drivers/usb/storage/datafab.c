@@ -102,7 +102,6 @@ MODULE_DEVICE_TABLE(usb, datafab_usb_ids);
 }
 
 static struct us_unusual_dev datafab_unusual_dev_list[] = {
-#	include "unusual_datafab.h"
 	{ }		/* Terminating entry */
 };
 

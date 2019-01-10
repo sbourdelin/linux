@@ -65,7 +65,6 @@ MODULE_DEVICE_TABLE(usb, ene_ub6250_usb_ids);
 }
 
 static struct us_unusual_dev ene_ub6250_unusual_dev_list[] = {
-#	include "unusual_ene_ub6250.h"
 	{ }		/* Terminating entry */
 };
 
