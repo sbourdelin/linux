@@ -34,7 +34,7 @@
 #include "iwpm_util.h"
 
 static const char iwpm_ulib_name[IWPM_ULIBNAME_SIZE] = "iWarpPortMapperUser";
-static int iwpm_ulib_version = 3;
+int iwpm_user_ulib_version = IWPM_UABI_VERSION;
 static int iwpm_user_pid = IWPM_PID_UNDEFINED;
 static atomic_t echo_nlmsg_seq;
 
@@ -130,6 +130,7 @@ pid_query_error:
  * nlmsg attributes:
  *	[IWPM_NLA_MANAGE_MAPPING_SEQ]
  *	[IWPM_NLA_MANAGE_ADDR]
+ *	[IWPM_NLA_MANAGE_FLAGS]
  */
 int iwpm_add_mapping(struct iwpm_sa_data *pm_msg, u8 nl_client)
 {
@@ -172,6 +173,12 @@ int iwpm_add_mapping(struct iwpm_sa_data *pm_msg, u8 nl_client)
 				&pm_msg->loc_addr, IWPM_NLA_MANAGE_ADDR);
 	if (ret)
 		goto add_mapping_error;
+	if (iwpm_user_ulib_version == IWPM_UABI_VERSION) {
+		ret = ibnl_put_attr(skb, nlh, sizeof(u32), &pm_msg->flags,
+				IWPM_NLA_MANAGE_FLAGS);
+		if (ret)
+			goto add_mapping_error;
+	}
 
 	nlmsg_end(skb, nlh);
 	nlmsg_request->req_buffer = pm_msg;
@@ -201,6 +208,7 @@ add_mapping_error:
  *	[IWPM_NLA_QUERY_MAPPING_SEQ]
  *	[IWPM_NLA_QUERY_LOCAL_ADDR]
  *	[IWPM_NLA_QUERY_REMOTE_ADDR]
+ *	[IWPM_NLA_QUERY_FLAGS]
  */
 int iwpm_add_and_query_mapping(struct iwpm_sa_data *pm_msg, u8 nl_client)
 {
@@ -250,6 +258,12 @@ int iwpm_add_and_query_mapping(struct iwpm_sa_data *pm_msg, u8 nl_client)
 				&pm_msg->rem_addr, IWPM_NLA_QUERY_REMOTE_ADDR);
 	if (ret)
 		goto query_mapping_error;
+	if (iwpm_user_ulib_version == IWPM_UABI_VERSION) {
+		ret = ibnl_put_attr(skb, nlh, sizeof(u32), &pm_msg->flags,
+				IWPM_NLA_QUERY_FLAGS);
+		if (ret)
+			goto query_mapping_error;
+	}
 
 	nlmsg_end(skb, nlh);
 	nlmsg_request->req_buffer = pm_msg;
@@ -379,7 +393,7 @@ int iwpm_register_pid_cb(struct sk_buff *skb, struct netlink_callback *cb)
 	/* check device name, ulib name and version */
 	if (strcmp(pm_msg->dev_name, dev_name) ||
 			strcmp(iwpm_ulib_name, iwpm_name) ||
-			iwpm_version != iwpm_ulib_version) {
+			iwpm_version < IWPM_UABI_VERSION_MIN) {
 
 		pr_info("%s: Incorrect info (dev = %s name = %s version = %d)\n",
 				__func__, dev_name, iwpm_name, iwpm_version);
@@ -387,6 +401,10 @@ int iwpm_register_pid_cb(struct sk_buff *skb, struct netlink_callback *cb)
 		goto register_pid_response_exit;
 	}
 	iwpm_user_pid = cb->nlh->nlmsg_pid;
+	iwpm_user_ulib_version = iwpm_version;
+	if (iwpm_user_ulib_version < IWPM_UABI_VERSION)
+		pr_info("%s: Warning: down level iwpmd ABI.  Continuing...",
+			__func__);
 	atomic_set(&echo_nlmsg_seq, cb->nlh->nlmsg_seq);
 	pr_debug("%s: iWarp Port Mapper (pid = %d) is available!\n",
 			__func__, iwpm_user_pid);
@@ -661,7 +679,7 @@ int iwpm_mapping_info_cb(struct sk_buff *skb, struct netlink_callback *cb)
 	iwpm_name = (char *)nla_data(nltb[IWPM_NLA_MAPINFO_ULIB_NAME]);
 	iwpm_version = nla_get_u16(nltb[IWPM_NLA_MAPINFO_ULIB_VER]);
 	if (strcmp(iwpm_ulib_name, iwpm_name) ||
-			iwpm_version != iwpm_ulib_version) {
+			iwpm_version < IWPM_UABI_VERSION_MIN) {
 		pr_info("%s: Invalid port mapper name = %s version = %d\n",
 				__func__, iwpm_name, iwpm_version);
 		return ret;

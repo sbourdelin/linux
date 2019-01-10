@@ -525,6 +525,8 @@ static int iw_cm_map(struct iw_cm_id *cm_id, bool active)
 	cm_id->mapped = true;
 	pm_msg.loc_addr = cm_id->local_addr;
 	pm_msg.rem_addr = cm_id->remote_addr;
+	pm_msg.flags = (cm_id->device->iwcm->driver_flags & IW_F_NO_PORT_MAP) ?
+		       IWPM_FLAGS_NO_PORT_MAP : 0;
 	if (active)
 		status = iwpm_add_and_query_mapping(&pm_msg,
 						    RDMA_NL_IWCM);
@@ -543,7 +545,7 @@ static int iw_cm_map(struct iw_cm_id *cm_id, bool active)
 
 	return iwpm_create_mapinfo(&cm_id->local_addr,
 				   &cm_id->m_local_addr,
-				   RDMA_NL_IWCM);
+				   RDMA_NL_IWCM, pm_msg.flags);
 }
 
 /*

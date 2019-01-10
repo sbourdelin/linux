@@ -78,6 +78,7 @@ struct iwpm_mapping_info {
 	struct sockaddr_storage local_sockaddr;
 	struct sockaddr_storage mapped_sockaddr;
 	u8     nl_client;
+	u32    map_flags;
 };
 
 struct iwpm_remote_info {
@@ -266,4 +267,6 @@ int iwpm_parse_nlmsg(struct netlink_callback *cb, int policy_max,
  * @msg: Message to print
  */
 void iwpm_print_sockaddr(struct sockaddr_storage *sockaddr, char *msg);
+extern int iwpm_user_ulib_version;
+
 #endif

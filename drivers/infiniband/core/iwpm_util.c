@@ -51,6 +51,9 @@ static DEFINE_SPINLOCK(iwpm_reminfo_lock);
 static DEFINE_MUTEX(iwpm_admin_lock);
 static struct iwpm_admin_data iwpm_admin;
 
+static struct class *iwpm_class;
+static CLASS_ATTR_STRING(abi_version, 0444, __stringify(IWPM_UABI_VERSION));
+
 int iwpm_init(u8 nl_client)
 {
 	int ret = 0;
@@ -69,6 +72,21 @@ int iwpm_init(u8 nl_client)
 		if (!iwpm_reminfo_bucket) {
 			kfree(iwpm_hash_bucket);
 			ret = -ENOMEM;
+			goto init_exit;
+		}
+		iwpm_class = class_create(THIS_MODULE, "iwpm");
+		if (IS_ERR(iwpm_class)) {
+			kfree(iwpm_reminfo_bucket);
+			kfree(iwpm_hash_bucket);
+			ret = PTR_ERR(iwpm_class);
+			goto init_exit;
+		}
+		ret = class_create_file(iwpm_class,
+					&class_attr_abi_version.attr);
+		if (ret) {
+			class_destroy(iwpm_class);
+			kfree(iwpm_reminfo_bucket);
+			kfree(iwpm_hash_bucket);
 			goto init_exit;
 		}
 	}
@@ -99,6 +117,8 @@ int iwpm_exit(u8 nl_client)
 		return -EINVAL;
 	}
 	if (atomic_dec_and_test(&iwpm_admin.refcount)) {
+		class_remove_file(iwpm_class, &class_attr_abi_version.attr);
+		class_destroy(iwpm_class);
 		free_hash_bucket();
 		free_reminfo_bucket();
 		pr_debug("%s: Resources are destroyed\n", __func__);
@@ -114,7 +134,7 @@ static struct hlist_head *get_mapinfo_hash_bucket(struct sockaddr_storage *,
 
 int iwpm_create_mapinfo(struct sockaddr_storage *local_sockaddr,
 			struct sockaddr_storage *mapped_sockaddr,
-			u8 nl_client)
+			u8 nl_client, u32 map_flags)
 {
 	struct hlist_head *hash_bucket_head = NULL;
 	struct iwpm_mapping_info *map_info;
@@ -132,6 +152,7 @@ int iwpm_create_mapinfo(struct sockaddr_storage *local_sockaddr,
 	memcpy(&map_info->mapped_sockaddr, mapped_sockaddr,
 	       sizeof(struct sockaddr_storage));
 	map_info->nl_client = nl_client;
+	map_info->map_flags = map_flags;
 
 	spin_lock_irqsave(&iwpm_mapinfo_lock, flags);
 	if (iwpm_hash_bucket) {
@@ -685,6 +706,14 @@ int iwpm_send_mapinfo(u8 nl_client, int iwpm_pid)
 					IWPM_NLA_MAPINFO_MAPPED_ADDR);
 			if (ret)
 				goto send_mapping_info_unlock;
+
+			if (iwpm_user_ulib_version == IWPM_UABI_VERSION) {
+				ret = ibnl_put_attr(skb, nlh, sizeof(u32),
+						&map_info->map_flags,
+						IWPM_NLA_MAPINFO_FLAGS);
+				if (ret)
+					goto send_mapping_info_unlock;
+			}
 
 			nlmsg_end(skb, nlh);
 
