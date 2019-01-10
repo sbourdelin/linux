@@ -34,6 +34,20 @@ obj-y += vdso32_wrapper.o
 extra-y += vdso32.lds
 CPPFLAGS_vdso32.lds += -P -C -Upowerpc
 
+# clang refuses to accept -mabi=elfv1 for when using the
+# 64-bit target in 32-bit mode
+ifdef CONFIG_CC_IS_CLANG
+ifdef CONFIG_PPC64
+AFLAGS_REMOVE_getcpu.o += -mabi=elfv1
+endif
+AFLAGS_REMOVE_sigtramp.o += -mabi=elfv1
+AFLAGS_REMOVE_gettimeofday.o += -mabi=elfv1
+AFLAGS_REMOVE_datapage.o += -mabi=elfv1
+AFLAGS_REMOVE_cacheflush.o += -mabi=elfv1
+AFLAGS_REMOVE_note.o += -mabi=elfv1
+endif
+
+
 # Force dependency (incbin is bad)
 $(obj)/vdso32_wrapper.o : $(obj)/vdso32.so
 
