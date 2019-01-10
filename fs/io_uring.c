@@ -113,6 +113,21 @@ struct sqe_submit {
 	unsigned index;
 };
 
+struct io_submit_state {
+	struct io_ring_ctx *ctx;
+
+	struct blk_plug plug;
+#ifdef CONFIG_BLOCK
+	struct blk_plug_cb plug_cb;
+#endif
+
+	/*
+	 * Polled iocbs that have been submitted, but not added to the ctx yet
+	 */
+	struct list_head req_list;
+	unsigned int req_count;
+};
+
 static struct kmem_cache *kiocb_cachep;
 
 static const struct file_operations io_scqring_fops;
@@ -480,27 +495,62 @@ static inline void io_rw_done(struct kiocb *req, ssize_t ret)
 }
 
 /*
- * After the iocb has been issued, it's safe to be found on the poll list.
- * Adding the kiocb to the list AFTER submission ensures that we don't
- * find it from a io_getevents() thread before the issuer is done accessing
- * the kiocb cookie.
+ * Called either at the end of IO submission, or through a plug callback
+ * because we're going to schedule. Moves out local batch of requests to
+ * the ctx poll list, so they can be found for polling + reaping.
  */
-static void io_iopoll_kiocb_issued(struct io_kiocb *kiocb)
+static void io_flush_state_reqs(struct io_ring_ctx *ctx,
+				 struct io_submit_state *state)
 {
+	spin_lock(&ctx->poll_lock);
+	list_splice_tail_init(&state->req_list, &ctx->poll_submitted);
+	spin_unlock(&ctx->poll_lock);
+	state->req_count = 0;
+}
+
+static void io_iopoll_iocb_add_list(struct io_kiocb *kiocb)
+{
+	const int front = test_bit(KIOCB_F_IOPOLL_COMPLETED, &kiocb->ki_flags);
+	struct io_ring_ctx *ctx = kiocb->ki_ctx;
+
 	/*
 	 * For fast devices, IO may have already completed. If it has, add
 	 * it to the front so we find it first. We can't add to the poll_done
 	 * list as that's unlocked from the completion side.
 	 */
-	const int front = test_bit(KIOCB_F_IOPOLL_COMPLETED, &kiocb->ki_flags);
-	struct io_ring_ctx *ctx = kiocb->ki_ctx;
-
 	spin_lock(&ctx->poll_lock);
 	if (front)
 		list_add(&kiocb->ki_list, &ctx->poll_submitted);
 	else
 		list_add_tail(&kiocb->ki_list, &ctx->poll_submitted);
 	spin_unlock(&ctx->poll_lock);
+}
+
+static void io_iopoll_iocb_add_state(struct io_submit_state *state,
+				     struct io_kiocb *kiocb)
+{
+	if (test_bit(KIOCB_F_IOPOLL_COMPLETED, &kiocb->ki_flags))
+		list_add(&kiocb->ki_list, &state->req_list);
+	else
+		list_add_tail(&kiocb->ki_list, &state->req_list);
+
+	if (++state->req_count >= IO_IOPOLL_BATCH)
+		io_flush_state_reqs(state->ctx, state);
+}
+
+/*
+ * After the iocb has been issued, it's safe to be found on the poll list.
+ * Adding the kiocb to the list AFTER submission ensures that we don't
+ * find it from a io_getevents() thread before the issuer is done accessing
+ * the kiocb cookie.
+ */
+static void io_iopoll_kiocb_issued(struct io_submit_state *state,
+				   struct io_kiocb *kiocb)
+{
+	if (!state || !IS_ENABLED(CONFIG_BLOCK))
+		io_iopoll_iocb_add_list(kiocb);
+	else
+		io_iopoll_iocb_add_state(state, kiocb);
 }
 
 static ssize_t io_read(struct io_kiocb *kiocb, const struct io_uring_sqe *sqe)
@@ -624,7 +674,8 @@ static int io_fsync(struct io_kiocb *kiocb, const struct io_uring_sqe *sqe,
 	return 0;
 }
 
-static int io_submit_sqe(struct io_ring_ctx *ctx, struct sqe_submit *s)
+static int io_submit_sqe(struct io_ring_ctx *ctx, struct sqe_submit *s,
+			 struct io_submit_state *state)
 {
 	const struct io_uring_sqe *sqe = s->sqe;
 	struct io_kiocb *req;
@@ -673,12 +724,49 @@ static int io_submit_sqe(struct io_ring_ctx *ctx, struct sqe_submit *s)
 			ret = -EAGAIN;
 			goto out_put_req;
 		}
-		io_iopoll_kiocb_issued(req);
+		io_iopoll_kiocb_issued(state, req);
 	}
 	return 0;
 out_put_req:
 	io_free_kiocb(req);
 	return ret;
+}
+
+#ifdef CONFIG_BLOCK
+static void io_state_unplug(struct blk_plug_cb *cb, bool from_schedule)
+{
+	struct io_submit_state *state;
+
+	state = container_of(cb, struct io_submit_state, plug_cb);
+	if (!list_empty(&state->req_list))
+		io_flush_state_reqs(state->ctx, state);
+}
+#endif
+
+/*
+ * Batched submission is done, ensure local IO is flushed out.
+ */
+static void io_submit_state_end(struct io_submit_state *state)
+{
+	blk_finish_plug(&state->plug);
+	if (!list_empty(&state->req_list))
+		io_flush_state_reqs(state->ctx, state);
+}
+
+/*
+ * Start submission side cache.
+ */
+static void io_submit_state_start(struct io_submit_state *state,
+				  struct io_ring_ctx *ctx)
+{
+	state->ctx = ctx;
+	INIT_LIST_HEAD(&state->req_list);
+	state->req_count = 0;
+#ifdef CONFIG_BLOCK
+	state->plug_cb.callback = io_state_unplug;
+	blk_start_plug(&state->plug);
+	list_add(&state->plug_cb.list, &state->plug.cb_list);
+#endif
 }
 
 static void io_inc_sqring(struct io_ring_ctx *ctx)
@@ -715,11 +803,13 @@ static bool io_peek_sqring(struct io_ring_ctx *ctx, struct sqe_submit *s)
 
 static int io_ring_submit(struct io_ring_ctx *ctx, unsigned int to_submit)
 {
+	struct io_submit_state state, *statep = NULL;
 	int i, ret = 0, submit = 0;
-	struct blk_plug plug;
 
-	if (to_submit > IO_PLUG_THRESHOLD)
-		blk_start_plug(&plug);
+	if (to_submit > IO_PLUG_THRESHOLD) {
+		io_submit_state_start(&state, ctx);
+		statep = &state;
+	}
 
 	for (i = 0; i < to_submit; i++) {
 		struct sqe_submit s;
@@ -727,7 +817,7 @@ static int io_ring_submit(struct io_ring_ctx *ctx, unsigned int to_submit)
 		if (!io_peek_sqring(ctx, &s))
 			break;
 
-		ret = io_submit_sqe(ctx, &s);
+		ret = io_submit_sqe(ctx, &s, statep);
 		if (ret)
 			break;
 
@@ -735,8 +825,8 @@ static int io_ring_submit(struct io_ring_ctx *ctx, unsigned int to_submit)
 		io_inc_sqring(ctx);
 	}
 
-	if (to_submit > IO_PLUG_THRESHOLD)
-		blk_finish_plug(&plug);
+	if (statep)
+		io_submit_state_end(statep);
 
 	return submit ? submit : ret;
 }
