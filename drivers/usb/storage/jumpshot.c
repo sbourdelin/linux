@@ -84,7 +84,6 @@ MODULE_DEVICE_TABLE(usb, jumpshot_usb_ids);
 }
 
 static struct us_unusual_dev jumpshot_unusual_dev_list[] = {
-#	include "unusual_jumpshot.h"
 	{ }		/* Terminating entry */
 };
 
