@@ -1362,10 +1362,7 @@ static inline unsigned int pblk_get_secs(struct bio *bio)
 
 static inline void pblk_setup_uuid(struct pblk *pblk)
 {
-	uuid_le uuid;
-
-	uuid_le_gen(&uuid);
-	memcpy(pblk->instance_uuid, uuid.b, 16);
+	guid_gen((guid_t *)&pblk->instance_uuid);
 }
 
 static inline char *pblk_disk_name(struct pblk *pblk)
