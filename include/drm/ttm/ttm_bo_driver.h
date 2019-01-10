@@ -381,6 +381,15 @@ struct ttm_bo_driver {
 	 */
 	int (*access_memory)(struct ttm_buffer_object *bo, unsigned long offset,
 			     void *buf, int len, int write);
+
+	/**
+	 * struct ttm_bo_driver member lru_notify
+	 *
+	 * @bo: the buffer object to be add
+	 *
+	 * send lru changed event to driver.
+	 */
+	void (*lru_notify)(struct ttm_buffer_object *bo);
 };
 
 /**
