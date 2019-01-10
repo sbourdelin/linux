@@ -2,6 +2,7 @@
 #include <linux/mount.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/proc_fs.h>
 #include <linux/proc_ns.h>
 #include <linux/magic.h>
 #include <linux/ktime.h>
