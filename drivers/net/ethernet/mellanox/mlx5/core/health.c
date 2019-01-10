@@ -191,9 +191,26 @@ static bool reset_fw_if_needed(struct mlx5_core_dev *dev)
 
 #define MLX5_CRDUMP_WAIT_MS	60000
 #define MLX5_FW_RESET_WAIT_MS	1000
+#define MLX5_RECOVERY_TIMEOUT_MS 1200000
+
+static bool mlx5_health_allow_recover(struct mlx5_core_health *health)
+{
+	bool ret = false;
+
+	ret = health->last_recover_tstamp ?
+	      time_after(jiffies, health->last_recover_tstamp +
+			 msecs_to_jiffies(MLX5_RECOVERY_TIMEOUT_MS)) :
+	      true;
+
+	health->last_recover_tstamp = jiffies;
+
+	return ret;
+}
+
 void mlx5_enter_error_state(struct mlx5_core_dev *dev, bool force)
 {
 	unsigned long end, delay_ms = MLX5_FW_RESET_WAIT_MS;
+	struct mlx5_core_health *health = &dev->priv.health;
 	u32 fatal_error, err;
 	int lock = -EBUSY;
 
@@ -211,6 +228,12 @@ void mlx5_enter_error_state(struct mlx5_core_dev *dev, bool force)
 		mlx5_core_err(dev, "start\n");
 
 	fatal_error = check_fatal_sensors(dev);
+
+	if (fatal_error == MLX5_SENSOR_FW_SYND_RFR &&
+	    !mlx5_health_allow_recover(health)) {
+		mlx5_core_warn_once(dev, "Device recovery ignored\n");
+		goto err_state_done;
+	}
 
 	if (fatal_error || force) {
 		dev->state = MLX5_DEVICE_STATE_INTERNAL_ERROR;
@@ -560,6 +583,7 @@ int mlx5_health_init(struct mlx5_core_dev *dev)
 	INIT_WORK(&health->work, health_care);
 	INIT_DELAYED_WORK(&health->recover_work, health_recover);
 	health->crdump = NULL;
+	health->last_recover_tstamp = 0;
 
 	return 0;
 }

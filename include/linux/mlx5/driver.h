@@ -442,6 +442,7 @@ struct mlx5_core_health {
 	struct work_struct		work;
 	struct delayed_work		recover_work;
 	struct mlx5_fw_crdump	       *crdump;
+	unsigned long			last_recover_tstamp;
 };
 
 struct mlx5_qp_table {
