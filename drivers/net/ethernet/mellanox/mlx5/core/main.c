@@ -66,6 +66,7 @@
 #include "lib/vxlan.h"
 #include "lib/devcom.h"
 #include "diag/fw_tracer.h"
+#include "lib/pci_vsc.h"
 
 MODULE_AUTHOR("Eli Cohen <eli@mellanox.com>");
 MODULE_DESCRIPTION("Mellanox 5th generation network adapters (ConnectX series) core driver");
@@ -1204,6 +1205,8 @@ static int init_one(struct pci_dev *pdev,
 	}
 
 	request_module_nowait(MLX5_IB_MOD);
+
+	mlx5_vsc_init(dev);
 
 	err = mlx5_devlink_register(devlink, &pdev->dev);
 	if (err)
