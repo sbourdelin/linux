@@ -62,7 +62,6 @@ MODULE_DEVICE_TABLE(usb, sddr55_usb_ids);
 }
 
 static struct us_unusual_dev sddr55_unusual_dev_list[] = {
-#	include "unusual_sddr55.h"
 	{ }		/* Terminating entry */
 };
 
