@@ -121,13 +121,12 @@ static int ib_device_check_mandatory(struct ib_device *device)
 	};
 	int i;
 
+	device->kverbs_provider = true;
 	for (i = 0; i < ARRAY_SIZE(mandatory_table); ++i) {
 		if (!*(void **) ((void *) &device->ops +
 				 mandatory_table[i].offset)) {
-			dev_warn(&device->dev,
-				 "Device is missing mandatory function %s\n",
-				 mandatory_table[i].name);
-			return -EINVAL;
+			device->kverbs_provider = false;
+			break;
 		}
 	}
 
@@ -330,6 +329,9 @@ static int add_client_context(struct ib_device *device, struct ib_client *client
 {
 	struct ib_client_data *context;
 
+	if (!device->kverbs_provider && !client->no_kverbs_req)
+		return -EOPNOTSUPP;
+
 	context = kmalloc(sizeof(*context), GFP_KERNEL);
 	if (!context)
 		return -ENOMEM;
@@ -374,10 +376,12 @@ static int read_port_immutable(struct ib_device *device)
 		return -ENOMEM;
 
 	for (port = start_port; port <= end_port; ++port) {
-		ret = device->ops.get_port_immutable(
-			device, port, &device->port_immutable[port]);
-		if (ret)
-			return ret;
+		if (device->ops.get_port_immutable) {
+			ret = device->ops.get_port_immutable(
+				device, port, &device->port_immutable[port]);
+			if (ret)
+				return ret;
+		}
 
 		if (verify_immutable(device, port))
 			return -EINVAL;
@@ -537,11 +541,13 @@ static int setup_device(struct ib_device *device)
 	}
 
 	memset(&device->attrs, 0, sizeof(device->attrs));
-	ret = device->ops.query_device(device, &device->attrs, &uhw);
-	if (ret) {
-		dev_warn(&device->dev,
-			 "Couldn't query the device attributes\n");
-		goto port_cleanup;
+	if (device->ops.query_device) {
+		ret = device->ops.query_device(device, &device->attrs, &uhw);
+		if (ret) {
+			dev_warn(&device->dev,
+				 "Couldn't query the device attributes\n");
+			goto port_cleanup;
+		}
 	}
 
 	ret = setup_port_pkey_list(device);
@@ -919,6 +925,9 @@ int ib_query_port(struct ib_device *device,
 {
 	union ib_gid gid;
 	int err;
+
+	if (!device->ops.query_port)
+		return -EOPNOTSUPP;
 
 	if (!rdma_is_port_valid(device, port_num))
 		return -EINVAL;
