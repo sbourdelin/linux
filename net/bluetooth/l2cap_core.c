@@ -2980,6 +2980,10 @@ static inline int l2cap_get_conf_opt(void **ptr, int *type, int *olen,
 		break;
 
 	default:
+		/* Only CONF_EFS and CONF_RFC are allowed here */
+		if ((opt->type != L2CAP_CONF_EFS) &&
+		    (opt->type != L2CAP_CONF_RFC))
+			return -EPROTO;
 		*val = (unsigned long) opt->val;
 		break;
 	}
@@ -3324,7 +3328,7 @@ static int l2cap_parse_conf_req(struct l2cap_chan *chan, void *data, size_t data
 	void *endptr = data + data_size;
 	void *req = chan->conf_req;
 	int len = chan->conf_len;
-	int type, hint, olen;
+	int type, hint, olen, err;
 	unsigned long val;
 	struct l2cap_conf_rfc rfc = { .mode = L2CAP_MODE_BASIC };
 	struct l2cap_conf_efs efs;
@@ -3336,7 +3340,10 @@ static int l2cap_parse_conf_req(struct l2cap_chan *chan, void *data, size_t data
 	BT_DBG("chan %p", chan);
 
 	while (len >= L2CAP_CONF_OPT_SIZE) {
-		len -= l2cap_get_conf_opt(&req, &type, &olen, &val);
+		err = l2cap_get_conf_opt(&req, &type, &olen, &val);
+		if (err < 0)
+			return err;
+		len -= err;
 
 		hint  = type & L2CAP_CONF_HINT;
 		type &= L2CAP_CONF_MASK;
@@ -3539,7 +3546,7 @@ static int l2cap_parse_conf_rsp(struct l2cap_chan *chan, void *rsp, int len,
 	struct l2cap_conf_req *req = data;
 	void *ptr = req->data;
 	void *endptr = data + size;
-	int type, olen;
+	int type, olen, err;
 	unsigned long val;
 	struct l2cap_conf_rfc rfc = { .mode = L2CAP_MODE_BASIC };
 	struct l2cap_conf_efs efs;
@@ -3547,7 +3554,10 @@ static int l2cap_parse_conf_rsp(struct l2cap_chan *chan, void *rsp, int len,
 	BT_DBG("chan %p, rsp %p, len %d, req %p", chan, rsp, len, data);
 
 	while (len >= L2CAP_CONF_OPT_SIZE) {
-		len -= l2cap_get_conf_opt(&rsp, &type, &olen, &val);
+		err = l2cap_get_conf_opt(&rsp, &type, &olen, &val);
+		if (err < 0)
+			return err;
+		len -= err;
 
 		switch (type) {
 		case L2CAP_CONF_MTU:
@@ -3707,7 +3717,7 @@ void __l2cap_connect_rsp_defer(struct l2cap_chan *chan)
 
 static void l2cap_conf_rfc_get(struct l2cap_chan *chan, void *rsp, int len)
 {
-	int type, olen;
+	int type, olen, err;
 	unsigned long val;
 	/* Use sane default values in case a misbehaving remote device
 	 * did not send an RFC or extended window size option.
@@ -3727,7 +3737,10 @@ static void l2cap_conf_rfc_get(struct l2cap_chan *chan, void *rsp, int len)
 		return;
 
 	while (len >= L2CAP_CONF_OPT_SIZE) {
-		len -= l2cap_get_conf_opt(&rsp, &type, &olen, &val);
+		err = l2cap_get_conf_opt(&rsp, &type, &olen, &val);
+		if (err < 0)
+			return;
+		len -= err;
 
 		switch (type) {
 		case L2CAP_CONF_RFC:
