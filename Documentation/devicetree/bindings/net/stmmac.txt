@@ -68,11 +68,11 @@ Optional properties:
 	- snps,xit_frm: unlock on WoL
 	- snps,wr_osr_lmt: max write outstanding req. limit
 	- snps,rd_osr_lmt: max read outstanding req. limit
-	- snps,kbbe: do not cross 1KiB boundary.
+	- snps,axi_kbbe: do not cross 1KiB boundary.
 	- snps,blen: this is a vector of supported burst length.
-	- snps,fb: fixed-burst
-	- snps,mb: mixed-burst
-	- snps,rb: rebuild INCRx Burst
+	- snps,axi_fb: fixed-burst
+	- snps,axi_mb: mixed-burst
+	- snps,axi_rb: rebuild INCRx Burst
 - mdio: with compatible = "snps,dwmac-mdio", create and register mdio bus.
 - Multiple RX Queues parameters: below the list of all the parameters to
 				 configure the multiple RX queues:
