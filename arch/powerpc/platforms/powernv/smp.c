@@ -254,12 +254,12 @@ static void pnv_smp_cpu_kill_self(void)
 static int pnv_cpu_bootable(unsigned int nr)
 {
 	/*
-	 * Starting with POWER8, the subcore logic relies on all threads of a
-	 * core being booted so that they can participate in split mode
-	 * switches. So on those machines we ignore the smt_enabled_at_boot
-	 * setting (smt-enabled on the kernel command line).
+	 * On POWER8 the subcore logic relies on all threads of a core being
+	 * booted so that they can participate in split mode switches. So on
+	 * those machines we ignore the smt_enabled_at_boot setting (smt-enabled
+	 * on the kernel command line).
 	 */
-	if (cpu_has_feature(CPU_FTR_ARCH_207S))
+	if (cpu_has_feature(CPU_FTR_ARCH_207S) && !cpu_has_feature(CPU_FTR_ARCH_300))
 		return 1;
 
 	return smp_generic_cpu_bootable(nr);
