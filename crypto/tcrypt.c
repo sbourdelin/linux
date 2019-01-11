@@ -2054,6 +2054,14 @@ static int do_test(const char *alg, u32 type, u32 mask, int m, u32 num_mb)
 		ret += tcrypt_test("cbc(sm4)");
 		ret += tcrypt_test("ctr(sm4)");
 		break;
+	case 192:
+		ret += tcrypt_test("kdf_ctr(hmac(sha256))");
+		ret += tcrypt_test("kdf_dpi(hmac(sha256))");
+		ret += tcrypt_test("kdf_fb(hmac(sha256))");
+		break;
+	case 193:
+		ret += tcrypt_test("hkdf(hmac(sha256))");
+		break;
 	case 200:
 		test_cipher_speed("ecb(aes)", ENCRYPT, sec, NULL, 0,
 				speed_template_16_24_32);
