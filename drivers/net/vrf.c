@@ -37,6 +37,7 @@
 #include <net/l3mdev.h>
 #include <net/fib_rules.h>
 #include <net/netns/generic.h>
+#include <net/netfilter/nf_conntrack.h>
 
 #define DRV_NAME	"vrf"
 #define DRV_VERSION	"1.0"
@@ -898,6 +899,12 @@ static struct sk_buff *vrf_rcv_nfhook(u8 pf, unsigned int hook,
 				      struct net_device *dev)
 {
 	struct net *net = dev_net(dev);
+	enum ip_conntrack_info ctinfo;
+	struct nf_conn *ct;
+
+	ct = nf_ct_get(skb, &ctinfo);
+	if (ct && (ct->status & IPS_DST_NAT))
+		return skb;
 
 	if (nf_hook(pf, hook, net, NULL, skb, dev, NULL, vrf_rcv_finish) != 1)
 		skb = NULL;    /* kfree_skb(skb) handled by nf code */
