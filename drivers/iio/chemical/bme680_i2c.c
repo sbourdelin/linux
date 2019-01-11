@@ -14,6 +14,7 @@
 #include <linux/acpi.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/regmap.h>
 
 #include "bme680.h"
@@ -70,10 +71,17 @@ static const struct acpi_device_id bme680_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, bme680_acpi_match);
 
+static const struct of_device_id bme680_of_i2c_match[] = {
+	{ .compatible = "bosch,bme680", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, bme680_of_i2c_match);
+
 static struct i2c_driver bme680_i2c_driver = {
 	.driver = {
 		.name			= "bme680_i2c",
 		.acpi_match_table       = ACPI_PTR(bme680_acpi_match),
+		.of_match_table		= of_match_ptr(bme680_of_i2c_match),
 	},
 	.probe = bme680_i2c_probe,
 	.id_table = bme680_i2c_id,
