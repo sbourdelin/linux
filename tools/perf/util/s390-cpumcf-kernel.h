@@ -10,6 +10,7 @@
 #define S390_CPUMCF_KERNEL_H
 
 #define	S390_CPUMCF_DIAG_DEF	0xfeef	/* Counter diagnostic entry ID */
+#define	PERF_EVENT_CPUM_CF_DIAG	0xBC000	/* Event: Counter sets */
 
 struct cf_ctrset_entry {	/* CPU-M CF counter set entry (8 byte) */
 	unsigned int def:16;	/* 0-15  Data Entry Format */
