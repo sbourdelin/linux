@@ -1047,9 +1047,12 @@ swp_entry_t get_swap_page_of_type(int type)
 	struct swap_info_struct *si;
 	pgoff_t offset;
 
+	if (type >= nr_swapfiles)
+		goto fail;
+
 	si = swap_info[type];
 	spin_lock(&si->lock);
-	if (si && (si->flags & SWP_WRITEOK)) {
+	if (si->flags & SWP_WRITEOK) {
 		atomic_long_dec(&nr_swap_pages);
 		/* This is called for allocating swap entry, not cache */
 		offset = scan_swap_map(si, 1);
@@ -1060,6 +1063,7 @@ swp_entry_t get_swap_page_of_type(int type)
 		atomic_long_inc(&nr_swap_pages);
 	}
 	spin_unlock(&si->lock);
+fail:
 	return (swp_entry_t) {0};
 }
 
