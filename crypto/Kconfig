@@ -568,6 +568,12 @@ config CRYPTO_KDF
 	  Support for KDF compliant to SP800-108. All three types of
 	  KDF specified in SP800-108 are implemented.
 
+config CRYPTO_HKDF
+	tristate "HMAC-based Extract-and expand Key Derivation Function"
+	select CRYPTO_RNG
+	help
+	  Support for KDF compliant to RFC5869.
+
 config CRYPTO_XCBC
 	tristate "XCBC support"
 	select CRYPTO_HASH
