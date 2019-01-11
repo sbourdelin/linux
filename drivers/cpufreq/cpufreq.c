@@ -21,6 +21,7 @@
 #include <linux/cpufreq.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/freq_constraint.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
@@ -1163,11 +1164,30 @@ static void cpufreq_policy_free(struct cpufreq_policy *policy)
 		per_cpu(cpufreq_cpu_data, cpu) = NULL;
 	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
+	freq_constraint_remove_cpumask_callback(policy->related_cpus);
 	cpufreq_policy_put_kobj(policy);
 	free_cpumask_var(policy->real_cpus);
 	free_cpumask_var(policy->related_cpus);
 	free_cpumask_var(policy->cpus);
 	kfree(policy);
+}
+
+static void freq_constraint_callback(void *param)
+{
+	struct cpufreq_policy *policy = param;
+	struct cpufreq_policy new_policy = *policy;
+
+	new_policy.min = policy->user_policy.min;
+	new_policy.max = policy->user_policy.max;
+
+	down_write(&policy->rwsem);
+	if (policy_is_inactive(policy))
+		goto unlock;
+
+	cpufreq_set_policy(policy, &new_policy);
+
+unlock:
+	up_write(&policy->rwsem);
 }
 
 static int cpufreq_online(unsigned int cpu)
@@ -1235,6 +1255,14 @@ static int cpufreq_online(unsigned int cpu)
 		for_each_cpu(j, policy->related_cpus) {
 			per_cpu(cpufreq_cpu_data, j) = policy;
 			add_cpu_dev_symlink(policy, j);
+		}
+
+		ret = freq_constraint_set_cpumask_callback(policy->related_cpus,
+					freq_constraint_callback, policy);
+		if (ret) {
+			pr_err("Failed to set freq-constraints: %d (%*pbl)\n",
+			       ret, cpumask_pr_args(policy->cpus));
+			goto out_destroy_policy;
 		}
 	} else {
 		policy->min = policy->user_policy.min;
@@ -2200,6 +2228,8 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 				struct cpufreq_policy *new_policy)
 {
 	struct cpufreq_governor *old_gov;
+	struct device *cpu_dev = get_cpu_device(policy->cpu);
+	unsigned long fc_min, fc_max;
 	int ret;
 
 	pr_debug("setting new policy for CPU %u: %u - %u kHz\n",
@@ -2219,6 +2249,20 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	if (ret)
 		return ret;
 
+	ret = freq_constraints_get(cpu_dev, &fc_min, &fc_max);
+	if (ret) {
+		dev_err(cpu_dev, "cpufreq: Failed to get freq-constraints\n");
+	} else {
+		if (fc_min > new_policy->min)
+			new_policy->min = fc_min;
+		if (fc_max < new_policy->max)
+			new_policy->max = fc_max;
+	}
+
+	/*
+	 * The notifier-chain shall be removed once all the users of
+	 * CPUFREQ_ADJUST are moved to use the freq-constraints.
+	 */
 	/* adjust if necessary - all reasons */
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 			CPUFREQ_ADJUST, new_policy);
