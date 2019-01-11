@@ -549,6 +549,8 @@ static const struct drm_i915_reg_descriptor gen7_render_regs[] = {
 	REG64_IDX(RING_TIMESTAMP, RENDER_RING_BASE),
 	REG64(MI_PREDICATE_SRC0),
 	REG64(MI_PREDICATE_SRC1),
+	REG64(MI_PREDICATE_DATA),
+	REG32(MI_PREDICATE_RESULT),
 	REG32(GEN7_3DPRIM_END_OFFSET),
 	REG32(GEN7_3DPRIM_START_VERTEX),
 	REG32(GEN7_3DPRIM_VERTEX_COUNT),
@@ -1382,6 +1384,8 @@ int i915_cmd_parser_get_version(struct drm_i915_private *dev_priv)
 	 *    the parser enabled.
 	 * 9. Don't whitelist or handle oacontrol specially, as ownership
 	 *    for oacontrol state is moving to i915-perf.
+	 * 10. Whitelist predicate data/result registers for conditional
+	 *     rendering in Anv.
 	 */
-	return 9;
+	return 10;
 }
