@@ -1004,6 +1004,19 @@
 			status = "disabled";
 		};
 
+		r_ir: ir@1f02000 {
+			compatible = "allwinner,sun50i-a64-ir",
+				     "allwinner,sun5i-a13-ir";
+			reg = <0x01f02000 0x400>;
+			clocks = <&r_ccu CLK_APB0_IR>, <&r_ccu CLK_IR>;
+			clock-names = "apb", "ir";
+			resets = <&r_ccu RST_APB0_IR>;
+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&r_ir_pin>;
+			status = "disabled";
+		};
+
 		r_i2c: i2c@1f02400 {
 			compatible = "allwinner,sun50i-a64-i2c",
 				     "allwinner,sun6i-a31-i2c";
@@ -1041,6 +1054,11 @@
 			r_i2c_pl89_pins: r-i2c-pl89-pins {
 				pins = "PL8", "PL9";
 				function = "s_i2c";
+			};
+
+			r_ir_pin: ir {
+				pins = "PL11";
+				function = "s_cir_rx";
 			};
 
 			r_pwm_pin: pwm {
