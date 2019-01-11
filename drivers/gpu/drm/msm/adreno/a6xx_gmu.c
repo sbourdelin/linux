@@ -948,25 +948,20 @@ static int a6xx_gmu_rpmh_arc_cmds(const char *id, void *vals, int size)
 }
 
 /* Return the 'arc-level' for the given frequency */
-static u32 a6xx_gmu_get_arc_level(struct device *dev, unsigned long freq)
+static unsigned int a6xx_gmu_get_arc_level(struct device *dev,
+					   unsigned long freq)
 {
 	struct dev_pm_opp *opp;
-	struct device_node *np;
-	u32 val = 0;
+	unsigned int val;
 
 	if (!freq)
 		return 0;
 
-	opp  = dev_pm_opp_find_freq_exact(dev, freq, true);
+	opp = dev_pm_opp_find_freq_exact(dev, freq, true);
 	if (IS_ERR(opp))
 		return 0;
 
-	np = dev_pm_opp_get_of_node(opp);
-
-	if (np) {
-		of_property_read_u32(np, "qcom,level", &val);
-		of_node_put(np);
-	}
+	val = dev_pm_opp_get_level(opp);
 
 	dev_pm_opp_put(opp);
 
@@ -983,7 +978,7 @@ static int a6xx_gmu_rpmh_arc_votes_init(struct device *dev, u32 *votes,
 	/* Construct a vote for each frequency */
 	for (i = 0; i < freqs_count; i++) {
 		u8 pindex = 0, sindex = 0;
-		u32 level = a6xx_gmu_get_arc_level(dev, freqs[i]);
+		unsigned int level = a6xx_gmu_get_arc_level(dev, freqs[i]);
 
 		/* Get the primary index that matches the arc level */
 		for (j = 0; j < pri_count; j++) {
