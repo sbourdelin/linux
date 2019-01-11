@@ -5299,26 +5299,6 @@ skip_alloc:
 		instance->use_seqnum_jbod_fp = false;
 }
 
-static void megasas_setup_reply_map(struct megasas_instance *instance)
-{
-	const struct cpumask *mask;
-	unsigned int queue, cpu;
-
-	for (queue = 0; queue < instance->msix_vectors; queue++) {
-		mask = pci_irq_get_affinity(instance->pdev, queue);
-		if (!mask)
-			goto fallback;
-
-		for_each_cpu(cpu, mask)
-			instance->reply_map[cpu] = queue;
-	}
-	return;
-
-fallback:
-	for_each_possible_cpu(cpu)
-		instance->reply_map[cpu] = cpu % instance->msix_vectors;
-}
-
 /**
  * megasas_init_fw -	Initializes the FW
  * @instance:		Adapter soft state
@@ -5523,8 +5503,6 @@ static int megasas_init_fw(struct megasas_instance *instance)
 		if (i < 0)
 			goto fail_init_adapter;
 	}
-
-	megasas_setup_reply_map(instance);
 
 	dev_info(&instance->pdev->dev,
 		"firmware supports msix\t: (%d)", fw_msix_count);
@@ -6164,6 +6142,8 @@ static int megasas_io_attach(struct megasas_instance *instance)
 	host->max_id = MEGASAS_MAX_DEV_PER_CHANNEL;
 	host->max_lun = MEGASAS_MAX_LUN;
 	host->max_cmd_len = 16;
+	if (instance->adapter_type != MFI_SERIES && instance->msix_vectors > 0)
+		host->nr_hw_queues = instance->msix_vectors;
 
 	/*
 	 * Notify the mid-layer about the new controller
@@ -6331,11 +6311,6 @@ static inline int megasas_alloc_mfi_ctrl_mem(struct megasas_instance *instance)
  */
 static int megasas_alloc_ctrl_mem(struct megasas_instance *instance)
 {
-	instance->reply_map = kcalloc(nr_cpu_ids, sizeof(unsigned int),
-				      GFP_KERNEL);
-	if (!instance->reply_map)
-		return -ENOMEM;
-
 	switch (instance->adapter_type) {
 	case MFI_SERIES:
 		if (megasas_alloc_mfi_ctrl_mem(instance))
@@ -6352,8 +6327,6 @@ static int megasas_alloc_ctrl_mem(struct megasas_instance *instance)
 
 	return 0;
  fail:
-	kfree(instance->reply_map);
-	instance->reply_map = NULL;
 	return -ENOMEM;
 }
 
@@ -6366,7 +6339,6 @@ static int megasas_alloc_ctrl_mem(struct megasas_instance *instance)
  */
 static inline void megasas_free_ctrl_mem(struct megasas_instance *instance)
 {
-	kfree(instance->reply_map);
 	if (instance->adapter_type == MFI_SERIES) {
 		if (instance->producer)
 			dma_free_coherent(&instance->pdev->dev, sizeof(u32),
@@ -6987,8 +6959,6 @@ megasas_resume(struct pci_dev *pdev)
 				     instance->msix_vectors : 1, irq_flags);
 	if (rval < 0)
 		goto fail_reenable_msix;
-
-	megasas_setup_reply_map(instance);
 
 	if (instance->adapter_type != MFI_SERIES) {
 		megasas_reset_reply_desc(instance);

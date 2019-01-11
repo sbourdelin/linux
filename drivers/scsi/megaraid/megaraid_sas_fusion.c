@@ -2629,6 +2629,7 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 	struct MR_PRIV_DEVICE *mrdev_priv;
 	struct RAID_CONTEXT *rctx;
 	struct RAID_CONTEXT_G35 *rctx_g35;
+	u32 tag = blk_mq_unique_tag(scp->request);
 
 	device_id = MEGASAS_DEV_INDEX(scp);
 
@@ -2724,8 +2725,7 @@ megasas_build_ldio_fusion(struct megasas_instance *instance,
 			fp_possible = (io_info.fpOkForIo > 0) ? true : false;
 	}
 
-	cmd->request_desc->SCSIIO.MSIxIndex =
-		instance->reply_map[raw_smp_processor_id()];
+	cmd->request_desc->SCSIIO.MSIxIndex = blk_mq_unique_tag_to_hwq(tag);
 
 	if (instance->adapter_type >= VENTURA_SERIES) {
 		/* FP for Optimal raid level 1.
@@ -2971,6 +2971,7 @@ megasas_build_syspd_fusion(struct megasas_instance *instance,
 	u16 pd_index = 0;
 	u16 os_timeout_value;
 	u16 timeout_limit;
+	u32 tag = blk_mq_unique_tag(scmd->request);
 	struct MR_DRV_RAID_MAP_ALL *local_map_ptr;
 	struct RAID_CONTEXT	*pRAID_Context;
 	struct MR_PD_CFG_SEQ_NUM_SYNC *pd_sync;
@@ -3038,8 +3039,7 @@ megasas_build_syspd_fusion(struct megasas_instance *instance,
 
 	cmd->request_desc->SCSIIO.DevHandle = io_request->DevHandle;
 
-	cmd->request_desc->SCSIIO.MSIxIndex =
-		instance->reply_map[raw_smp_processor_id()];
+	cmd->request_desc->SCSIIO.MSIxIndex = blk_mq_unique_tag_to_hwq(tag);
 
 	if (!fp_possible) {
 		/* system pd firmware path */
