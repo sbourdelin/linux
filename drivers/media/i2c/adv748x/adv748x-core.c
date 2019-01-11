@@ -209,7 +209,8 @@ static int adv748x_write_regs(struct adv748x_state *state,
 
 	while (regs->page != ADV748X_PAGE_EOR) {
 		if (regs->page == ADV748X_PAGE_WAIT) {
-			msleep(regs->value);
+			usleep_range(regs->value * 1000,
+				     (regs->value * 1000) + 1000);
 		} else {
 			ret = adv748x_write(state, regs->page, regs->reg,
 				      regs->value);
