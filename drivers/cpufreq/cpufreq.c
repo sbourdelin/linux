@@ -685,22 +685,15 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 static ssize_t store_##file_name					\
 (struct cpufreq_policy *policy, const char *buf, size_t count)		\
 {									\
-	int ret, temp;							\
-	struct cpufreq_policy new_policy;				\
+	unsigned long min = policy->min, max = policy->max;		\
+	int ret;							\
 									\
-	memcpy(&new_policy, policy, sizeof(*policy));			\
-	new_policy.min = policy->user_policy.min;			\
-	new_policy.max = policy->user_policy.max;			\
-									\
-	ret = sscanf(buf, "%u", &new_policy.object);			\
+	ret = sscanf(buf, "%lu", &object);				\
 	if (ret != 1)							\
 		return -EINVAL;						\
 									\
-	temp = new_policy.object;					\
-	ret = cpufreq_set_policy(policy, &new_policy);		\
-	if (!ret)							\
-		policy->user_policy.object = temp;			\
-									\
+	ret = freq_constraint_update(get_cpu_device(policy->cpu),	\
+				     policy->user_fc, min, max);	\
 	return ret ? ret : count;					\
 }
 
@@ -1164,6 +1157,9 @@ static void cpufreq_policy_free(struct cpufreq_policy *policy)
 		per_cpu(cpufreq_cpu_data, cpu) = NULL;
 	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
+	if (!IS_ERR(policy->user_fc))
+		freq_constraint_remove(get_cpu_device(policy->cpu),
+				       policy->user_fc);
 	freq_constraint_remove_cpumask_callback(policy->related_cpus);
 	cpufreq_policy_put_kobj(policy);
 	free_cpumask_var(policy->real_cpus);
@@ -1176,9 +1172,6 @@ static void freq_constraint_callback(void *param)
 {
 	struct cpufreq_policy *policy = param;
 	struct cpufreq_policy new_policy = *policy;
-
-	new_policy.min = policy->user_policy.min;
-	new_policy.max = policy->user_policy.max;
 
 	down_write(&policy->rwsem);
 	if (policy_is_inactive(policy))
@@ -1249,9 +1242,6 @@ static int cpufreq_online(unsigned int cpu)
 	cpumask_and(policy->cpus, policy->cpus, cpu_online_mask);
 
 	if (new_policy) {
-		policy->user_policy.min = policy->min;
-		policy->user_policy.max = policy->max;
-
 		for_each_cpu(j, policy->related_cpus) {
 			per_cpu(cpufreq_cpu_data, j) = policy;
 			add_cpu_dev_symlink(policy, j);
@@ -1264,9 +1254,15 @@ static int cpufreq_online(unsigned int cpu)
 			       ret, cpumask_pr_args(policy->cpus));
 			goto out_destroy_policy;
 		}
-	} else {
-		policy->min = policy->user_policy.min;
-		policy->max = policy->user_policy.max;
+
+		policy->user_fc = freq_constraint_add(get_cpu_device(cpu),
+						      FREQ_CONSTRAINT_USER,
+						      policy->min, policy->max);
+		if (IS_ERR(policy->user_fc)) {
+			ret = PTR_ERR(policy->user_fc);
+			pr_err("Failed to add user constraint: %d\n", ret);
+			goto out_destroy_policy;
+		}
 	}
 
 	if (cpufreq_driver->get && !cpufreq_driver->setpolicy) {
@@ -2237,13 +2233,6 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 
 	memcpy(&new_policy->cpuinfo, &policy->cpuinfo, sizeof(policy->cpuinfo));
 
-	/*
-	* This check works well when we store new min/max freq attributes,
-	* because new_policy is a copy of policy with one field updated.
-	*/
-	if (new_policy->min > new_policy->max)
-		return -EINVAL;
-
 	/* verify the cpu speed can be set within this limit */
 	ret = cpufreq_driver->verify(new_policy);
 	if (ret)
@@ -2253,10 +2242,8 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	if (ret) {
 		dev_err(cpu_dev, "cpufreq: Failed to get freq-constraints\n");
 	} else {
-		if (fc_min > new_policy->min)
-			new_policy->min = fc_min;
-		if (fc_max < new_policy->max)
-			new_policy->max = fc_max;
+		new_policy->min = fc_min;
+		new_policy->max = fc_max;
 	}
 
 	/*
@@ -2358,8 +2345,6 @@ void cpufreq_update_policy(unsigned int cpu)
 
 	pr_debug("updating policy for CPU %u\n", cpu);
 	memcpy(&new_policy, policy, sizeof(*policy));
-	new_policy.min = policy->user_policy.min;
-	new_policy.max = policy->user_policy.max;
 
 	/*
 	 * BIOS might change freq behind our back
@@ -2403,10 +2388,11 @@ static int cpufreq_boost_set_sw(int state)
 			break;
 		}
 
-		down_write(&policy->rwsem);
-		policy->user_policy.max = policy->max;
-		cpufreq_governor_limits(policy);
-		up_write(&policy->rwsem);
+		ret = freq_constraint_update(get_cpu_device(policy->cpu),
+					     policy->user_fc, policy->min,
+					     policy->max);
+		if (ret)
+			break;
 	}
 
 	return ret;
