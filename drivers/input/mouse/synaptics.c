@@ -181,6 +181,12 @@ static const char * const smbus_pnp_ids[] = {
 };
 
 static const char * const forcepad_pnp_ids[] = {
+	"DLL06e4", /* Dell XPS 15 9550 */
+	"DLL0704", /* Dell XPS 13 9350 */
+	"DLL075b", /* Dell XPS 13 9360 */
+	"DLL07be", /* Dell XPS 15 9560 */
+	"DLL07e6", /* Dell XPS 13 9370 */
+	"DLL087c", /* Dell XPS 15 9570 */
 	"SYN300D",
 	"SYN3014",
 	NULL
