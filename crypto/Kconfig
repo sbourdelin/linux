@@ -561,6 +561,13 @@ config CRYPTO_HMAC
 	  HMAC: Keyed-Hashing for Message Authentication (RFC2104).
 	  This is required for IPSec.
 
+config CRYPTO_KDF
+	tristate "Key Derivation Function (SP800-108)"
+	select CRYPTO_RNG
+	help
+	  Support for KDF compliant to SP800-108. All three types of
+	  KDF specified in SP800-108 are implemented.
+
 config CRYPTO_XCBC
 	tristate "XCBC support"
 	select CRYPTO_HASH
