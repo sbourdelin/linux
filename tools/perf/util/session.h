@@ -128,4 +128,7 @@ int perf_event__synthesize_id_index(struct perf_tool *tool,
 				    struct perf_evlist *evlist,
 				    struct machine *machine);
 
+void arch__trace_event(struct perf_evlist *evlist __maybe_unused,
+		       union perf_event *event __maybe_unused,
+		       struct perf_sample *sample __maybe_unused);
 #endif /* __PERF_SESSION_H */

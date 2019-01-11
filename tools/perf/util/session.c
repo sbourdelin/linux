@@ -1055,6 +1055,12 @@ static void sample_read__printf(struct perf_sample *sample, u64 read_format)
 			sample->read.one.id, sample->read.one.value);
 }
 
+void __weak arch__trace_event(struct perf_evlist *evlist __maybe_unused,
+			      union perf_event *event __maybe_unused,
+			      struct perf_sample *sample __maybe_unused)
+{
+}
+
 static void dump_event(struct perf_evlist *evlist, union perf_event *event,
 		       u64 file_offset, struct perf_sample *sample)
 {
@@ -1065,6 +1071,7 @@ static void dump_event(struct perf_evlist *evlist, union perf_event *event,
 	       file_offset, event->header.size, event->header.type);
 
 	trace_event(event);
+	arch__trace_event(evlist, event, sample);
 
 	if (sample)
 		perf_evlist__print_tstamp(evlist, event, sample);
