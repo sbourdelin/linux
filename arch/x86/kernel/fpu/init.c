@@ -301,3 +301,39 @@ void __init fpu__init_system(struct cpuinfo_x86 *c)
 
 	fpu__init_system_ctx_switch();
 }
+
+/* Although parse fpu parameters early before parse_early_param(),but
+ * __setup() is still mandatory in order not to pass fpu parameters
+ * into init as argument. At here, the interfaces don't need to set
+ * registers again, they are only used to indicate parse_args() that
+ * the parameter has been consumed.
+ */
+static int __init no_387(char *s)
+{
+	return 1;
+}
+__setup("no387", no_387);
+
+static int __init x86_noxsave_setup(char *s)
+{
+	return 1;
+}
+__setup("noxsave", x86_noxsave_setup);
+
+static int __init x86_noxsaveopt_setup(char *s)
+{
+	return 1;
+}
+__setup("noxsaveopt", x86_noxsaveopt_setup);
+
+static int __init x86_noxsaves_setup(char *s)
+{
+	return 1;
+}
+__setup("noxsaves", x86_noxsaves_setup);
+
+static int __init x86_nofxsr_setup(char *s)
+{
+	return 1;
+}
+__setup("nofxsr", x86_nofxsr_setup);
