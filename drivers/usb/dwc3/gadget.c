@@ -1434,6 +1434,12 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 				&req->request, req->dep->name))
 		return -EINVAL;
 
+	if (req->request.status == -EINPROGRESS) {
+		dev_err(dwc->dev, "%s: %pK request already in queue\n",
+					dep->name, req);
+		return -EBUSY;
+	}
+
 	pm_runtime_get(dwc->dev);
 
 	req->request.actual	= 0;
