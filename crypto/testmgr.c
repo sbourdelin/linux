@@ -110,6 +110,11 @@ struct drbg_test_suite {
 	unsigned int count;
 };
 
+struct kdf_test_suite {
+	struct kdf_testvec *vecs;
+	unsigned int count;
+};
+
 struct akcipher_test_suite {
 	const struct akcipher_testvec *vecs;
 	unsigned int count;
@@ -133,6 +138,7 @@ struct alg_test_desc {
 		struct hash_test_suite hash;
 		struct cprng_test_suite cprng;
 		struct drbg_test_suite drbg;
+		struct kdf_test_suite kdf;
 		struct akcipher_test_suite akcipher;
 		struct kpp_test_suite kpp;
 	} suite;
@@ -2020,6 +2026,64 @@ outbuf:
 	return ret;
 }
 
+static int kdf_cavs_test(struct kdf_testvec *test,
+			 const char *driver, u32 type, u32 mask)
+{
+	int ret = -EAGAIN;
+	struct crypto_rng *drng;
+	unsigned char *buf = kzalloc(test->expectedlen, GFP_KERNEL);
+
+	if (!buf)
+		return -ENOMEM;
+
+	drng = crypto_alloc_rng(driver, type | CRYPTO_ALG_INTERNAL, mask);
+	if (IS_ERR(drng)) {
+		printk(KERN_ERR "alg: kdf: could not allocate cipher handle "
+		       "for %s\n", driver);
+		kzfree(buf);
+		return -ENOMEM;
+	}
+
+	ret = crypto_rng_reset(drng, test->K1, test->K1len);
+	if (ret) {
+		printk(KERN_ERR "alg: kdf: could not set key derivation key\n");
+		goto err;
+	}
+
+	ret = crypto_rng_generate(drng, test->context, test->contextlen,
+				  buf, test->expectedlen);
+	if (ret) {
+		printk(KERN_ERR "alg: kdf: could not obtain key data\n");
+		goto err;
+	}
+
+	ret = memcmp(test->expected, buf, test->expectedlen);
+
+err:
+	crypto_free_rng(drng);
+	kzfree(buf);
+	return ret;
+}
+
+static int alg_test_kdf(const struct alg_test_desc *desc, const char *driver,
+			u32 type, u32 mask)
+{
+	int err = 0;
+	unsigned int i = 0;
+	struct kdf_testvec *template = desc->suite.kdf.vecs;
+	unsigned int tcount = desc->suite.kdf.count;
+
+	for (i = 0; i < tcount; i++) {
+		err = kdf_cavs_test(&template[i], driver, type, mask);
+		if (err) {
+			printk(KERN_ERR "alg: kdf: Test %d failed for %s\n",
+			       i, driver);
+			err = -EINVAL;
+			break;
+		}
+	}
+	return err;
+}
 
 static int alg_test_drbg(const struct alg_test_desc *desc, const char *driver,
 			 u32 type, u32 mask)
@@ -3220,6 +3284,168 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.alg = "jitterentropy_rng",
 		.fips_allowed = 1,
 		.test = alg_test_null,
+	}, {
+		.alg = "kdf_ctr(cmac(aes))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(cmac(des3_ede))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(hmac(sha1))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(hmac(sha224))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(hmac(sha256))",
+		.test = alg_test_kdf,
+		.fips_allowed = 1,
+		.suite = {
+			.kdf = {
+				.vecs = kdf_ctr_hmac_sha256_tv_template,
+				.count = ARRAY_SIZE(kdf_ctr_hmac_sha256_tv_template)
+			}
+		}
+	}, {
+		.alg = "kdf_ctr(hmac(sha384))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(hmac(sha512))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(sha1)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(sha224)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(sha256)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(sha384)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_ctr(sha512)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(cmac(aes))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(cmac(des3_ede))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(hmac(sha1))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(hmac(sha224))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(hmac(sha256))",
+		.test = alg_test_kdf,
+		.fips_allowed = 1,
+		.suite = {
+			.kdf = {
+				.vecs = kdf_dpi_hmac_sha256_tv_template,
+				.count = ARRAY_SIZE(kdf_dpi_hmac_sha256_tv_template)
+			}
+		}
+	}, {
+		.alg = "kdf_dpi(hmac(sha384))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(hmac(sha512))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(sha1)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(sha224)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(sha256)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(sha384)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_dpi(sha512)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(cmac(aes))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(cmac(des3_ede))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(hmac(sha1))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(hmac(sha224))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(hmac(sha256))",
+		.test = alg_test_kdf,
+		.fips_allowed = 1,
+		.suite = {
+			.kdf = {
+				.vecs = kdf_fb_hmac_sha256_tv_template,
+				.count = ARRAY_SIZE(kdf_fb_hmac_sha256_tv_template)
+			}
+		}
+	}, {
+		.alg = "kdf_fb(hmac(sha384))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(hmac(sha512))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(sha1)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(sha224)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(sha256)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(sha384)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
+		.alg = "kdf_fb(sha512)",
+		.test = alg_test_null,
+		.fips_allowed = 1,
 	}, {
 		.alg = "kw(aes)",
 		.test = alg_test_skcipher,
