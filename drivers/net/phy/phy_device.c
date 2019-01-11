@@ -2154,7 +2154,8 @@ static int phy_probe(struct device *dev)
 	 * a controller will attach, and may modify one
 	 * or both of these values
 	 */
-	linkmode_copy(phydev->supported, phydrv->features);
+	if (phydrv->features)
+		linkmode_copy(phydev->supported, phydrv->features);
 	of_set_phy_supported(phydev);
 	linkmode_copy(phydev->advertising, phydev->supported);
 
@@ -2174,8 +2175,9 @@ static int phy_probe(struct device *dev)
 	 * (e.g. hardware erratum) where the driver wants to set only one
 	 * of these bits.
 	 */
-	if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features) ||
-	    test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydrv->features)) {
+	if (phydrv->features &&
+	    (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features) ||
+	     test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydrv->features))) {
 		linkmode_clear_bit(ETHTOOL_LINK_MODE_Pause_BIT,
 				   phydev->supported);
 		linkmode_clear_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
