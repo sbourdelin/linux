@@ -2633,6 +2633,18 @@ int skl_format_to_fourcc(int format, bool rgb_order, bool alpha)
 		return DRM_FORMAT_RGB565;
 	case PLANE_CTL_FORMAT_NV12:
 		return DRM_FORMAT_NV12;
+	case PLANE_CTL_FORMAT_Y210:
+		return DRM_FORMAT_Y210;
+	case PLANE_CTL_FORMAT_Y212:
+		return DRM_FORMAT_Y212;
+	case PLANE_CTL_FORMAT_Y216:
+		return DRM_FORMAT_Y216;
+	case PLANE_CTL_FORMAT_Y410:
+		return DRM_FORMAT_Y410;
+	case PLANE_CTL_FORMAT_Y412:
+		return DRM_FORMAT_Y412;
+	case PLANE_CTL_FORMAT_Y416:
+		return DRM_FORMAT_Y416;
 	default:
 	case PLANE_CTL_FORMAT_XRGB_8888:
 		if (rgb_order) {
@@ -3529,6 +3541,18 @@ static u32 skl_plane_ctl_format(uint32_t pixel_format)
 		return PLANE_CTL_FORMAT_YUV422 | PLANE_CTL_YUV422_VYUY;
 	case DRM_FORMAT_NV12:
 		return PLANE_CTL_FORMAT_NV12;
+	case DRM_FORMAT_Y210:
+		return PLANE_CTL_FORMAT_Y210;
+	case DRM_FORMAT_Y212:
+		return PLANE_CTL_FORMAT_Y212;
+	case DRM_FORMAT_Y216:
+		return PLANE_CTL_FORMAT_Y216;
+	case DRM_FORMAT_Y410:
+		return PLANE_CTL_FORMAT_Y410;
+	case DRM_FORMAT_Y412:
+		return PLANE_CTL_FORMAT_Y412;
+	case DRM_FORMAT_Y416:
+		return PLANE_CTL_FORMAT_Y416;
 	default:
 		MISSING_CASE(pixel_format);
 	}
@@ -5022,6 +5046,12 @@ static int skl_update_scaler_plane(struct intel_crtc_state *crtc_state,
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_Y210:
+	case DRM_FORMAT_Y212:
+	case DRM_FORMAT_Y216:
+	case DRM_FORMAT_Y410:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
 		break;
 	default:
 		DRM_DEBUG_KMS("[PLANE:%d:%s] FB:%d unsupported scaling format 0x%x\n",
