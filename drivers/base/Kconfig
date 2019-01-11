@@ -26,6 +26,11 @@ config UEVENT_HELPER_PATH
 	  via /proc/sys/kernel/hotplug or via /sys/kernel/uevent_helper
 	  later at runtime.
 
+config DEVICE_FREQ_CONSTRAINT
+	bool
+	help
+	  Enable support for device frequency constraints.
+
 config DEVTMPFS
 	bool "Maintain a devtmpfs filesystem to mount at /dev"
 	help

@@ -6176,6 +6176,14 @@ F:	Documentation/power/freezing-of-tasks.txt
 F:	include/linux/freezer.h
 F:	kernel/freezer.c
 
+FREQUENCY CONSTRAINTS
+M:	Viresh Kumar <vireshk@kernel.org>
+L:	linux-pm@vger.kernel.org
+S:	Maintained
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/pm.git
+F:	drivers/base/freq_constraint.c
+F:	include/linux/freq_constraint.h
+
 FRONTSWAP API
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 L:	linux-kernel@vger.kernel.org
