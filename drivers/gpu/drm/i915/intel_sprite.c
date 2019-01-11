@@ -1750,6 +1750,27 @@ static const uint32_t skl_plane_formats[] = {
 	DRM_FORMAT_VYUY,
 };
 
+static const uint32_t icl_plane_formats[] = {
+	DRM_FORMAT_C8,
+	DRM_FORMAT_RGB565,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_XRGB2101010,
+	DRM_FORMAT_XBGR2101010,
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
+	DRM_FORMAT_Y210,
+	DRM_FORMAT_Y212,
+	DRM_FORMAT_Y216,
+	DRM_FORMAT_Y410,
+	DRM_FORMAT_Y412,
+	DRM_FORMAT_Y416,
+};
+
 static const uint32_t skl_planar_formats[] = {
 	DRM_FORMAT_C8,
 	DRM_FORMAT_RGB565,
@@ -1764,6 +1785,28 @@ static const uint32_t skl_planar_formats[] = {
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_VYUY,
 	DRM_FORMAT_NV12,
+};
+
+static const uint32_t icl_planar_formats[] = {
+	DRM_FORMAT_C8,
+	DRM_FORMAT_RGB565,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_XRGB2101010,
+	DRM_FORMAT_XBGR2101010,
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_Y210,
+	DRM_FORMAT_Y212,
+	DRM_FORMAT_Y216,
+	DRM_FORMAT_Y410,
+	DRM_FORMAT_Y412,
+	DRM_FORMAT_Y416,
 };
 
 static const uint64_t skl_plane_format_modifiers_noccs[] = {
@@ -1904,6 +1947,12 @@ static bool skl_plane_format_mod_supported(struct drm_plane *_plane,
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
+	case DRM_FORMAT_Y210:
+	case DRM_FORMAT_Y212:
+	case DRM_FORMAT_Y216:
+	case DRM_FORMAT_Y410:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
 	case DRM_FORMAT_NV12:
 		if (modifier == I915_FORMAT_MOD_Yf_TILED)
 			return true;
@@ -2045,8 +2094,16 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 		plane->update_slave = icl_update_slave;
 
 	if (skl_plane_has_planar(dev_priv, pipe, plane_id)) {
-		formats = skl_planar_formats;
-		num_formats = ARRAY_SIZE(skl_planar_formats);
+		if (INTEL_GEN(dev_priv) >= 11) {
+			formats = icl_planar_formats;
+			num_formats = ARRAY_SIZE(icl_planar_formats);
+		} else {
+			formats = skl_planar_formats;
+			num_formats = ARRAY_SIZE(skl_planar_formats);
+		}
+	} else if (INTEL_GEN(dev_priv) >= 11) {
+		formats = icl_plane_formats;
+		num_formats = ARRAY_SIZE(icl_plane_formats);
 	} else {
 		formats = skl_plane_formats;
 		num_formats = ARRAY_SIZE(skl_plane_formats);
