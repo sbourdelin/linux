@@ -345,6 +345,17 @@ static int __init rbtree_test_init(void)
 		check(0);
 	}
 
+	/*
+	 * a little regression test to catch a bug may be introduced by
+	 * 6d58452dc06 (rbtree: adjust root color in rb_insert_color() only when
+	 * necessary)
+	 */
+	insert(nodes, &root);
+	nodes->rb.__rb_parent_color = RB_RED;
+	insert(nodes + 1, &root);
+	erase(nodes + 1, &root);
+	erase(nodes, &root);
+
 	printk(KERN_ALERT "augmented rbtree testing");
 
 	init();

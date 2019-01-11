@@ -127,6 +127,13 @@ __rb_insert(struct rb_node *node, struct rb_root *root,
 			break;
 
 		gparent = rb_red_parent(parent);
+		if (unlikely(!gparent)) {
+			/*
+			 * The root is red so correct it.
+			 */
+			rb_set_parent_color(parent, NULL, RB_BLACK);
+			break;
+		}
 
 		tmp = gparent->rb_right;
 		if (parent != tmp) {	/* parent == gparent->rb_left */
