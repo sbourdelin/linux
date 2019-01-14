@@ -129,7 +129,7 @@ static void xas_squash_marks(const struct xa_state *xas)
 			continue;
 		__set_bit(xas->xa_offset, marks);
 		bitmap_clear(marks, xas->xa_offset + 1, xas->xa_sibs);
-	} while (mark++ != (__force unsigned)XA_MARK_MAX);
+	} while (++mark != (__force unsigned)XA_MARK_MAX);
 }
 
 /* extracts the offset within this node from the index */
