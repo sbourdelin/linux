@@ -170,8 +170,6 @@ static int hpwdt_pretimeout(unsigned int ulReason, struct pt_regs *regs)
 	if (ilo5 && !pretimeout && !mynmi)
 		return NMI_DONE;
 
-	hpwdt_stop();
-
 	hex_byte_pack(panic_msg, mynmi);
 	nmi_panic(regs, panic_msg);
 
