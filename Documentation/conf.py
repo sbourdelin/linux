@@ -389,6 +389,8 @@ latex_documents = [
      'ext4 Data Structures and Algorithms', 'ext4 Community', 'manual'),
     ('gpu/index', 'gpu.tex', 'Linux GPU Driver Developer\'s Guide',
      'The kernel development community', 'manual'),
+    ('infiniband/index', 'infiniband.tex', 'Infiniband subsystem',
+     'The kernel development community', 'manual'),
     ('input/index', 'linux-input.tex', 'The Linux input driver subsystem',
      'The kernel development community', 'manual'),
     ('kernel-hacking/index', 'kernel-hacking.tex', 'Unreliable Guide To Hacking The Linux Kernel',

@@ -82,6 +82,7 @@ needed).
    core-api/index
    media/index
    networking/index
+   infiniband/index
    input/index
    gpu/index
    security/index
