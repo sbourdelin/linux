@@ -16,15 +16,13 @@
 #ifndef __DMA_IOMMU_H
 #define __DMA_IOMMU_H
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#include <asm/errno.h>
-
-#ifdef CONFIG_IOMMU_DMA
+#include <linux/errno.h>
 #include <linux/dma-mapping.h>
 #include <linux/iommu.h>
 #include <linux/msi.h>
+#include <linux/types.h>
 
+#ifdef CONFIG_IOMMU_DMA
 int iommu_dma_init(void);
 
 /* Domain management interface for IOMMU drivers */
@@ -74,11 +72,7 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
 void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
 void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list);
 
-#else
-
-struct iommu_domain;
-struct msi_msg;
-struct device;
+#else /* CONFIG_IOMMU_DMA */
 
 static inline int iommu_dma_init(void)
 {
@@ -108,5 +102,4 @@ static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_he
 }
 
 #endif	/* CONFIG_IOMMU_DMA */
-#endif	/* __KERNEL__ */
 #endif	/* __DMA_IOMMU_H */
