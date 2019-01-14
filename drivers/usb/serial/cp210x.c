@@ -598,9 +598,15 @@ static int cp210x_read_vendor_block(struct usb_serial *serial, u8 type, u16 val,
 	void *dmabuf;
 	int result;
 
+	result = usb_autopm_get_interface(serial->interface);
+	if (result)
+		return result;
+
 	dmabuf = kmalloc(bufsize, GFP_KERNEL);
-	if (!dmabuf)
+	if (!dmabuf) {
+		usb_autopm_put_interface(serial->interface);
 		return -ENOMEM;
+	}
 
 	result = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
 				 CP210X_VENDOR_SPECIFIC, type, val,
@@ -618,6 +624,7 @@ static int cp210x_read_vendor_block(struct usb_serial *serial, u8 type, u16 val,
 	}
 
 	kfree(dmabuf);
+	usb_autopm_put_interface(serial->interface);
 
 	return result;
 }
@@ -702,9 +709,15 @@ static int cp210x_write_vendor_block(struct usb_serial *serial, u8 type,
 	void *dmabuf;
 	int result;
 
+	result = usb_autopm_get_interface(serial->interface);
+	if (result)
+		return result;
+
 	dmabuf = kmemdup(buf, bufsize, GFP_KERNEL);
-	if (!dmabuf)
+	if (!dmabuf) {
+		usb_autopm_put_interface(serial->interface);
 		return -ENOMEM;
+	}
 
 	result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
 				 CP210X_VENDOR_SPECIFIC, type, val,
@@ -712,6 +725,7 @@ static int cp210x_write_vendor_block(struct usb_serial *serial, u8 type,
 				 USB_CTRL_SET_TIMEOUT);
 
 	kfree(dmabuf);
+	usb_autopm_put_interface(serial->interface);
 
 	if (result == bufsize) {
 		result = 0;
@@ -1383,6 +1397,7 @@ static void cp210x_gpio_set(struct gpio_chip *gc, unsigned int gpio, int value)
 	} else {
 		u16 wIndex = buf.state << 8 | buf.mask;
 
+		usb_autopm_get_interface(serial->interface);
 		result = usb_control_msg(serial->dev,
 					 usb_sndctrlpipe(serial->dev, 0),
 					 CP210X_VENDOR_SPECIFIC,
@@ -1390,6 +1405,7 @@ static void cp210x_gpio_set(struct gpio_chip *gc, unsigned int gpio, int value)
 					 CP210X_WRITE_LATCH,
 					 wIndex,
 					 NULL, 0, USB_CTRL_SET_TIMEOUT);
+		usb_autopm_put_interface(serial->interface);
 	}
 
 	if (result < 0) {
