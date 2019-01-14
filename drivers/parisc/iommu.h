@@ -4,7 +4,7 @@
 struct parisc_device;
 struct ioc;
 
-static inline void *parisc_walk_tree(struct device *dev)
+static inline struct pci_hba_data *parisc_walk_tree(struct device *dev)
 {
 	struct device *otherdev;
 
