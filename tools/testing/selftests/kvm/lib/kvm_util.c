@@ -571,7 +571,7 @@ void vm_userspace_mem_region_add(struct kvm_vm *vm,
 	 * already exist.
 	 */
 	region = (struct userspace_mem_region *) userspace_mem_region_find(
-		vm, guest_paddr, guest_paddr + npages * vm->page_size);
+		vm, guest_paddr, (guest_paddr + npages * vm->page_size) + 1);
 	if (region != NULL)
 		TEST_ASSERT(false, "overlapping userspace_mem_region already "
 			"exists\n"
@@ -586,11 +586,6 @@ void vm_userspace_mem_region_add(struct kvm_vm *vm,
 	for (region = vm->userspace_mem_region_head; region;
 		region = region->next) {
 		if (region->region.slot == slot)
-			break;
-		if ((guest_paddr <= (region->region.guest_phys_addr
-				+ region->region.memory_size))
-			&& ((guest_paddr + npages * vm->page_size)
-				>= region->region.guest_phys_addr))
 			break;
 	}
 	if (region != NULL)
