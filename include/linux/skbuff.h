@@ -2424,18 +2424,18 @@ static inline void skb_pop_mac_header(struct sk_buff *skb)
 	skb->mac_header = skb->network_header;
 }
 
-static inline void skb_probe_transport_header(struct sk_buff *skb,
-					      const int offset_hint)
+static inline bool skb_try_probe_transport_header(struct sk_buff *skb)
 {
 	struct flow_keys_basic keys;
 
 	if (skb_transport_header_was_set(skb))
-		return;
+		return true;
 
-	if (skb_flow_dissect_flow_keys_basic(skb, &keys, NULL, 0, 0, 0, 0))
-		skb_set_transport_header(skb, keys.control.thoff);
-	else
-		skb_set_transport_header(skb, offset_hint);
+	if (!skb_flow_dissect_flow_keys_basic(skb, &keys, NULL, 0, 0, 0, 0))
+		return false;
+
+	skb_set_transport_header(skb, keys.control.thoff);
+	return true;
 }
 
 static inline void skb_mac_header_rebuild(struct sk_buff *skb)

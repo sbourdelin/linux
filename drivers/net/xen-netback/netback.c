@@ -1105,6 +1105,7 @@ static int xenvif_tx_submit(struct xenvif_queue *queue)
 		struct xen_netif_tx_request *txp;
 		u16 pending_idx;
 		unsigned data_len;
+		bool th_set;
 
 		pending_idx = XENVIF_TX_CB(skb)->pending_idx;
 		txp = &queue->pending_tx_info[pending_idx].req;
@@ -1169,20 +1170,22 @@ static int xenvif_tx_submit(struct xenvif_queue *queue)
 			continue;
 		}
 
-		skb_probe_transport_header(skb, 0);
+		th_set = skb_try_probe_transport_header(skb);
 
 		/* If the packet is GSO then we will have just set up the
 		 * transport header offset in checksum_setup so it's now
 		 * straightforward to calculate gso_segs.
 		 */
 		if (skb_is_gso(skb)) {
-			int mss = skb_shinfo(skb)->gso_size;
-			int hdrlen = skb_transport_header(skb) -
-				skb_mac_header(skb) +
-				tcp_hdrlen(skb);
+			if (likely(th_set)) { /* GSO implies having L4 header */
+				int mss = skb_shinfo(skb)->gso_size;
+				int hdrlen = skb_transport_header(skb) -
+					skb_mac_header(skb) +
+					tcp_hdrlen(skb);
 
-			skb_shinfo(skb)->gso_segs =
-				DIV_ROUND_UP(skb->len - hdrlen, mss);
+				skb_shinfo(skb)->gso_segs =
+					DIV_ROUND_UP(skb->len - hdrlen, mss);
+			}
 		}
 
 		queue->stats.rx_bytes += skb->len;
