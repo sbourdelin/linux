@@ -133,7 +133,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
 	else
 		next_cpu = cpumask_next(next_cpu, cpu_online_mask);
 
-	if (!cpu_possible(next_cpu)) {
+	if (next_cpu >= nr_cpu_ids) {
 		dev_err(dev, "probe failed. Number of DPIOs exceeds NR_CPUS.\n");
 		err = -ERANGE;
 		goto err_allocate_irqs;
