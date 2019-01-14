@@ -84,6 +84,12 @@ save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
 EXPORT_SYMBOL_GPL(save_stack_trace_regs);
 
 #ifdef CONFIG_HAVE_RELIABLE_STACKTRACE
+/*
+ * This function returns an error if it detects any unreliable features of the
+ * stack.  Otherwise it guarantees that the stack trace is reliable.
+ *
+ * If the task is not 'current', the caller *must* ensure the task is inactive.
+ */
 int
 save_stack_trace_tsk_reliable(struct task_struct *tsk,
 				struct stack_trace *trace)
@@ -143,7 +149,7 @@ save_stack_trace_tsk_reliable(struct task_struct *tsk,
 			return 1;
 
 		/* Mark stacktraces with exception frames as unreliable. */
-		if (sp <= stack_end - STACK_INT_FRAME_SIZE &&
+		if (!firstframe && sp <= stack_end - STACK_INT_FRAME_SIZE &&
 		    stack[STACK_FRAME_MARKER] == STACK_FRAME_REGS_MARKER) {
 			return 1;
 		}
