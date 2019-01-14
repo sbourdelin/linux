@@ -660,6 +660,13 @@ static int pci_xircom_init(struct pci_dev *dev)
 	return 0;
 }
 
+static int pci_ni_probe(struct pci_dev *dev)
+{
+	dev->class = PCI_CLASS_COMMUNICATION_MULTISERIAL << 8 |
+			(dev->class & 0xff);
+	return 0;
+}
+
 static int pci_ni8420_init(struct pci_dev *dev)
 {
 	void __iomem *p;
@@ -1844,6 +1851,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PCI23216,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1853,6 +1861,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PCI2328,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1862,6 +1871,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PCI2324,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1871,6 +1881,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PCI2322,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1880,6 +1891,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PCI2324I,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1889,6 +1901,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PCI2322I,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1898,6 +1911,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PXI8420_23216,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1907,6 +1921,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PXI8420_2328,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1916,6 +1931,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PXI8420_2324,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1925,6 +1941,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PXI8420_2322,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1934,6 +1951,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PXI8422_2324,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1943,6 +1961,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_DEVICE_ID_NI_PXI8422_2322,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8420_init,
 		.setup		= pci_default_setup,
 		.exit		= pci_ni8420_exit,
@@ -1952,6 +1971,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.device		= PCI_ANY_ID,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
+		.probe		= pci_ni_probe,
 		.init		= pci_ni8430_init,
 		.setup		= pci_ni8430_setup,
 		.exit		= pci_ni8430_exit,
