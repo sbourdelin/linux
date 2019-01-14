@@ -22,6 +22,7 @@
 #include <linux/acpi_iort.h>
 #include <linux/device.h>
 #include <linux/dma-iommu.h>
+#include <linux/dma-noncoherent.h>
 #include <linux/gfp.h>
 #include <linux/huge_mm.h>
 #include <linux/iommu.h>
@@ -533,8 +534,6 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
  * @attrs: DMA attributes for this allocation
  * @prot: IOMMU mapping flags
  * @handle: Out argument for allocated DMA handle
- * @flush_page: Arch callback which must ensure PAGE_SIZE bytes from the
- *		given VA/PA are visible to the given non-coherent device.
  *
  * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
  * but an IOMMU which supports smaller pages might not map the whole thing.
@@ -543,8 +542,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
  *	   or NULL on failure.
  */
 struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-		unsigned long attrs, int prot, dma_addr_t *handle,
-		void (*flush_page)(struct device *, const void *, phys_addr_t))
+		unsigned long attrs, int prot, dma_addr_t *handle)
 {
 	struct iommu_domain *domain = iommu_get_dma_domain(dev);
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
@@ -580,12 +578,8 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
 	for (i = 0; i < count; i++) {
 		phys_addr_t phys = page_to_phys(pages[i]);
 
-		if (!(prot & IOMMU_CACHE)) {
-			void *vaddr = kmap_atomic(pages[i]);
-
-			flush_page(dev, vaddr, phys);
-			kunmap_atomic(vaddr);
-		}
+		if (!(prot & IOMMU_CACHE))
+			arch_dma_prep_coherent(pages[i], PAGE_SIZE);
 
 		if (iommu_map(domain, iova + mapped, phys, PAGE_SIZE, prot))
 			goto out_unmap;
