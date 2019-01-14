@@ -50,10 +50,11 @@ struct s3cmci_host {
 
 	int			dma_complete;
 
+	struct scatterlist	*cur_sg;
 	u32			pio_sgptr;
 	u32			pio_bytes;
 	u32			pio_count;
-	u32			*pio_ptr;
+	u32			pio_offset;
 #define XFER_NONE 0
 #define XFER_READ 1
 #define XFER_WRITE 2
