@@ -2229,6 +2229,28 @@ ath10k_wmi_tlv_op_gen_peer_create(struct ath10k *ar, u32 vdev_id,
 }
 
 static struct sk_buff *
+ath10k_wmi_tlv_op_gen_pdev_set_base_macaddr(struct ath10k *ar,
+					    const u8 addr[ETH_ALEN])
+{
+	struct wmi_pdev_set_base_macaddr_cmd *cmd;
+	struct wmi_tlv *tlv;
+	struct sk_buff *skb;
+
+	skb = ath10k_wmi_alloc_skb(ar, sizeof(*tlv) + sizeof(*cmd));
+	if (!skb)
+		return ERR_PTR(-ENOMEM);
+
+	tlv = (void *)skb->data;
+	tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_PDEV_SET_BASE_MACADDR_CMD);
+	tlv->len = __cpu_to_le16(sizeof(*cmd));
+	cmd = (void *)tlv->value;
+	ether_addr_copy(cmd->mac_addr.addr, addr);
+
+	ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv set base macaddr\n");
+	return skb;
+}
+
+static struct sk_buff *
 ath10k_wmi_tlv_op_gen_peer_delete(struct ath10k *ar, u32 vdev_id,
 				  const u8 peer_addr[ETH_ALEN])
 {
@@ -4110,6 +4132,8 @@ static const struct wmi_ops wmi_tlv_ops = {
 
 	.gen_pdev_suspend = ath10k_wmi_tlv_op_gen_pdev_suspend,
 	.gen_pdev_resume = ath10k_wmi_tlv_op_gen_pdev_resume,
+	.gen_pdev_set_base_macaddr =
+			ath10k_wmi_tlv_op_gen_pdev_set_base_macaddr,
 	.gen_pdev_set_rd = ath10k_wmi_tlv_op_gen_pdev_set_rd,
 	.gen_pdev_set_param = ath10k_wmi_tlv_op_gen_pdev_set_param,
 	.gen_init = ath10k_wmi_tlv_op_gen_init,
