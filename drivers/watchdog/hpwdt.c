@@ -155,19 +155,20 @@ static int hpwdt_my_nmi(void)
 static int hpwdt_pretimeout(unsigned int ulReason, struct pt_regs *regs)
 {
 	unsigned int mynmi = hpwdt_my_nmi();
-	static char panic_msg[] =
-		"00: An NMI occurred. Depending on your system the reason "
-		"for the NMI is logged in any one of the following resources:\n"
-		"1. Integrated Management Log (IML)\n"
-		"2. OA Syslog\n"
-		"3. OA Forward Progress Log\n"
-		"4. iLO Event Log";
 
 	if (!mynmi)
 		return NMI_DONE;
 
-	hex_byte_pack(panic_msg, mynmi);
-	nmi_panic(regs, panic_msg);
+	pr_emerg("%02x: An NMI occurred (reason %02x, CPU %d). Depending on "
+		 "your system the reason for the NMI is logged in any one of "
+		 "the following resources:\n"
+		 "1. Integrated Management Log (IML)\n"
+		 "2. OA Syslog\n"
+		 "3. OA Forward Progress Log\n"
+		 "4. iLO Event Log\n",
+		 mynmi, ulReason, smp_processor_id());
+
+	nmi_panic(regs, "hpwdt: NMI: Not continuing");
 
 	return NMI_HANDLED;
 }
