@@ -30,6 +30,7 @@
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/scatterlist.h>
+#include <linux/highmem.h>
 #include <linux/vmalloc.h>
 
 struct iommu_dma_msi_page {
@@ -549,9 +550,9 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	struct iova_domain *iovad = &cookie->iovad;
 	struct page **pages;
-	struct sg_table sgt;
 	dma_addr_t iova;
-	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap;
+	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap, i;
+	size_t mapped = 0;
 
 	*handle = DMA_MAPPING_ERROR;
 
@@ -576,32 +577,25 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
 	if (!iova)
 		goto out_free_pages;
 
-	if (sg_alloc_table_from_pages(&sgt, pages, count, 0, size, GFP_KERNEL))
-		goto out_free_iova;
+	for (i = 0; i < count; i++) {
+		phys_addr_t phys = page_to_phys(pages[i]);
 
-	if (!(prot & IOMMU_CACHE)) {
-		struct sg_mapping_iter miter;
-		/*
-		 * The CPU-centric flushing implied by SG_MITER_TO_SG isn't
-		 * sufficient here, so skip it by using the "wrong" direction.
-		 */
-		sg_miter_start(&miter, sgt.sgl, sgt.orig_nents, SG_MITER_FROM_SG);
-		while (sg_miter_next(&miter))
-			flush_page(dev, miter.addr, page_to_phys(miter.page));
-		sg_miter_stop(&miter);
+		if (!(prot & IOMMU_CACHE)) {
+			void *vaddr = kmap_atomic(pages[i]);
+
+			flush_page(dev, vaddr, phys);
+			kunmap_atomic(vaddr);
+		}
+
+		if (iommu_map(domain, iova + mapped, phys, PAGE_SIZE, prot))
+			goto out_unmap;
+		mapped += PAGE_SIZE;
 	}
 
-	if (iommu_map_sg(domain, iova, sgt.sgl, sgt.orig_nents, prot)
-			< size)
-		goto out_free_sg;
-
 	*handle = iova;
-	sg_free_table(&sgt);
 	return pages;
-
-out_free_sg:
-	sg_free_table(&sgt);
-out_free_iova:
+out_unmap:
+	iommu_unmap(domain, iova, mapped);
 	iommu_dma_free_iova(cookie, iova, size);
 out_free_pages:
 	__iommu_dma_free_pages(pages, count);
