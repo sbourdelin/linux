@@ -16,6 +16,8 @@ struct perf_mem_event {
 	const char	*sysfs_name;
 };
 
+#define PERF_MEM_EVENT(t, n, s) { .tag = t, .name = n, .sysfs_name = s }
+
 enum {
 	PERF_MEM_EVENTS__LOAD,
 	PERF_MEM_EVENTS__STORE,
