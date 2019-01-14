@@ -37,6 +37,10 @@ static unsigned int soft_margin = DEFAULT_MARGIN;	/* in seconds */
 static bool nowayout = WATCHDOG_NOWAYOUT;
 static bool pretimeout = IS_ENABLED(CONFIG_HPWDT_NMI_DECODING);
 
+#ifdef CONFIG_HPWDT_NMI_DECODING
+static bool panic_on_nmi = true;
+#endif /* CONFIG_HPWDT_NMI_DECODING */
+
 static void __iomem *pci_mem_addr;		/* the PCI-memory address */
 static unsigned long __iomem *hpwdt_nmistat;
 static unsigned long __iomem *hpwdt_timer_reg;
@@ -146,7 +150,10 @@ static int hpwdt_set_pretimeout(struct watchdog_device *wdd, unsigned int req)
 
 static int hpwdt_my_nmi(void)
 {
-	return ioread8(hpwdt_nmistat) & 0x6;
+	int nmistat = ioread8(hpwdt_nmistat);
+
+	iowrite8(nmistat & ~0x6, hpwdt_nmistat);
+	return nmistat & 0x6;
 }
 
 /*
@@ -168,7 +175,10 @@ static int hpwdt_pretimeout(unsigned int ulReason, struct pt_regs *regs)
 		 "4. iLO Event Log\n",
 		 mynmi, ulReason, smp_processor_id());
 
-	nmi_panic(regs, "hpwdt: NMI: Not continuing");
+	if (panic_on_nmi)
+		nmi_panic(regs, "hpwdt: NMI: Not continuing");
+
+	pr_emerg("Dazed and confused, but trying to continue\n");
 
 	return NMI_HANDLED;
 }
@@ -376,6 +386,9 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 #ifdef CONFIG_HPWDT_NMI_DECODING
 module_param(pretimeout, bool, 0);
 MODULE_PARM_DESC(pretimeout, "Watchdog pretimeout enabled");
-#endif
+
+module_param(panic_on_nmi, bool, 0);
+MODULE_PARM_DESC(panic_on_nmi, "Cause panic on NMI induced by iLO (default=1)");
+#endif /* CONFIG_HPWDT_NMI_DECODING */
 
 module_pci_driver(hpwdt_driver);
