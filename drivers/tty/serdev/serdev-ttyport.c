@@ -121,7 +121,7 @@ static int ttyport_open(struct serdev_controller *ctrl)
 
 	ret = tty->ops->open(serport->tty, NULL);
 	if (ret)
-		goto err_close;
+		goto err_unlock;
 
 	tty_unlock(serport->tty);
 
@@ -142,8 +142,6 @@ static int ttyport_open(struct serdev_controller *ctrl)
 
 	return 0;
 
-err_close:
-	tty->ops->close(tty, NULL);
 err_unlock:
 	tty_unlock(tty);
 	tty_release_struct(tty, serport->tty_idx);
