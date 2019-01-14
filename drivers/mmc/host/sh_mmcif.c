@@ -234,7 +234,6 @@ struct sh_mmcif_host {
 	enum sh_mmcif_wait_for wait_for;
 	struct delayed_work timeout_work;
 	size_t blocksize;
-	int sg_idx;
 	int sg_blkidx;
 	bool power;
 	bool ccs_enable;		/* Command Completion Signal support */
@@ -606,13 +605,13 @@ static bool sh_mmcif_next_block(struct sh_mmcif_host *host)
 
 	if (host->sg_blkidx == data->sg->length) {
 		host->sg_blkidx = 0;
-		if (++host->sg_idx < data->sg_len) {
-			data->sg++;
-			host->pio_offset = data->sg->offset / 4;
-		}
+		data->sg = sg_next(data->sg);
+		if (!data->sg)
+			return false;
+		host->pio_offset = data->sg->offset / 4;
 	}
 
-	return host->sg_idx != data->sg_len;
+	return true;
 }
 
 static void sh_mmcif_single_read(struct sh_mmcif_host *host,
@@ -665,7 +664,6 @@ static void sh_mmcif_multi_read(struct sh_mmcif_host *host,
 		BLOCK_SIZE_MASK;
 
 	host->wait_for = MMCIF_WAIT_FOR_MREAD;
-	host->sg_idx = 0;
 	host->sg_blkidx = 0;
 	host->pio_offset = data->sg->offset / 4;
 
@@ -752,7 +750,6 @@ static void sh_mmcif_multi_write(struct sh_mmcif_host *host,
 		BLOCK_SIZE_MASK;
 
 	host->wait_for = MMCIF_WAIT_FOR_MWRITE;
-	host->sg_idx = 0;
 	host->sg_blkidx = 0;
 	host->pio_offset = data->sg->offset / 4;
 
