@@ -760,6 +760,22 @@ static void *iommu_dma_alloc_pool(struct device *dev, size_t size,
 	return vaddr;
 }
 
+static void *iommu_dma_alloc_noncoherent(struct device *dev, size_t size,
+		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
+{
+	/*
+	 * In atomic context we can't remap anything, so we'll only get the
+	 * virtually contiguous buffer we need by way of a physically
+	 * contiguous allocation.
+	 */
+	if (!gfpflags_allow_blocking(gfp))
+		return iommu_dma_alloc_pool(dev, size, dma_handle, gfp, attrs);
+	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
+		return iommu_dma_alloc_contiguous_remap(dev, size, dma_handle,
+				gfp, attrs);
+	return iommu_dma_alloc_remap(dev, size, dma_handle, gfp, attrs);
+}
+
 static void iommu_dma_sync_single_for_cpu(struct device *dev,
 		dma_addr_t dma_handle, size_t size, enum dma_data_direction dir)
 {
@@ -1033,40 +1049,23 @@ static void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
 }
 
 static void *iommu_dma_alloc(struct device *dev, size_t size,
-		dma_addr_t *handle, gfp_t gfp, unsigned long attrs)
+		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
 {
-	bool coherent = dev_is_dma_coherent(dev);
-	size_t iosize = size;
-	void *addr;
-
 	/*
 	 * Some drivers rely on this, and we probably don't want the
 	 * possibility of stale kernel data being read by devices anyway.
 	 */
 	gfp |= __GFP_ZERO;
 
-	if (!gfpflags_allow_blocking(gfp)) {
-		/*
-		 * In atomic context we can't remap anything, so we'll only
-		 * get the virtually contiguous buffer we need by way of a
-		 * physically contiguous allocation.
-		 */
-		if (!coherent)
-			return iommu_dma_alloc_pool(dev, iosize, handle, gfp,
-					attrs);
-		return iommu_dma_alloc_contiguous(dev, iosize, handle, gfp,
+	if (!dev_is_dma_coherent(dev))
+		return iommu_dma_alloc_noncoherent(dev, size, dma_handle, gfp,
 				attrs);
-	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-		if (coherent)
-			addr = iommu_dma_alloc_contiguous(dev, iosize, handle,
-					gfp, attrs);
-		else
-			addr = iommu_dma_alloc_contiguous_remap(dev, iosize,
-					handle, gfp, attrs);
-	} else {
-		addr = iommu_dma_alloc_remap(dev, iosize, handle, gfp, attrs);
-	}
-	return addr;
+
+	if (gfpflags_allow_blocking(gfp) &&
+	    !(attrs & DMA_ATTR_FORCE_CONTIGUOUS))
+		return iommu_dma_alloc_remap(dev, size, dma_handle, gfp, attrs);
+
+	return iommu_dma_alloc_contiguous(dev, size, dma_handle, gfp, attrs);
 }
 
 static void iommu_dma_free(struct device *dev, size_t size, void *cpu_addr,
