@@ -308,7 +308,7 @@ static int manage_channel(struct fw_card *card, int irm_id, int generation,
 			if ((data[0] & bit) == (data[1] & bit))
 				continue;
 
-			/* 1394-1995 IRM, fall through to retry. */
+			/* fall through - 1394-1995 IRM to retry. */
 		default:
 			if (retry) {
 				retry--;
