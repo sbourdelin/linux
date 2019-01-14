@@ -60,6 +60,8 @@ choice
 	In such a case, change this option to adjust the format used in the
 	kernel accordingly.
 
+	Select Clang gcov format if building with Clang compiler.
+
 config GCOV_FORMAT_3_4
 	bool "GCC 3.4 format"
 	depends on CC_IS_GCC && GCC_VERSION < 40700
@@ -68,11 +70,13 @@ config GCOV_FORMAT_3_4
 
 config GCOV_FORMAT_4_7
 	bool "GCC 4.7 format"
+	depends on CC_IS_GCC
 	---help---
 	Select this option to use the format defined by GCC 4.7.
 
 config GCOV_FORMAT_CLANG
 	bool "Clang format"
+	depends on CC_IS_CLANG
 	---help---
 	Select this option to use the format defined by Clang.
 
