@@ -1339,9 +1339,6 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 		request_end(fc, req);
 		goto restart;
 	}
-	spin_lock(&fpq->lock);
-	list_add(&req->list, &fpq->io);
-	spin_unlock(&fpq->lock);
 	cs->req = req;
 	err = fuse_copy_one(cs, &in->h, sizeof(in->h));
 	if (!err)
@@ -1362,7 +1359,7 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 		goto out_end;
 	}
 	hash = fuse_req_hash(req->in.h.unique);
-	list_move_tail(&req->list, &fpq->processing[hash]);
+	list_add_tail(&req->list, &fpq->processing[hash]);
 	__fuse_get_request(req);
 	set_bit(FR_SENT, &req->flags);
 	spin_unlock(&fpq->lock);
@@ -1375,7 +1372,6 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 	return reqsize;
 
 out_end:
-	list_del_init(&req->list);
 	spin_unlock(&fpq->lock);
 	request_end(fc, req);
 	return err;
@@ -1951,7 +1947,7 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 	}
 
 	clear_bit(FR_SENT, &req->flags);
-	list_move(&req->list, &fpq->io);
+	list_del_init(&req->list);
 	req->out.h = oh;
 	spin_unlock(&fpq->lock);
 	cs->req = req;
@@ -1961,13 +1957,8 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 	err = copy_out_args(cs, &req->out, nbytes);
 	fuse_copy_finish(cs);
 
-	spin_lock(&fpq->lock);
-	if (!fpq->connected)
-		err = -ENOENT;
-	else if (err)
+	if (err)
 		req->out.h.error = -EIO;
-	list_del_init(&req->list);
-	spin_unlock(&fpq->lock);
 
 	request_end(fc, req);
 out:
@@ -2217,7 +2208,6 @@ int fuse_dev_release(struct inode *inode, struct file *file)
 		unsigned int i;
 
 		spin_lock(&fpq->lock);
-		WARN_ON(!list_empty(&fpq->io));
 		for (i = 0; i < FUSE_PQ_HASH_SIZE; i++)
 			list_splice_init(&fpq->processing[i], &to_end);
 		spin_unlock(&fpq->lock);

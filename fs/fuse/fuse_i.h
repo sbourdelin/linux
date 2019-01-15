@@ -469,9 +469,6 @@ struct fuse_pqueue {
 
 	/** Hash table of requests being processed */
 	struct list_head *processing;
-
-	/** The list of requests under I/O */
-	struct list_head io;
 };
 
 /**
