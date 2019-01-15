@@ -4,6 +4,7 @@
 #include <linux/rtnetlink.h>
 #include <net/devlink.h>
 
+#include "nfpcore/nfp_cpp.h"
 #include "nfpcore/nfp_nsp.h"
 #include "nfp_app.h"
 #include "nfp_main.h"
@@ -171,6 +172,26 @@ static int nfp_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode,
 	return ret;
 }
 
+static int
+nfp_devlink_serial_get(struct devlink *devlink, u8 *buf, size_t buf_len,
+		       size_t *len, struct netlink_ext_ack *extack)
+{
+	struct nfp_pf *pf = devlink_priv(devlink);
+	const u8 *serial;
+	int ret;
+
+	ret = nfp_cpp_serial(pf->cpp, &serial);
+	if (ret < 0)
+		return ret;
+
+	if (buf_len < ret)
+		return -EINVAL;
+	*len = ret;
+
+	memcpy(buf, serial, *len);
+	return 0;
+}
+
 const struct devlink_ops nfp_devlink_ops = {
 	.port_split		= nfp_devlink_port_split,
 	.port_unsplit		= nfp_devlink_port_unsplit,
@@ -178,6 +199,7 @@ const struct devlink_ops nfp_devlink_ops = {
 	.sb_pool_set		= nfp_devlink_sb_pool_set,
 	.eswitch_mode_get	= nfp_devlink_eswitch_mode_get,
 	.eswitch_mode_set	= nfp_devlink_eswitch_mode_set,
+	.serial_get		= nfp_devlink_serial_get,
 };
 
 int nfp_devlink_port_register(struct nfp_app *app, struct nfp_port *port)
