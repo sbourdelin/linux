@@ -2231,11 +2231,18 @@ void fuse_abort_conn(struct fuse_conn *fc)
 		kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
 		end_polls(fc);
 		wake_up_all(&fc->blocked_waitq);
+		fc->aborting = true;
 		spin_unlock(&fc->lock);
 
 		end_requests(fc, &to_end);
+
+		spin_lock(&fc->lock);
+		fc->aborting = false;
+		spin_unlock(&fc->lock);
+		wake_up_all(&fc->blocked_waitq);
 	} else {
 		spin_unlock(&fc->lock);
+		wait_event(fc->blocked_waitq, !fc->aborting);
 	}
 }
 EXPORT_SYMBOL_GPL(fuse_abort_conn);

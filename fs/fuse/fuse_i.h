@@ -587,6 +587,9 @@ struct fuse_conn {
 	    abort and device release */
 	unsigned connected;
 
+	/** Connection abort is in process */
+	bool aborting;
+
 	/** Connection aborted via sysfs */
 	bool aborted;
 
