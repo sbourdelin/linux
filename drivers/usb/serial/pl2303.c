@@ -144,6 +144,9 @@ MODULE_DEVICE_TABLE(usb, id_table);
 #define UART_OVERRUN_ERROR		0x40
 #define UART_CTS			0x80
 
+#define TYPE_HX_PULLUP_MODE_DATA	0x08
+#define TYPE_HX_PULLUP_MODE_REG		0x09
+
 static void pl2303_set_break(struct usb_serial_port *port, bool enable);
 
 enum pl2303_type {
@@ -685,6 +688,15 @@ static void pl2303_set_termios(struct tty_struct *tty,
 		pl2303_vendor_write(serial, 0x0, 0xc0);
 	} else {
 		pl2303_vendor_write(serial, 0x0, 0x0);
+	}
+
+	pl2303_vendor_read(serial, 0x8484, buf);
+	pl2303_vendor_write(serial, 0x0404, TYPE_HX_PULLUP_MODE_REG);
+	pl2303_vendor_read(serial, 0x8484, buf);
+	pl2303_vendor_read(serial, 0x8383, buf);
+	if (*buf == TYPE_HX_PULLUP_MODE_DATA) {
+		pl2303_vendor_write(serial, 0x0, 0x31);
+		pl2303_vendor_write(serial, 0x1, 0x01);
 	}
 
 	kfree(buf);
