@@ -475,6 +475,8 @@ struct devlink_ops {
 	int (*eswitch_encap_mode_get)(struct devlink *devlink, u8 *p_encap_mode);
 	int (*eswitch_encap_mode_set)(struct devlink *devlink, u8 encap_mode,
 				      struct netlink_ext_ack *extack);
+	int (*serial_get)(struct devlink *devlink, u8 *buf, size_t buf_len,
+			  size_t *len, struct netlink_ext_ack *extack);
 };
 
 static inline void *devlink_priv(struct devlink *devlink)
