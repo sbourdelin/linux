@@ -93,6 +93,7 @@ i.mx specific properties
 - over-current-active-low: over current signal polarity is active low.
 - over-current-active-high: over current signal polarity is active high.
   It's recommended to specify the over current polarity.
+- power-active-high: power signal polarity is high active (only for imx6q/dl)
 - external-vbus-divider: enables off-chip resistor divider for Vbus
 
 Example:
