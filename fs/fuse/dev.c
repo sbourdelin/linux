@@ -731,43 +731,6 @@ void fuse_force_forget(struct file *file, u64 nodeid)
 	fuse_put_request(fc, req);
 }
 
-/*
- * Lock the request.  Up to the next unlock_request() there mustn't be
- * anything that could cause a page-fault.  If the request was already
- * aborted bail out.
- */
-static int lock_request(struct fuse_req *req)
-{
-	int err = 0;
-	if (req) {
-		spin_lock(&req->waitq.lock);
-		if (test_bit(FR_ABORTED, &req->flags))
-			err = -ENOENT;
-		else
-			set_bit(FR_LOCKED, &req->flags);
-		spin_unlock(&req->waitq.lock);
-	}
-	return err;
-}
-
-/*
- * Unlock request.  If it was aborted while locked, caller is responsible
- * for unlocking and ending the request.
- */
-static int unlock_request(struct fuse_req *req)
-{
-	int err = 0;
-	if (req) {
-		spin_lock(&req->waitq.lock);
-		if (test_bit(FR_ABORTED, &req->flags))
-			err = -ENOENT;
-		else
-			clear_bit(FR_LOCKED, &req->flags);
-		spin_unlock(&req->waitq.lock);
-	}
-	return err;
-}
-
 struct fuse_copy_state {
 	struct fuse_dev *fud;
 	int write;
@@ -812,6 +775,16 @@ static void fuse_copy_finish(struct fuse_copy_state *cs)
 	cs->pg = NULL;
 }
 
+static int fuse_copy_aborted(struct fuse_copy_state *cs)
+{
+	struct fuse_pqueue *pq = &cs->fud->pq;
+
+	if (READ_ONCE(pq->connected))
+		return 0;
+	else
+		return -ENOENT;
+}
+
 /*
  * Get another pagefull of userspace buffer, and map it to kernel
  * address space, and lock request
@@ -821,7 +794,7 @@ static int fuse_copy_fill(struct fuse_copy_state *cs)
 	struct page *page;
 	int err;
 
-	err = unlock_request(cs->req);
+	err = fuse_copy_aborted(cs);
 	if (err)
 		return err;
 
@@ -872,7 +845,7 @@ static int fuse_copy_fill(struct fuse_copy_state *cs)
 		iov_iter_advance(cs->iter, err);
 	}
 
-	return lock_request(cs->req);
+	return fuse_copy_aborted(cs);
 }
 
 /* Do as much copy to/from userspace buffer as we can */
@@ -923,7 +896,7 @@ static int fuse_try_move_page(struct fuse_copy_state *cs, struct page **pagep)
 	struct page *newpage;
 	struct pipe_buffer *buf = cs->pipebufs;
 
-	err = unlock_request(cs->req);
+	err = fuse_copy_aborted(cs);
 	if (err)
 		return err;
 
@@ -980,12 +953,10 @@ static int fuse_try_move_page(struct fuse_copy_state *cs, struct page **pagep)
 		lru_cache_add_file(newpage);
 
 	err = 0;
-	spin_lock(&cs->req->waitq.lock);
-	if (test_bit(FR_ABORTED, &cs->req->flags))
+	if (fuse_copy_aborted(cs))
 		err = -ENOENT;
 	else
 		*pagep = newpage;
-	spin_unlock(&cs->req->waitq.lock);
 
 	if (err) {
 		unlock_page(newpage);
@@ -1005,7 +976,7 @@ out_fallback:
 	cs->pg = buf->page;
 	cs->offset = buf->offset;
 
-	err = lock_request(cs->req);
+	err = fuse_copy_aborted(cs);
 	if (err)
 		return err;
 
@@ -1021,7 +992,7 @@ static int fuse_ref_page(struct fuse_copy_state *cs, struct page *page,
 	if (cs->nr_segs == cs->pipe->buffers)
 		return -EIO;
 
-	err = unlock_request(cs->req);
+	err = fuse_copy_aborted(cs);
 	if (err)
 		return err;
 
@@ -2172,13 +2143,6 @@ static void end_polls(struct fuse_conn *fc)
  * and all users of the filesystem.  The exception is the combination of an
  * asynchronous request and the tricky deadlock (see
  * Documentation/filesystems/fuse.txt).
- *
- * Aborting requests under I/O goes as follows: 1: Separate out unlocked
- * requests, they should be finished off immediately.  Locked requests will be
- * finished after unlock; see unlock_request(). 2: Finish off the unlocked
- * requests.  It is possible that some request will finish before we can.  This
- * is OK, the request will in that case be removed from the list before we touch
- * it.
  */
 void fuse_abort_conn(struct fuse_conn *fc)
 {
@@ -2187,7 +2151,7 @@ void fuse_abort_conn(struct fuse_conn *fc)
 	spin_lock(&fc->lock);
 	if (fc->connected) {
 		struct fuse_dev *fud;
-		struct fuse_req *req, *next;
+		struct fuse_req *req;
 		LIST_HEAD(to_end);
 		unsigned int i;
 
@@ -2205,17 +2169,6 @@ void fuse_abort_conn(struct fuse_conn *fc)
 
 			spin_lock(&fpq->lock);
 			fpq->connected = 0;
-			list_for_each_entry_safe(req, next, &fpq->io, list) {
-				req->out.h.error = -ECONNABORTED;
-				spin_lock(&req->waitq.lock);
-				set_bit(FR_ABORTED, &req->flags);
-				if (!test_bit(FR_LOCKED, &req->flags)) {
-					set_bit(FR_PRIVATE, &req->flags);
-					__fuse_get_request(req);
-					list_move(&req->list, &to_end);
-				}
-				spin_unlock(&req->waitq.lock);
-			}
 			for (i = 0; i < FUSE_PQ_HASH_SIZE; i++)
 				list_splice_tail_init(&fpq->processing[i],
 						      &to_end);
@@ -2238,6 +2191,7 @@ void fuse_abort_conn(struct fuse_conn *fc)
 		spin_unlock(&fc->lock);
 
 		end_requests(fc, &to_end);
+		fuse_wait_aborted(fc);
 
 		spin_lock(&fc->lock);
 		fc->aborting = false;
