@@ -474,7 +474,7 @@ ACPI_EXTERNAL_RETURN_STATUS(acpi_status ACPI_INIT_FUNCTION
 ACPI_EXTERNAL_RETURN_STATUS(acpi_status ACPI_INIT_FUNCTION
 			    acpi_reallocate_root_table(void))
 
-ACPI_EXTERNAL_RETURN_STATUS(acpi_status ACPI_INIT_FUNCTION
+ACPI_EXTERNAL_RETURN_STATUS(acpi_status
 			    acpi_find_root_pointer(acpi_physical_address
 						   *rsdp_address))
 ACPI_EXTERNAL_RETURN_STATUS(acpi_status

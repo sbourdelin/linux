@@ -20,6 +20,7 @@
 #include <linux/mm.h>
 #include <linux/efi.h>
 #include <linux/verification.h>
+#include <linux/acpi.h>
 
 #include <asm/bootparam.h>
 #include <asm/setup.h>
@@ -255,8 +256,28 @@ setup_boot_parameters(struct kimage *image, struct boot_params *params,
 	/* Setup EFI state */
 	setup_efi_state(params, params_load_addr, efi_map_offset, efi_map_sz,
 			efi_setup_data_offset);
+
+#ifdef CONFIG_ACPI
+	/* Setup ACPI RSDP pointer in case EFI is not available in second kernel */
+	if (!acpi_disabled && (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_OLD_MEMMAP))) {
+		/* Copied from acpi_os_get_root_pointer accordingly */
+		params->acpi_rsdp_addr = boot_params.acpi_rsdp_addr;
+		if (!params->acpi_rsdp_addr) {
+			if (efi_enabled(EFI_CONFIG_TABLES)) {
+				if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
+					params->acpi_rsdp_addr = efi.acpi20;
+				else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
+					params->acpi_rsdp_addr = efi.acpi;
+			} else if (IS_ENABLED(CONFIG_ACPI_LEGACY_TABLES_LOOKUP)) {
+				acpi_find_root_pointer(&params->acpi_rsdp_addr);
+			}
+		}
+		if (!params->acpi_rsdp_addr)
+			pr_warn("RSDP is not available for second kernel\n");
+	}
 #endif
 
+#endif
 	/* Setup EDD info */
 	memcpy(params->eddbuf, boot_params.eddbuf,
 				EDDMAXNR * sizeof(struct edd_info));
