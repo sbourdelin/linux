@@ -16,7 +16,7 @@
  */
 struct io_uring_sqe {
 	__u8	opcode;		/* type of operation for this sqe */
-	__u8	flags;		/* as of now unused */
+	__u8	flags;		/* IOSQE_ flags */
 	__u16	ioprio;		/* ioprio for the request */
 	__s32	fd;		/* file descriptor to do IO on */
 	__u64	off;		/* offset into file */
@@ -35,6 +35,11 @@ struct io_uring_sqe {
 		__u64	__pad2[3];
 	};
 };
+
+/*
+ * sqe->flags
+ */
+#define IOSQE_FIXED_FILE	(1 << 0)	/* use fixed fileset */
 
 /*
  * io_uring_setup() flags
@@ -123,6 +128,8 @@ struct io_uring_params {
  */
 #define IORING_REGISTER_BUFFERS		0
 #define IORING_UNREGISTER_BUFFERS	1
+#define IORING_REGISTER_FILES		2
+#define IORING_UNREGISTER_FILES		3
 
 struct io_uring_register_buffers {
 	union {
@@ -130,6 +137,14 @@ struct io_uring_register_buffers {
 		__u64 pad;
 	};
 	__u32 nr_iovecs;
+};
+
+struct io_uring_register_files {
+	union {
+		__s32 *fds;
+		__u64 pad;
+	};
+	__u32 nr_fds;
 };
 
 #endif
