@@ -192,6 +192,77 @@ nfp_devlink_serial_get(struct devlink *devlink, u8 *buf, size_t buf_len,
 	return 0;
 }
 
+static const struct nfp_devlink_versions_simple {
+	const char *key;
+	const char *hwinfo;
+} nfp_devlink_versions_hwinfo[] = {
+	{ "board.model",	"assembly.model", },
+	{ "board.partno",	"assembly.partno", },
+	{ "board.revision",	"assembly.revision", },
+	{ "board.vendor",	"assembly.vendor", },
+};
+
+static int
+nfp_devlink_versions_get_hwinfo(struct sk_buff *skb, struct nfp_nsp *nsp,
+				struct netlink_ext_ack *extack)
+{
+	unsigned int i;
+	int attr;
+	int err;
+
+	attr = DEVLINK_ATTR_INFO_VERSIONS_FIXED;
+
+	for (i = 0; i < ARRAY_SIZE(nfp_devlink_versions_hwinfo); i++) {
+		const struct nfp_devlink_versions_simple *info;
+		char buf[256] = {};
+
+		info = &nfp_devlink_versions_hwinfo[i];
+		strcpy(buf, info->hwinfo);
+
+		err = nfp_nsp_hwinfo_lookup(nsp, buf, sizeof(buf));
+		if (err == -ENOENT)
+			continue;
+		if (err) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "error reading versions string from FW");
+			return err;
+		}
+
+		err = devlink_versions_report(skb, attr, info->key, buf);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+static int
+nfp_devlink_versions_get(struct devlink *devlink, struct sk_buff *skb,
+			 struct netlink_ext_ack *extack)
+{
+	struct nfp_pf *pf = devlink_priv(devlink);
+	struct nfp_nsp *nsp;
+	int err;
+
+	nsp = nfp_nsp_open(pf->cpp);
+	if (IS_ERR(nsp)) {
+		NL_SET_ERR_MSG_MOD(extack, "can't access NSP");
+		return PTR_ERR(nsp);
+	}
+
+	err = nfp_devlink_versions_get_hwinfo(skb, nsp, extack);
+	if (err)
+		goto err_close_nsp;
+
+	nfp_nsp_close(nsp);
+
+	return 0;
+
+err_close_nsp:
+	nfp_nsp_close(nsp);
+	return err;
+}
+
 const struct devlink_ops nfp_devlink_ops = {
 	.port_split		= nfp_devlink_port_split,
 	.port_unsplit		= nfp_devlink_port_unsplit,
@@ -200,6 +271,7 @@ const struct devlink_ops nfp_devlink_ops = {
 	.eswitch_mode_get	= nfp_devlink_eswitch_mode_get,
 	.eswitch_mode_set	= nfp_devlink_eswitch_mode_set,
 	.serial_get		= nfp_devlink_serial_get,
+	.versions_get		= nfp_devlink_versions_get,
 };
 
 int nfp_devlink_port_register(struct nfp_app *app, struct nfp_port *port)
