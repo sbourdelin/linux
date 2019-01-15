@@ -332,35 +332,23 @@ struct fuse_io_priv {
  * FR_FORCE:		force sending of the request even if interrupted
  * FR_BACKGROUND:	request is sent in the background
  * FR_WAITING:		request is counted as "waiting"
- * FR_ABORTED:		the request was aborted
  * FR_INTERRUPTED:	the request has been interrupted
- * FR_LOCKED:		data is being copied to/from the request
  * FR_PENDING:		request is not yet in userspace
  * FR_SENT:		request is in userspace, waiting for an answer
  * FR_FINISHED:		request is finished
- * FR_PRIVATE:		request is on private list
  */
 enum fuse_req_flag {
 	FR_ISREPLY,
 	FR_FORCE,
 	FR_BACKGROUND,
 	FR_WAITING,
-	FR_ABORTED,
 	FR_INTERRUPTED,
-	FR_LOCKED,
 	FR_PENDING,
 	FR_SENT,
 	FR_FINISHED,
-	FR_PRIVATE,
 };
 
-/**
- * A request to the client
- *
- * .waitq.lock protects the following fields:
- *   - FR_ABORTED
- *   - FR_LOCKED (may also be modified under fc->lock, tested under both)
- */
+/* A request to the client */
 struct fuse_req {
 	/** This can be on either pending processing or io lists in
 	    fuse_conn */

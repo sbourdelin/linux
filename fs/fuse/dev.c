@@ -1349,7 +1349,6 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 				     (struct fuse_arg *) in->args, 0);
 	fuse_copy_finish(cs);
 	spin_lock(&fpq->lock);
-	clear_bit(FR_LOCKED, &req->flags);
 	if (!fpq->connected) {
 		err = fc->aborted ? -ECONNABORTED : -ENODEV;
 		goto out_end;
@@ -1376,8 +1375,7 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
 	return reqsize;
 
 out_end:
-	if (!test_bit(FR_PRIVATE, &req->flags))
-		list_del_init(&req->list);
+	list_del_init(&req->list);
 	spin_unlock(&fpq->lock);
 	request_end(fc, req);
 	return err;
@@ -1955,7 +1953,6 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 	clear_bit(FR_SENT, &req->flags);
 	list_move(&req->list, &fpq->io);
 	req->out.h = oh;
-	set_bit(FR_LOCKED, &req->flags);
 	spin_unlock(&fpq->lock);
 	cs->req = req;
 	if (!req->out.page_replace)
@@ -1965,13 +1962,11 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 	fuse_copy_finish(cs);
 
 	spin_lock(&fpq->lock);
-	clear_bit(FR_LOCKED, &req->flags);
 	if (!fpq->connected)
 		err = -ENOENT;
 	else if (err)
 		req->out.h.error = -EIO;
-	if (!test_bit(FR_PRIVATE, &req->flags))
-		list_del_init(&req->list);
+	list_del_init(&req->list);
 	spin_unlock(&fpq->lock);
 
 	request_end(fc, req);
