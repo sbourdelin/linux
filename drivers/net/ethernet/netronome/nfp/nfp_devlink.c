@@ -236,6 +236,48 @@ nfp_devlink_versions_get_hwinfo(struct sk_buff *skb, struct nfp_nsp *nsp,
 	return 0;
 }
 
+static const struct nfp_devlink_versions {
+	enum nfp_nsp_versions id;
+	const char *key;
+} nfp_devlink_versions_nsp[] = {
+	{ NFP_VERSIONS_BSP,	"fw.mgmt", },
+	{ NFP_VERSIONS_CPLD,	"fw.cpld", },
+	{ NFP_VERSIONS_APP,	"fw.app", },
+};
+
+static int
+nfp_devlink_versions_get_nsp(struct sk_buff *skb, bool flash,
+			     const u8 *buf, unsigned int size)
+{
+	unsigned int i;
+	int attr;
+	int err;
+
+	attr = flash ? DEVLINK_ATTR_INFO_VERSIONS_STORED :
+		       DEVLINK_ATTR_INFO_VERSIONS_RUNNING;
+
+	for (i = 0; i < ARRAY_SIZE(nfp_devlink_versions_nsp); i++) {
+		const struct nfp_devlink_versions *info;
+		const char *version;
+
+		info = &nfp_devlink_versions_nsp[i];
+
+		version = nfp_nsp_versions_get(info->id, flash, buf, size);
+		if (IS_ERR(version)) {
+			if (PTR_ERR(version) == -ENOENT)
+				continue;
+			else
+				return PTR_ERR(version);
+		}
+
+		err = devlink_versions_report(skb, attr, info->key, version);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
 static int
 nfp_devlink_versions_get(struct devlink *devlink, struct sk_buff *skb,
 			 struct netlink_ext_ack *extack)
@@ -253,6 +295,24 @@ nfp_devlink_versions_get(struct devlink *devlink, struct sk_buff *skb,
 	err = nfp_devlink_versions_get_hwinfo(skb, nsp, extack);
 	if (err)
 		goto err_close_nsp;
+
+	if (nfp_nsp_has_versions(nsp)) {
+		char buf[512] = {};
+
+		err = nfp_nsp_versions(nsp, buf, sizeof(buf));
+		if (err)
+			goto err_close_nsp;
+
+		err = nfp_devlink_versions_get_nsp(skb, false,
+						   buf, sizeof(buf));
+		if (err)
+			goto err_close_nsp;
+
+		err = nfp_devlink_versions_get_nsp(skb, true,
+						   buf, sizeof(buf));
+		if (err)
+			goto err_close_nsp;
+	}
 
 	nfp_nsp_close(nsp);
 
