@@ -450,6 +450,24 @@ static void __gre_xmit(struct sk_buff *skb, struct net_device *dev,
 			 tunnel->parms.o_flags, proto, tunnel->parms.o_key,
 			 htonl(tunnel->o_seqno));
 
+	if (!tnl_params->daddr) {
+		struct ip_tunnel_info *tun_info;
+
+		tun_info = skb_tunnel_info(skb);
+		if (tun_info && (tun_info->mode & IP_TUNNEL_INFO_TX) &&
+		    ip_tunnel_info_af(tun_info) == AF_INET &&
+		    tun_info->key.u.ipv4.dst) {
+			struct iphdr tnl_params_info;
+
+			memcpy(&tnl_params_info, tnl_params,
+			       sizeof(tnl_params_info));
+			tnl_params_info.daddr = tun_info->key.u.ipv4.dst;
+
+			return ip_tunnel_xmit(skb, dev, &tnl_params_info,
+			       tnl_params_info.protocol);
+		}
+	}
+
 	ip_tunnel_xmit(skb, dev, tnl_params, tnl_params->protocol);
 }
 
