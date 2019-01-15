@@ -1054,10 +1054,19 @@ struct fuse_dev *fuse_dev_alloc(struct fuse_conn *fc)
 	fuse_pqueue_init(&fud->pq);
 
 	spin_lock(&fc->lock);
+	if (!fc->connected) {
+		spin_unlock(&fc->lock);
+		goto out_put;
+	}
 	list_add_tail(&fud->entry, &fc->devices);
 	spin_unlock(&fc->lock);
 
 	return fud;
+out_put:
+	fuse_conn_put(fc);
+	kfree(pq);
+	kfree(fud);
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(fuse_dev_alloc);
 
