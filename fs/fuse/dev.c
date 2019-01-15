@@ -769,6 +769,7 @@ static int unlock_request(struct fuse_req *req)
 }
 
 struct fuse_copy_state {
+	struct fuse_dev *fud;
 	int write;
 	struct fuse_req *req;
 	struct iov_iter *iter;
@@ -782,10 +783,12 @@ struct fuse_copy_state {
 	unsigned move_pages:1;
 };
 
-static void fuse_copy_init(struct fuse_copy_state *cs, int write,
+static void fuse_copy_init(struct fuse_copy_state *cs,
+		           struct fuse_dev *fud, int write,
 			   struct iov_iter *iter)
 {
 	memset(cs, 0, sizeof(*cs));
+	cs->fud = fud;
 	cs->write = write;
 	cs->iter = iter;
 }
@@ -1436,7 +1439,7 @@ static ssize_t fuse_dev_read(struct kiocb *iocb, struct iov_iter *to)
 	if (!iter_is_iovec(to))
 		return -EINVAL;
 
-	fuse_copy_init(&cs, 1, to);
+	fuse_copy_init(&cs, fud, 1, to);
 
 	return fuse_dev_do_read(fud, file, &cs, iov_iter_count(to));
 }
@@ -1459,7 +1462,7 @@ static ssize_t fuse_dev_splice_read(struct file *in, loff_t *ppos,
 	if (!bufs)
 		return -ENOMEM;
 
-	fuse_copy_init(&cs, 1, NULL);
+	fuse_copy_init(&cs, fud, 1, NULL);
 	cs.pipebufs = bufs;
 	cs.pipe = pipe;
 	ret = fuse_dev_do_read(fud, in, &cs, len);
@@ -2020,7 +2023,7 @@ static ssize_t fuse_dev_write(struct kiocb *iocb, struct iov_iter *from)
 	if (!iter_is_iovec(from))
 		return -EINVAL;
 
-	fuse_copy_init(&cs, 0, from);
+	fuse_copy_init(&cs, fud, 0, from);
 
 	return fuse_dev_do_write(fud, &cs, iov_iter_count(from));
 }
@@ -2089,7 +2092,7 @@ static ssize_t fuse_dev_splice_write(struct pipe_inode_info *pipe,
 	}
 	pipe_unlock(pipe);
 
-	fuse_copy_init(&cs, 0, NULL);
+	fuse_copy_init(&cs, fud, 0, NULL);
 	cs.pipebufs = bufs;
 	cs.nr_segs = nbuf;
 	cs.pipe = pipe;
