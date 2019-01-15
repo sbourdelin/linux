@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/linkage.h>
 #include <asm/asm.h>
+#include <asm/frame.h>
 
 	.text
 
@@ -20,18 +21,22 @@
  */
 ENTRY(vmx_vmenter)
 	/* EFLAGS.ZF is set if VMCS.LAUNCHED == 0 */
+	FRAME_BEGIN
 	je 2f
 
 1:	vmresume
+	FRAME_END
 	ret
 
 2:	vmlaunch
+	FRAME_END
 	ret
 
 3:	cmpb $0, kvm_rebooting
 	jne 4f
 	call kvm_spurious_fault
-4:	ret
+4:	FRAME_END
+	ret
 
 	.pushsection .fixup, "ax"
 5:	jmp 3b
