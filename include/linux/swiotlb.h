@@ -62,6 +62,7 @@ extern void swiotlb_tbl_sync_single(struct device *hwdev,
 
 extern int
 swiotlb_dma_supported(struct device *hwdev, u64 mask);
+extern size_t swiotlb_max_mapping_size(struct device *dev);
 
 #ifdef CONFIG_SWIOTLB
 extern enum swiotlb_force swiotlb_force;
@@ -94,6 +95,10 @@ static inline void swiotlb_exit(void)
 static inline unsigned int swiotlb_max_segment(void)
 {
 	return 0;
+}
+static inline size_t swiotlb_max_mapping_size(struct device *dev)
+{
+	return SIZE_MAX;
 }
 #endif /* CONFIG_SWIOTLB */
 
