@@ -244,6 +244,11 @@ void nft_meta_get_eval(const struct nft_expr *expr,
 		strncpy((char *)dest, p->br->dev->name, IFNAMSIZ);
 		return;
 #endif
+	case NFT_META_L3MASTER:
+		if (in == NULL)
+			goto err;
+		nft_reg_store8(dest, netif_is_l3_master(in));
+		break;
 	default:
 		WARN_ON(1);
 		goto err;
@@ -359,6 +364,9 @@ static int nft_meta_get_init(const struct nft_ctx *ctx,
 		len = IFNAMSIZ;
 		break;
 #endif
+	case NFT_META_L3MASTER:
+		len = sizeof(u8);
+		break;
 	default:
 		return -EOPNOTSUPP;
 	}
