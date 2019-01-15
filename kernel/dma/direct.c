@@ -380,3 +380,13 @@ int dma_direct_supported(struct device *dev, u64 mask)
 	 */
 	return mask >= __phys_to_dma(dev, min_mask);
 }
+
+size_t dma_direct_max_mapping_size(struct device *dev)
+{
+	/*
+	 * Return the minimum of the direct DMA limit and the SWIOTLB limit.
+	 * Since direct DMA has no limit, it is fine to just return the SWIOTLB
+	 * limit.
+	 */
+	return swiotlb_max_mapping_size(dev);
+}
