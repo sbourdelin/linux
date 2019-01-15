@@ -3615,6 +3615,32 @@ static int devlink_nl_info_sn_fill(struct sk_buff *msg, struct devlink *devlink,
 	return nla_put(msg, DEVLINK_ATTR_INFO_SERIAL_NUMBER, len, sn);
 }
 
+static int devlink_nl_info_versions_fill(struct sk_buff *msg,
+					 struct devlink *devlink,
+					 struct netlink_ext_ack *extack)
+{
+	struct nlattr *attr;
+	int err;
+
+	if (!devlink->ops->versions_get)
+		return 0;
+
+	attr = nla_nest_start(msg, DEVLINK_ATTR_INFO_VERSIONS);
+	if (!attr)
+		return -EMSGSIZE;
+
+	err = devlink->ops->versions_get(devlink, msg, extack);
+	if (err)
+		goto err_cancel;
+
+	nla_nest_end(msg, attr);
+	return 0;
+
+err_cancel:
+	nla_nest_cancel(msg, attr);
+	return err;
+}
+
 static int
 devlink_nl_info_fill(struct sk_buff *msg, struct devlink *devlink,
 		     enum devlink_command cmd, u32 portid,
@@ -3635,6 +3661,10 @@ devlink_nl_info_fill(struct sk_buff *msg, struct devlink *devlink,
 	if (err)
 		goto err_cancel_msg;
 
+	err = devlink_nl_info_versions_fill(msg, devlink, extack);
+	if (err)
+		goto err_cancel_msg;
+
 	genlmsg_end(msg, hdr);
 	return 0;
 
@@ -3650,7 +3680,8 @@ static int devlink_nl_cmd_info_get_doit(struct sk_buff *skb,
 	struct sk_buff *msg;
 	int err;
 
-	if (!devlink->ops || !devlink->ops->serial_get)
+	if (!devlink->ops ||
+	    (!devlink->ops->serial_get && !devlink->ops->versions_get))
 		return -EOPNOTSUPP;
 
 	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
@@ -3700,6 +3731,40 @@ static int devlink_nl_cmd_info_get_dumpit(struct sk_buff *msg,
 	cb->args[0] = idx;
 	return msg->len;
 }
+
+int devlink_versions_report(struct sk_buff *skb, enum devlink_attr attr,
+			    const char *version_name, const char *version_value)
+{
+	struct nlattr *nest;
+	int err;
+
+	if (attr < DEVLINK_ATTR_INFO_VERSIONS_FIXED ||
+	    attr > DEVLINK_ATTR_INFO_VERSIONS_STORED)
+		return -EINVAL;
+
+	nest = nla_nest_start(skb, attr);
+	if (!nest)
+		return -EMSGSIZE;
+
+	err = nla_put_string(skb, DEVLINK_ATTR_INFO_VERSIONS_NAME,
+			     version_name);
+	if (err)
+		goto nla_put_failure;
+
+	err = nla_put_string(skb, DEVLINK_ATTR_INFO_VERSIONS_VALUE,
+			     version_value);
+	if (err)
+		goto nla_put_failure;
+
+	nla_nest_end(skb, nest);
+
+	return 0;
+
+nla_put_failure:
+	nla_nest_cancel(skb, nest);
+	return err;
+}
+EXPORT_SYMBOL_GPL(devlink_versions_report);
 
 static const struct nla_policy devlink_nl_policy[DEVLINK_ATTR_MAX + 1] = {
 	[DEVLINK_ATTR_BUS_NAME] = { .type = NLA_NUL_STRING },

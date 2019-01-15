@@ -477,6 +477,8 @@ struct devlink_ops {
 				      struct netlink_ext_ack *extack);
 	int (*serial_get)(struct devlink *devlink, u8 *buf, size_t buf_len,
 			  size_t *len, struct netlink_ext_ack *extack);
+	int (*versions_get)(struct devlink *devlink, struct sk_buff *skb,
+			    struct netlink_ext_ack *extack);
 };
 
 static inline void *devlink_priv(struct devlink *devlink)
@@ -585,6 +587,10 @@ u32 devlink_region_shapshot_id_get(struct devlink *devlink);
 int devlink_region_snapshot_create(struct devlink_region *region, u64 data_len,
 				   u8 *data, u32 snapshot_id,
 				   devlink_snapshot_data_dest_t *data_destructor);
+
+int devlink_versions_report(struct sk_buff *skb, enum devlink_attr attr,
+			    const char *version_name,
+			    const char *version_value);
 
 #else
 
@@ -842,6 +848,13 @@ static inline int
 devlink_region_snapshot_create(struct devlink_region *region, u64 data_len,
 			       u8 *data, u32 snapshot_id,
 			       devlink_snapshot_data_dest_t *data_destructor)
+{
+	return 0;
+}
+
+static inline int
+devlink_versions_report(struct sk_buff *skb, enum devlink_attr attr,
+			const char *version_name, const char *version_value)
 {
 	return 0;
 }

@@ -288,6 +288,12 @@ enum devlink_attr {
 	DEVLINK_ATTR_REGION_CHUNK_LEN,          /* u64 */
 
 	DEVLINK_ATTR_INFO_SERIAL_NUMBER,	/* binary */
+	DEVLINK_ATTR_INFO_VERSIONS,		/* nested */
+	DEVLINK_ATTR_INFO_VERSIONS_FIXED,	/* nested */
+	DEVLINK_ATTR_INFO_VERSIONS_RUNNING,	/* nested */
+	DEVLINK_ATTR_INFO_VERSIONS_STORED,	/* nested */
+	DEVLINK_ATTR_INFO_VERSIONS_NAME,	/* string */
+	DEVLINK_ATTR_INFO_VERSIONS_VALUE,	/* string */
 
 	/* add new attributes above here, update the policy in devlink.c */
 
