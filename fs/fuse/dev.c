@@ -2191,6 +2191,9 @@ void fuse_abort_conn(struct fuse_conn *fc)
 		/* Background queuing checks fc->connected under bg_lock */
 		spin_lock(&fc->bg_lock);
 		fc->connected = 0;
+		fc->blocked = 0;
+		fc->max_background = UINT_MAX;
+		flush_bg_queue(fc);
 		spin_unlock(&fc->bg_lock);
 
 		fuse_set_initialized(fc);
@@ -2215,11 +2218,6 @@ void fuse_abort_conn(struct fuse_conn *fc)
 						      &to_end);
 			spin_unlock(&fpq->lock);
 		}
-		spin_lock(&fc->bg_lock);
-		fc->blocked = 0;
-		fc->max_background = UINT_MAX;
-		flush_bg_queue(fc);
-		spin_unlock(&fc->bg_lock);
 
 		spin_lock(&fiq->waitq.lock);
 		fiq->connected = 0;
