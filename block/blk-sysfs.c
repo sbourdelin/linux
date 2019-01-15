@@ -824,10 +824,9 @@ static void blk_free_queue_rcu(struct rcu_head *rcu_head)
  * @work: pointer to the release_work member of the request queue to be released
  *
  * Description:
- *     blk_release_queue is the counterpart of blk_init_queue(). It should be
- *     called when a request queue is being released; typically when a block
- *     device is being de-registered. Its primary task it to free the queue
- *     itself.
+ *     Should be called when a request queue is being released;
+ *     typically when a block device is being de-registered. Its primary task it
+ *     to free the queue itself.
  *
  * Notes:
  *     The low level driver must have finished any outstanding requests first
