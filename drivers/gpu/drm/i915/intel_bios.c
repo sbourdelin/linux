@@ -758,6 +758,16 @@ parse_psr(struct drm_i915_private *dev_priv, const struct bdb_header *bdb)
 
 		dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time = wakeup_time;
 	}
+
+	if (bdb->version >= 226) {
+		u32 wakeup_time = psr_table->psr2_tp2_tp3_tp4_wakeup_time;
+
+		wakeup_time = (wakeup_time >> (2 * panel_type)) & 0x3;
+		dev_priv->vbt.psr.psr2_tp2_tp3_tp4_wakeup_time = wakeup_time;
+	} else {
+		/* Reusing PSR1 wakeup time for PSR2 in older VBTs */
+		dev_priv->vbt.psr.psr2_tp2_tp3_tp4_wakeup_time = dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time;
+	}
 }
 
 static void parse_dsi_backlight_ports(struct drm_i915_private *dev_priv,

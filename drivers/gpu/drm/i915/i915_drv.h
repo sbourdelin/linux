@@ -960,6 +960,13 @@ enum psr_tp_wakeup_time {
 	PSR_TP_WAKEUP_TIME_LAST
 };
 
+enum psr2_tp_wakeup_time {
+	PSR2_TP_WAKEUP_TIME_500USEC = 0,
+	PSR2_TP_WAKEUP_TIME_100USEC,
+	PSR2_TP_WAKEUP_TIME_2500USEC,
+	PSR2_TP_WAKEUP_TIME_50USEC
+};
+
 struct intel_vbt_data {
 	struct drm_display_mode *lfp_lvds_vbt_mode; /* if any */
 	struct drm_display_mode *sdvo_lvds_vbt_mode; /* if any */
@@ -998,6 +1005,7 @@ struct intel_vbt_data {
 		enum psr_lines_to_wait lines_to_wait;
 		enum psr_tp_wakeup_time tp1_wakeup_time;
 		enum psr_tp_wakeup_time tp2_tp3_tp4_wakeup_time;
+		enum psr2_tp_wakeup_time psr2_tp2_tp3_tp4_wakeup_time;
 	} psr;
 
 	struct {

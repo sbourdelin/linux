@@ -468,7 +468,7 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 
 	val |= EDP_PSR2_FRAME_BEFORE_SU(dev_priv->psr.sink_sync_latency + 1);
 
-	val |= dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time << EDP_PSR2_TP2_TP3_TIME_SHIFT;
+	val |= dev_priv->vbt.psr.psr2_tp2_tp3_tp4_wakeup_time << EDP_PSR2_TP2_TP3_TIME_SHIFT;
 
 	I915_WRITE(EDP_PSR2_CTL, val);
 }
