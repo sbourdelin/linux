@@ -57,8 +57,6 @@
 # error "Need more virtual address space for the ESPFIX hack"
 #endif
 
-#define PGALLOC_GFP (GFP_KERNEL | __GFP_ZERO)
-
 /* This contains the *bottom* address of the espfix stack */
 DEFINE_PER_CPU_READ_MOSTLY(unsigned long, espfix_stack);
 DEFINE_PER_CPU_READ_MOSTLY(unsigned long, espfix_waddr);
@@ -172,7 +170,7 @@ void init_espfix_ap(int cpu)
 	pud_p = &espfix_pud_page[pud_index(addr)];
 	pud = *pud_p;
 	if (!pud_present(pud)) {
-		struct page *page = alloc_pages_node(node, PGALLOC_GFP, 0);
+		struct page *page = alloc_pages_node(node, GFP_PGTABLE, 0);
 
 		pmd_p = (pmd_t *)page_address(page);
 		pud = __pud(__pa(pmd_p) | (PGTABLE_PROT & ptemask));
@@ -184,7 +182,7 @@ void init_espfix_ap(int cpu)
 	pmd_p = pmd_offset(&pud, addr);
 	pmd = *pmd_p;
 	if (!pmd_present(pmd)) {
-		struct page *page = alloc_pages_node(node, PGALLOC_GFP, 0);
+		struct page *page = alloc_pages_node(node, GFP_PGTABLE, 0);
 
 		pte_p = (pte_t *)page_address(page);
 		pmd = __pmd(__pa(pte_p) | (PGTABLE_PROT & ptemask));

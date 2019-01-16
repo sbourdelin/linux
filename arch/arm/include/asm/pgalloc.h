@@ -57,8 +57,6 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 extern pgd_t *pgd_alloc(struct mm_struct *mm);
 extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
 
-#define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
-
 static inline void clean_pte_table(pte_t *pte)
 {
 	clean_dcache_area(pte + PTE_HWTABLE_PTRS, PTE_HWTABLE_SIZE);
@@ -85,7 +83,7 @@ pte_alloc_one_kernel(struct mm_struct *mm)
 {
 	pte_t *pte;
 
-	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
+	pte = (pte_t *)__get_free_page(GFP_PGTABLE);
 	if (pte)
 		clean_pte_table(pte);
 
@@ -98,9 +96,9 @@ pte_alloc_one(struct mm_struct *mm)
 	struct page *pte;
 
 #ifdef CONFIG_HIGHPTE
-	pte = alloc_pages(PGALLOC_GFP | __GFP_HIGHMEM, 0);
+	pte = alloc_pages(GFP_PGTABLE | __GFP_HIGHMEM, 0);
 #else
-	pte = alloc_pages(PGALLOC_GFP, 0);
+	pte = alloc_pages(GFP_PGTABLE, 0);
 #endif
 	if (!pte)
 		return NULL;

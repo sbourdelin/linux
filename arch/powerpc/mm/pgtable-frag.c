@@ -58,7 +58,7 @@ static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
 	struct page *page;
 
 	if (!kernel) {
-		page = alloc_page(PGALLOC_GFP | __GFP_ACCOUNT);
+		page = alloc_page(GFP_PGTABLE | __GFP_ACCOUNT);
 		if (!page)
 			return NULL;
 		if (!pgtable_page_ctor(page)) {
@@ -66,7 +66,7 @@ static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
 			return NULL;
 		}
 	} else {
-		page = alloc_page(PGALLOC_GFP);
+		page = alloc_page(GFP_PGTABLE);
 		if (!page)
 			return NULL;
 	}

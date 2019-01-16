@@ -52,11 +52,11 @@ void pte_frag_destroy(void *pte_frag);
 static inline pgd_t *radix__pgd_alloc(struct mm_struct *mm)
 {
 #ifdef CONFIG_PPC_64K_PAGES
-	return (pgd_t *)__get_free_page(pgtable_gfp_flags(mm, PGALLOC_GFP));
+	return (pgd_t *)__get_free_page(pgtable_gfp_flags(mm, GFP_PGTABLE));
 #else
 	struct page *page;
-	page = alloc_pages(pgtable_gfp_flags(mm, PGALLOC_GFP | __GFP_RETRY_MAYFAIL),
-				4);
+	page = alloc_pages(pgtable_gfp_flags(mm, GFP_PGTABLE |
+				__GFP_RETRY_MAYFAIL), 4);
 	if (!page)
 		return NULL;
 	return (pgd_t *) page_address(page);

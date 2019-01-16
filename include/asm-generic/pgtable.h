@@ -1186,4 +1186,6 @@ static inline bool arch_has_pfn_modify_check(void)
 #define mm_pmd_folded(mm)	__is_defined(__PAGETABLE_PMD_FOLDED)
 #endif
 
+#define GFP_PGTABLE	(GFP_KERNEL | __GFP_ZERO)
+
 #endif /* _ASM_GENERIC_PGTABLE_H */
