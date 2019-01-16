@@ -1876,6 +1876,8 @@ static void i915_oa_stream_enable(struct i915_perf_stream *stream)
 {
 	struct drm_i915_private *dev_priv = stream->dev_priv;
 
+	dev_priv->perf.oa.pollin = false;
+
 	dev_priv->perf.oa.ops.oa_enable(stream);
 
 	if (dev_priv->perf.oa.periodic)
