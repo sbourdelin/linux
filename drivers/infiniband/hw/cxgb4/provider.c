@@ -569,6 +569,7 @@ static const struct ib_device_ops c4iw_dev_ops = {
 	.query_qp = c4iw_ib_query_qp,
 	.reg_user_mr = c4iw_reg_user_mr,
 	.req_notify_cq = c4iw_arm_cq,
+	.fill_res_entry = fill_res_entry,
 };
 
 void c4iw_register_device(struct work_struct *work)
@@ -629,7 +630,6 @@ void c4iw_register_device(struct work_struct *work)
 	dev->ibdev.iwcm->add_ref = c4iw_qp_add_ref;
 	dev->ibdev.iwcm->rem_ref = c4iw_qp_rem_ref;
 	dev->ibdev.iwcm->get_qp = c4iw_get_qp;
-	dev->ibdev.res.fill_res_entry = fill_res_entry;
 	memcpy(dev->ibdev.iwcm->ifname, dev->rdev.lldi.ports[0]->name,
 	       sizeof(dev->ibdev.iwcm->ifname));
 

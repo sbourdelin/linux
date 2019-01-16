@@ -70,13 +70,6 @@ struct rdma_restrack_root {
 	 * we insert based on pointers and auto-allocate unique index.
 	 */
 	struct xarray xa[RDMA_RESTRACK_MAX];
-	/**
-	 * @fill_res_entry: driver-specific fill function
-	 *
-	 * Allows rdma drivers to add their own restrack attributes.
-	 */
-	int (*fill_res_entry)(struct sk_buff *msg,
-			      struct rdma_restrack_entry *entry);
 };
 
 /**

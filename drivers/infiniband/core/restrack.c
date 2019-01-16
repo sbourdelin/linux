@@ -31,7 +31,6 @@ void rdma_restrack_init(struct ib_device *dev)
 		xa_init_flags(&res->xa[i], XA_FLAGS_ALLOC);
 
 	init_rwsem(&res->rwsem);
-	res->fill_res_entry = fill_res_noop;
 }
 
 static const char *type2str(enum rdma_restrack_type type)
