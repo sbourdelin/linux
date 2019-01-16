@@ -1601,6 +1601,9 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 		return 0;
 
 	sdp = sdkp->device;
+	if (!sdp->removable)
+		return 0;
+
 	SCSI_LOG_HLQUEUE(3, sd_printk(KERN_INFO, sdkp, "sd_check_events\n"));
 
 	/*
