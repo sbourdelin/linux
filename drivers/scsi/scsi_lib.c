@@ -1175,6 +1175,7 @@ void scsi_init_command(struct scsi_device *dev, struct scsi_cmnd *cmd)
 
 	cmd->device = dev;
 	cmd->sense_buffer = buf;
+	cmd->req.sense = buf;
 	cmd->prot_sdb = prot;
 	cmd->flags = flags;
 	INIT_DELAYED_WORK(&cmd->abort_work, scmd_eh_abort_handler);
