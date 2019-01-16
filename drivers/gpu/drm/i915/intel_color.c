@@ -557,6 +557,25 @@ static void glk_load_luts(struct intel_crtc_state *crtc_state)
 	POSTING_READ(GAMMA_MODE(pipe));
 }
 
+static void icl_load_luts(struct intel_crtc_state *crtc_state)
+{
+	struct drm_crtc *crtc = crtc_state->base.crtc;
+	struct drm_device *dev = crtc_state->base.crtc->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	enum pipe pipe = to_intel_crtc(crtc)->pipe;
+
+	if (crtc_state_is_legacy_gamma(crtc_state)) {
+		haswell_load_luts(crtc_state);
+		return;
+	}
+
+	glk_load_degamma_lut(crtc_state);
+	bdw_load_gamma_lut(crtc_state, 0);
+
+	I915_WRITE(GAMMA_MODE(pipe), GAMMA_MODE_MODE_10BIT |
+		   PRE_CSC_GAMMA_ENABLE | POST_CSC_GAMMA_ENABLE);
+}
+
 /* Loads the palette/gamma unit for the CRTC on CherryView. */
 static void cherryview_load_luts(struct intel_crtc_state *crtc_state)
 {
@@ -672,6 +691,8 @@ void intel_color_init(struct intel_crtc *crtc)
 	} else if (IS_GEMINILAKE(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 		dev_priv->display.load_csc_matrix = ilk_load_csc_matrix;
 		dev_priv->display.load_luts = glk_load_luts;
+	} else if (IS_ICELAKE(dev_priv)) {
+		dev_priv->display.load_luts = icl_load_luts;
 	} else {
 		dev_priv->display.load_luts = i9xx_load_luts;
 	}
