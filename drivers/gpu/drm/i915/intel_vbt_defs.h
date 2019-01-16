@@ -771,7 +771,7 @@ struct psr_table {
 
 	/* TP wake up time in multiple of 100 */
 	u16 tp1_wakeup_time;
-	u16 tp2_tp3_wakeup_time;
+	u16 tp2_tp3_tp4_wakeup_time;
 } __packed;
 
 struct bdb_psr {
