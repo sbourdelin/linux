@@ -15430,6 +15430,27 @@ static void intel_sanitize_crtc(struct intel_crtc *crtc,
 		}
 	}
 
+	/*
+	 * Sanitize gamma mode incase BIOS leaves it in SPLIT GAMMA MODE
+	 * or gamma luts, csc  with any other unexpected values than desired.
+	 * We don't read out the LUT's and CTM that the BIOS setup, so at the
+	 * moment they stick around for a while until they get unexpectedly
+	 * clobbered by a subsequent modeset or fastset.
+	 * The change here will basically force them to be reset to
+	 * standard/linear values at startup.
+	 * Workaround HSW : Do not read or write the pipe palette/gamma data
+	 * while GAMMA_MODE is configured for split gamma and IPS_CTL has IPS
+	 * enabled.
+	 */
+	if (IS_HASWELL(dev_priv)) {
+		hsw_disable_ips(crtc_state);
+
+		intel_color_set_csc(crtc_state);
+		intel_color_load_luts(crtc_state);
+
+		hsw_enable_ips(crtc_state);
+	}
+
 	/* Adjust the state of the output pipe according to whether we
 	 * have active connectors/encoders. */
 	if (crtc_state->base.active && !intel_crtc_has_encoders(crtc))
