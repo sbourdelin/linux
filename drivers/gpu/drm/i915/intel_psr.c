@@ -430,23 +430,8 @@ static void hsw_activate_psr1(struct intel_dp *intel_dp)
 	if (dev_priv->psr.link_standby)
 		val |= EDP_PSR_LINK_STANDBY;
 
-	if (dev_priv->vbt.psr.tp1_wakeup_time_us == 0)
-		val |=  EDP_PSR_TP1_TIME_0us;
-	else if (dev_priv->vbt.psr.tp1_wakeup_time_us <= 100)
-		val |= EDP_PSR_TP1_TIME_100us;
-	else if (dev_priv->vbt.psr.tp1_wakeup_time_us <= 500)
-		val |= EDP_PSR_TP1_TIME_500us;
-	else
-		val |= EDP_PSR_TP1_TIME_2500us;
-
-	if (dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us == 0)
-		val |=  EDP_PSR_TP2_TP3_TIME_0us;
-	else if (dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us <= 100)
-		val |= EDP_PSR_TP2_TP3_TIME_100us;
-	else if (dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us <= 500)
-		val |= EDP_PSR_TP2_TP3_TIME_500us;
-	else
-		val |= EDP_PSR_TP2_TP3_TIME_2500us;
+	val |= dev_priv->vbt.psr.tp1_wakeup_time << EDP_PSR_TP1_TIME_SHIFT;
+	val |= dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time << EDP_PSR_TP2_TP3_TIME_SHIFT;
 
 	if (intel_dp_source_supports_hbr2(intel_dp) &&
 	    drm_dp_tps3_supported(intel_dp->dpcd))
@@ -483,15 +468,7 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 
 	val |= EDP_PSR2_FRAME_BEFORE_SU(dev_priv->psr.sink_sync_latency + 1);
 
-	if (dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us >= 0 &&
-	    dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us <= 50)
-		val |= EDP_PSR2_TP2_TIME_50us;
-	else if (dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us <= 100)
-		val |= EDP_PSR2_TP2_TIME_100us;
-	else if (dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us <= 500)
-		val |= EDP_PSR2_TP2_TIME_500us;
-	else
-		val |= EDP_PSR2_TP2_TIME_2500us;
+	val |= dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time << EDP_PSR2_TP2_TP3_TIME_SHIFT;
 
 	I915_WRITE(EDP_PSR2_CTL, val);
 }

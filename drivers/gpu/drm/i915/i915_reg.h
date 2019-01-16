@@ -4137,14 +4137,8 @@ enum {
 #define   EDP_PSR_TP1_TP2_SEL			(0 << 11)
 #define   EDP_PSR_TP1_TP3_SEL			(1 << 11)
 #define   EDP_PSR_CRC_ENABLE			(1 << 10) /* BDW+ */
-#define   EDP_PSR_TP2_TP3_TIME_500us		(0 << 8)
-#define   EDP_PSR_TP2_TP3_TIME_100us		(1 << 8)
-#define   EDP_PSR_TP2_TP3_TIME_2500us		(2 << 8)
-#define   EDP_PSR_TP2_TP3_TIME_0us		(3 << 8)
-#define   EDP_PSR_TP1_TIME_500us		(0 << 4)
-#define   EDP_PSR_TP1_TIME_100us		(1 << 4)
-#define   EDP_PSR_TP1_TIME_2500us		(2 << 4)
-#define   EDP_PSR_TP1_TIME_0us			(3 << 4)
+#define   EDP_PSR_TP2_TP3_TIME_SHIFT		(8)
+#define   EDP_PSR_TP1_TIME_SHIFT		(4)
 #define   EDP_PSR_IDLE_FRAME_SHIFT		0
 
 /* Bspec claims those aren't shifted but stay at 0x64800 */
@@ -4210,11 +4204,7 @@ enum {
 #define   EDP_Y_COORDINATE_ENABLE	(1 << 25) /* GLK and CNL+ */
 #define   EDP_MAX_SU_DISABLE_TIME(t)	((t) << 20)
 #define   EDP_MAX_SU_DISABLE_TIME_MASK	(0x1f << 20)
-#define   EDP_PSR2_TP2_TIME_500us	(0 << 8)
-#define   EDP_PSR2_TP2_TIME_100us	(1 << 8)
-#define   EDP_PSR2_TP2_TIME_2500us	(2 << 8)
-#define   EDP_PSR2_TP2_TIME_50us	(3 << 8)
-#define   EDP_PSR2_TP2_TIME_MASK	(3 << 8)
+#define   EDP_PSR2_TP2_TP3_TIME_SHIFT	(8)
 #define   EDP_PSR2_FRAME_BEFORE_SU_SHIFT 4
 #define   EDP_PSR2_FRAME_BEFORE_SU_MASK	(0xf << 4)
 #define   EDP_PSR2_FRAME_BEFORE_SU(a)	((a) << 4)

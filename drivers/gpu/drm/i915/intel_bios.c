@@ -720,46 +720,43 @@ parse_psr(struct drm_i915_private *dev_priv, const struct bdb_header *bdb)
 	if (bdb->version >= 205 &&
 	    (IS_GEN9_BC(dev_priv) || IS_GEMINILAKE(dev_priv) ||
 	     INTEL_GEN(dev_priv) >= 10)) {
-		switch (psr_table->tp1_wakeup_time) {
-		case 0:
-			dev_priv->vbt.psr.tp1_wakeup_time_us = 500;
-			break;
-		case 1:
-			dev_priv->vbt.psr.tp1_wakeup_time_us = 100;
-			break;
-		case 3:
-			dev_priv->vbt.psr.tp1_wakeup_time_us = 0;
-			break;
-		default:
+		dev_priv->vbt.psr.tp1_wakeup_time = psr_table->tp1_wakeup_time;
+		if (dev_priv->vbt.psr.tp1_wakeup_time >= PSR_TP_WAKEUP_TIME_LAST) {
 			DRM_DEBUG_KMS("VBT tp1 wakeup time value %d is outside range[0-3], defaulting to max value 2500us\n",
-					psr_table->tp1_wakeup_time);
-			/* fallthrough */
-		case 2:
-			dev_priv->vbt.psr.tp1_wakeup_time_us = 2500;
-			break;
+				      dev_priv->vbt.psr.tp1_wakeup_time);
+			dev_priv->vbt.psr.tp1_wakeup_time = PSR_TP_WAKEUP_TIME_2500USEC;
 		}
 
-		switch (psr_table->tp2_tp3_tp4_wakeup_time) {
-		case 0:
-			dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us = 500;
-			break;
-		case 1:
-			dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us = 100;
-			break;
-		case 3:
-			dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us = 0;
-			break;
-		default:
+		dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time = psr_table->tp2_tp3_tp4_wakeup_time;
+		if (dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time >= PSR_TP_WAKEUP_TIME_LAST) {
 			DRM_DEBUG_KMS("VBT tp2_tp3_tp4 wakeup time value %d is outside range[0-3], defaulting to max value 2500us\n",
-				      psr_table->tp2_tp3_tp4_wakeup_time);
-			/* fallthrough */
-		case 2:
-			dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us = 2500;
-		break;
+				      dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time);
+			dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time = PSR_TP_WAKEUP_TIME_2500USEC;
 		}
 	} else {
-		dev_priv->vbt.psr.tp1_wakeup_time_us = psr_table->tp1_wakeup_time * 100;
-		dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time_us = psr_table->tp2_tp3_tp4_wakeup_time * 100;
+		enum psr_tp_wakeup_time wakeup_time;
+
+		if (psr_table->tp1_wakeup_time == 0)
+			wakeup_time = PSR_TP_WAKEUP_TIME_NONE;
+		else if (psr_table->tp1_wakeup_time == 1)
+			wakeup_time = PSR_TP_WAKEUP_TIME_100USEC;
+		else if (psr_table->tp1_wakeup_time <= 5)
+			wakeup_time = PSR_TP_WAKEUP_TIME_500USEC;
+		else
+			wakeup_time = PSR_TP_WAKEUP_TIME_2500USEC;
+
+		dev_priv->vbt.psr.tp1_wakeup_time = wakeup_time;
+
+		if (psr_table->tp2_tp3_tp4_wakeup_time == 0)
+			wakeup_time = PSR_TP_WAKEUP_TIME_NONE;
+		else if (psr_table->tp2_tp3_tp4_wakeup_time == 1)
+			wakeup_time = PSR_TP_WAKEUP_TIME_100USEC;
+		else if (psr_table->tp2_tp3_tp4_wakeup_time <= 5)
+			wakeup_time = PSR_TP_WAKEUP_TIME_500USEC;
+		else
+			wakeup_time = PSR_TP_WAKEUP_TIME_2500USEC;
+
+		dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time = wakeup_time;
 	}
 }
 
