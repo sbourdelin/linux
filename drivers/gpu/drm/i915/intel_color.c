@@ -113,29 +113,58 @@ static u64 *ctm_mult_by_limited(u64 *result, const u64 *input)
 	return result;
 }
 
-static void ilk_load_ycbcr_conversion_matrix(struct intel_crtc *crtc)
+static void ilk_load_ycbcr_conversion_matrix(struct intel_crtc_state
+					     *crtc_state)
 {
-	int pipe = crtc->pipe;
+	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	int pipe = crtc->pipe;
 
-	I915_WRITE(PIPE_CSC_PREOFF_HI(pipe), 0);
-	I915_WRITE(PIPE_CSC_PREOFF_ME(pipe), 0);
-	I915_WRITE(PIPE_CSC_PREOFF_LO(pipe), 0);
+	if (INTEL_GEN(dev_priv) < 11) {
+		I915_WRITE(PIPE_CSC_PREOFF_HI(pipe), 0);
+		I915_WRITE(PIPE_CSC_PREOFF_ME(pipe), 0);
+		I915_WRITE(PIPE_CSC_PREOFF_LO(pipe), 0);
 
-	I915_WRITE(PIPE_CSC_COEFF_RU_GU(pipe), CSC_RGB_TO_YUV_RU_GU);
-	I915_WRITE(PIPE_CSC_COEFF_BU(pipe), CSC_RGB_TO_YUV_BU);
+		I915_WRITE(PIPE_CSC_COEFF_RU_GU(pipe), CSC_RGB_TO_YUV_RU_GU);
+		I915_WRITE(PIPE_CSC_COEFF_BU(pipe), CSC_RGB_TO_YUV_BU);
 
-	I915_WRITE(PIPE_CSC_COEFF_RY_GY(pipe), CSC_RGB_TO_YUV_RY_GY);
-	I915_WRITE(PIPE_CSC_COEFF_BY(pipe), CSC_RGB_TO_YUV_BY);
+		I915_WRITE(PIPE_CSC_COEFF_RY_GY(pipe), CSC_RGB_TO_YUV_RY_GY);
+		I915_WRITE(PIPE_CSC_COEFF_BY(pipe), CSC_RGB_TO_YUV_BY);
 
-	I915_WRITE(PIPE_CSC_COEFF_RV_GV(pipe), CSC_RGB_TO_YUV_RV_GV);
-	I915_WRITE(PIPE_CSC_COEFF_BV(pipe), CSC_RGB_TO_YUV_BV);
+		I915_WRITE(PIPE_CSC_COEFF_RV_GV(pipe), CSC_RGB_TO_YUV_RV_GV);
+		I915_WRITE(PIPE_CSC_COEFF_BV(pipe), CSC_RGB_TO_YUV_BV);
 
-	I915_WRITE(PIPE_CSC_POSTOFF_HI(pipe), POSTOFF_RGB_TO_YUV_HI);
-	I915_WRITE(PIPE_CSC_POSTOFF_ME(pipe), POSTOFF_RGB_TO_YUV_ME);
-	I915_WRITE(PIPE_CSC_POSTOFF_LO(pipe), POSTOFF_RGB_TO_YUV_LO);
+		I915_WRITE(PIPE_CSC_POSTOFF_HI(pipe), POSTOFF_RGB_TO_YUV_HI);
+		I915_WRITE(PIPE_CSC_POSTOFF_ME(pipe), POSTOFF_RGB_TO_YUV_ME);
+		I915_WRITE(PIPE_CSC_POSTOFF_LO(pipe), POSTOFF_RGB_TO_YUV_LO);
 
-	I915_WRITE(PIPE_CSC_MODE(pipe), 0);
+		crtc_state->csc_mode = 0;
+	} else {
+		I915_WRITE(PIPE_CSC_OUTPUT_PREOFF_HI(pipe), 0);
+		I915_WRITE(PIPE_CSC_OUTPUT_PREOFF_ME(pipe), 0);
+		I915_WRITE(PIPE_CSC_OUTPUT_PREOFF_LO(pipe), 0);
+
+		I915_WRITE(PIPE_CSC_OUTPUT_COEFF_RU_GU(pipe),
+			   CSC_RGB_TO_YUV_RU_GU);
+		I915_WRITE(PIPE_CSC_OUTPUT_COEFF_BU(pipe), CSC_RGB_TO_YUV_BU);
+
+		I915_WRITE(PIPE_CSC_OUTPUT_COEFF_RY_GY(pipe),
+			   CSC_RGB_TO_YUV_RY_GY);
+		I915_WRITE(PIPE_CSC_OUTPUT_COEFF_BY(pipe), CSC_RGB_TO_YUV_BY);
+
+		I915_WRITE(PIPE_CSC_OUTPUT_COEFF_RV_GV(pipe),
+			   CSC_RGB_TO_YUV_RV_GV);
+		I915_WRITE(PIPE_CSC_OUTPUT_COEFF_BV(pipe), CSC_RGB_TO_YUV_BV);
+
+		I915_WRITE(PIPE_CSC_OUTPUT_POSTOFF_HI(pipe),
+			   POSTOFF_RGB_TO_YUV_HI);
+		I915_WRITE(PIPE_CSC_OUTPUT_POSTOFF_ME(pipe),
+			   POSTOFF_RGB_TO_YUV_ME);
+		I915_WRITE(PIPE_CSC_OUTPUT_POSTOFF_LO(pipe),
+			   POSTOFF_RGB_TO_YUV_LO);
+
+		crtc_state->csc_mode = ICL_OUTPUT_CSC_ENABLE;
+	}
 }
 
 static void ilk_load_csc_matrix(struct intel_crtc_state *crtc_state)
@@ -153,10 +182,14 @@ static void ilk_load_csc_matrix(struct intel_crtc_state *crtc_state)
 	if (INTEL_GEN(dev_priv) >= 8 || IS_HASWELL(dev_priv))
 		limited_color_range = crtc_state->limited_color_range;
 
+	crtc_state->csc_mode = 0;
 	if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
 	    crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR444) {
-		ilk_load_ycbcr_conversion_matrix(crtc);
-		return;
+		ilk_load_ycbcr_conversion_matrix(crtc_state);
+		if (INTEL_GEN(dev_priv) < 11) {
+			I915_WRITE(PIPE_CSC_MODE(pipe), crtc_state->csc_mode);
+			return;
+		}
 	} else if (crtc_state->base.ctm) {
 		struct drm_color_ctm *ctm = crtc_state->base.ctm->data;
 		const u64 *input;
@@ -243,10 +276,12 @@ static void ilk_load_csc_matrix(struct intel_crtc_state *crtc_state)
 		I915_WRITE(PIPE_CSC_POSTOFF_ME(pipe), postoff);
 		I915_WRITE(PIPE_CSC_POSTOFF_LO(pipe), postoff);
 
-		if (INTEL_GEN(dev_priv) >= 11)
-			I915_WRITE(PIPE_CSC_MODE(pipe), ICL_CSC_ENABLE);
-		else
+		if (INTEL_GEN(dev_priv) >= 11) {
+			crtc_state->csc_mode |= ICL_CSC_ENABLE;
+			I915_WRITE(PIPE_CSC_MODE(pipe), crtc_state->csc_mode);
+		} else {
 			I915_WRITE(PIPE_CSC_MODE(pipe), 0);
+		}
 	} else {
 		uint32_t mode = CSC_MODE_YUV_TO_RGB;
 
