@@ -258,7 +258,7 @@ static int ib_uverbs_get_context(struct uverbs_attr_bundle *attrs)
 
 	fd_install(resp.async_fd, filp);
 
-	ucontext->res.type = RDMA_RESTRACK_CTX;
+	rdma_rt_set_type(&ucontext->res, RDMA_RESTRACK_CTX);
 	rdma_restrack_uadd(&ucontext->res);
 
 	/*
@@ -417,7 +417,7 @@ static int ib_uverbs_alloc_pd(struct uverbs_attr_bundle *attrs)
 	uobj->object = pd;
 	memset(&resp, 0, sizeof resp);
 	resp.pd_handle = uobj->id;
-	pd->res.type = RDMA_RESTRACK_PD;
+	rdma_rt_set_type(&pd->res, RDMA_RESTRACK_PD);
 	rdma_restrack_uadd(&pd->res);
 
 	ret = uverbs_response(attrs, &resp, sizeof(resp));
@@ -733,7 +733,7 @@ static int ib_uverbs_reg_mr(struct uverbs_attr_bundle *attrs)
 	mr->dm	    = NULL;
 	mr->uobject = uobj;
 	atomic_inc(&pd->usecnt);
-	mr->res.type = RDMA_RESTRACK_MR;
+	rdma_rt_set_type(&mr->res, RDMA_RESTRACK_MR);
 	rdma_restrack_uadd(&mr->res);
 
 	uobj->object = mr;
@@ -1011,7 +1011,7 @@ static struct ib_ucq_object *create_cq(struct uverbs_attr_bundle *attrs,
 	resp.base.cqe       = cq->cqe;
 	resp.response_length = uverbs_response_length(attrs, sizeof(resp));
 
-	cq->res.type = RDMA_RESTRACK_CQ;
+	rdma_rt_set_type(&cq->res, RDMA_RESTRACK_CQ);
 	rdma_restrack_uadd(&cq->res);
 
 	ret = uverbs_response(attrs, &resp, sizeof(resp));

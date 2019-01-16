@@ -275,7 +275,7 @@ struct ib_pd *__ib_alloc_pd(struct ib_device *device, unsigned int flags,
 		mr_access_flags |= IB_ACCESS_REMOTE_READ | IB_ACCESS_REMOTE_WRITE;
 	}
 
-	pd->res.type = RDMA_RESTRACK_PD;
+	rdma_rt_set_type(&pd->res, RDMA_RESTRACK_PD);
 	rdma_restrack_set_task(&pd->res, caller);
 	rdma_restrack_kadd(&pd->res);
 
@@ -1907,7 +1907,7 @@ struct ib_cq *__ib_create_cq(struct ib_device *device,
 		cq->event_handler = event_handler;
 		cq->cq_context    = cq_context;
 		atomic_set(&cq->usecnt, 0);
-		cq->res.type = RDMA_RESTRACK_CQ;
+		rdma_rt_set_type(&cq->res, RDMA_RESTRACK_CQ);
 		rdma_restrack_set_task(&cq->res, caller);
 		rdma_restrack_kadd(&cq->res);
 	}
@@ -1990,7 +1990,7 @@ struct ib_mr *ib_alloc_mr(struct ib_pd *pd,
 		mr->uobject = NULL;
 		atomic_inc(&pd->usecnt);
 		mr->need_inval = false;
-		mr->res.type = RDMA_RESTRACK_MR;
+		rdma_rt_set_type(&mr->res, RDMA_RESTRACK_MR);
 		rdma_restrack_kadd(&mr->res);
 	}
 

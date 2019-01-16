@@ -293,8 +293,8 @@ static inline struct ib_qp *_ib_create_qp(struct ib_device *dev,
 	 * and more importantly they are created internaly by driver,
 	 * see mlx5 create_dev_resources() as an example.
 	 */
+	rdma_rt_set_type(&qp->res, RDMA_RESTRACK_QP);
 	if (attr->qp_type < IB_QPT_XRC_INI) {
-		qp->res.type = RDMA_RESTRACK_QP;
 		if (uobj)
 			rdma_restrack_uadd(&qp->res);
 		else

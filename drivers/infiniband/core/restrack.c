@@ -499,3 +499,27 @@ void rdma_rt_set_id_range(struct ib_device *dev, enum rdma_restrack_type type,
 	rt[type].next_id = reserved;
 }
 EXPORT_SYMBOL(rdma_rt_set_id_range);
+
+/**
+ * rdma_rt_set_id() - Set unique ID as seen by restrack,
+ *                    needed for HW-capable device
+ * @res: resrouce to operate
+ * @id: ID to set
+ *
+ * Return: 0 on success
+ */
+int rdma_rt_set_id(struct rdma_restrack_entry *res, u32 id)
+{
+	struct ib_device *dev = res_to_dev(res);
+	struct xarray *xa = rdma_dev_to_xa(dev, res->type);
+
+	if (xa_load(xa, id) == res) {
+		WARN_ONCE(true, "Tried to add non-unique %s entry %u\n",
+			  type2str(res->type), res->id);
+		return -EEXIST;
+	}
+
+	res->id = id;
+	return 0;
+}
+EXPORT_SYMBOL(rdma_rt_set_id);

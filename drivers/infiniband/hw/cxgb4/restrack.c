@@ -198,7 +198,7 @@ union union_ep {
 static int fill_res_ep_entry(struct sk_buff *msg,
 			     struct rdma_restrack_entry *res)
 {
-	struct rdma_cm_id *cm_id = rdma_res_to_id(res);
+	struct rdma_cm_id *cm_id = rdma_res_to_cmid(res);
 	struct nlattr *table_attr;
 	struct c4iw_ep_common *epcp;
 	struct c4iw_listen_ep *listen_ep = NULL;

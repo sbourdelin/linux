@@ -125,7 +125,7 @@ static int UVERBS_HANDLER(UVERBS_METHOD_CQ_CREATE)(
 	obj->uobject.object = cq;
 	obj->uobject.user_handle = user_handle;
 	atomic_set(&cq->usecnt, 0);
-	cq->res.type = RDMA_RESTRACK_CQ;
+	rdma_rt_set_type(&cq->res, RDMA_RESTRACK_CQ);
 	rdma_restrack_uadd(&cq->res);
 
 	ret = uverbs_copy_to(attrs, UVERBS_ATTR_CREATE_CQ_RESP_CQE, &cq->cqe,

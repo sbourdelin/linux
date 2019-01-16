@@ -162,17 +162,17 @@ struct iw_cm_id *rdma_iw_cm_id(struct rdma_cm_id *id)
 EXPORT_SYMBOL(rdma_iw_cm_id);
 
 /**
- * rdma_res_to_id() - return the rdma_cm_id pointer for this restrack.
+ * rdma_res_to_cmid() - return the rdma_cm_id pointer for this restrack.
  * @res: rdma resource tracking entry pointer
  */
-struct rdma_cm_id *rdma_res_to_id(struct rdma_restrack_entry *res)
+struct rdma_cm_id *rdma_res_to_cmid(struct rdma_restrack_entry *res)
 {
 	struct rdma_id_private *id_priv =
 		container_of(res, struct rdma_id_private, res);
 
 	return &id_priv->id;
 }
-EXPORT_SYMBOL(rdma_res_to_id);
+EXPORT_SYMBOL(rdma_res_to_cmid);
 
 static void cma_add_one(struct ib_device *device);
 static void cma_remove_one(struct ib_device *device, void *client_data);
@@ -878,7 +878,7 @@ struct rdma_cm_id *__rdma_create_id(struct net *net,
 		return ERR_PTR(-ENOMEM);
 
 	rdma_restrack_set_task(&id_priv->res, caller);
-	id_priv->res.type = RDMA_RESTRACK_CM_ID;
+	rdma_rt_set_type(&id_priv->res, RDMA_RESTRACK_CM_ID);
 	id_priv->state = RDMA_CM_IDLE;
 	id_priv->id.context = context;
 	id_priv->id.event_handler = event_handler;

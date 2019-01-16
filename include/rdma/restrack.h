@@ -172,4 +172,26 @@ void rdma_rt_read_lock(struct ib_device *dev, enum rdma_restrack_type type);
 void rdma_rt_read_unlock(struct ib_device *dev, enum rdma_restrack_type type);
 void rdma_rt_set_id_range(struct ib_device *dev, enum rdma_restrack_type type,
 			  u32 reserved, u32 max);
+/**
+ * rdma_res_to_id() - Unique ID as seen by restrack
+ * @res: resrouce to operate
+ *
+ * Return: unique ID
+ */
+static inline u32 rdma_res_to_id(struct rdma_restrack_entry *res)
+{
+	return res->id;
+}
+int rdma_rt_set_id(struct rdma_restrack_entry *res, u32 id);
+/**
+ * rdma_rt_set_type() - Set restrack entry type,
+ *                      prior to call rdma_restrack_add()
+ * @res: resrouce to operate
+ * @type: Actual type
+ */
+static inline void rdma_rt_set_type(struct rdma_restrack_entry *res,
+				    enum rdma_restrack_type type)
+{
+	res->type = type;
+}
 #endif /* _RDMA_RESTRACK_H_ */
