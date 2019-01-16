@@ -2527,8 +2527,11 @@ static int beiscsi_alloc_mem(struct beiscsi_hba *phba)
 		mem_descr->size_in_bytes = phba->mem_req[i];
 		mem_descr->mem_array = kmalloc_array(j, sizeof(*mem_arr),
 						     GFP_KERNEL);
-		if (!mem_descr->mem_array)
+		if (!mem_descr->mem_array) {
+			mem_descr->mem_array = mem_arr_orig;
+			mem_arr_orig = NULL;
 			goto free_mem;
+		}
 
 		memcpy(mem_descr->mem_array, mem_arr_orig,
 		       sizeof(struct mem_array) * j);
