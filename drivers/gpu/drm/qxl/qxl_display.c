@@ -191,6 +191,21 @@ void qxl_display_read_client_monitors_config(struct qxl_device *qdev)
 	}
 }
 
+static int qxl_check_mode(struct qxl_device *qdev,
+			  unsigned int width,
+			  unsigned int height)
+{
+	if (width * height * 4 > qdev->vram_size)
+		return -ENOMEM;
+	return 0;
+}
+
+static int qxl_check_framebuffer(struct qxl_device *qdev,
+				 struct qxl_bo *bo)
+{
+	return qxl_check_mode(qdev, bo->surf.width, bo->surf.height);
+}
+
 static int qxl_add_monitors_config_modes(struct drm_connector *connector,
                                          unsigned *pwidth,
                                          unsigned *pheight)
@@ -466,12 +481,7 @@ static int qxl_primary_atomic_check(struct drm_plane *plane,
 
 	bo = gem_to_qxl_bo(state->fb->obj[0]);
 
-	if (bo->surf.stride * bo->surf.height > qdev->vram_size) {
-		DRM_ERROR("Mode doesn't fit in vram size (vgamem)");
-		return -EINVAL;
-	}
-
-	return 0;
+	return qxl_check_framebuffer(qdev, bo);
 }
 
 static int qxl_primary_apply_cursor(struct drm_plane *plane)
@@ -941,20 +951,11 @@ static enum drm_mode_status qxl_conn_mode_valid(struct drm_connector *connector,
 {
 	struct drm_device *ddev = connector->dev;
 	struct qxl_device *qdev = ddev->dev_private;
-	int i;
 
-	/* TODO: is this called for user defined modes? (xrandr --add-mode)
-	 * TODO: check that the mode fits in the framebuffer */
+	if (qxl_check_mode(qdev, mode->hdisplay, mode->vdisplay) != 0)
+		return MODE_BAD;
 
-	if (qdev->monitors_config_width == mode->hdisplay &&
-	    qdev->monitors_config_height == mode->vdisplay)
-		return MODE_OK;
-
-	for (i = 0; i < ARRAY_SIZE(common_modes); i++) {
-		if (common_modes[i].w == mode->hdisplay && common_modes[i].h == mode->vdisplay)
-			return MODE_OK;
-	}
-	return MODE_BAD;
+	return MODE_OK;
 }
 
 static struct drm_encoder *qxl_best_encoder(struct drm_connector *connector)
