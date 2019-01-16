@@ -224,14 +224,12 @@ static void rdma_restrack_add(struct rdma_restrack_entry *res)
 	init_completion(&res->comp);
 	res->valid = true;
 
-	down_write(&dev->res.rwsem);
 	id = res_to_id(res);
 	ret = xa_insert(&dev->res.xa[res->type], id, res, GFP_KERNEL);
 	WARN_ONCE(ret == -EEXIST, "Tried to add non-unique type %d entry\n",
 		  res->type);
 	if (ret)
 		res->valid = false;
-	up_write(&dev->res.rwsem);
 }
 
 /**
