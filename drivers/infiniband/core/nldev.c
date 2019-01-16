@@ -1121,7 +1121,7 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 
 	xa = rdma_dev_to_xa(device, res_type);
 	rdma_rt_read_lock(device, res_type);
-	xa_for_each(xa, res, id, ULONG_MAX, XA_PRESENT) {
+	xa_for_each(xa, res, id, ULONG_MAX, RES_VISIBLE) {
 		if (idx < start)
 			goto next;
 

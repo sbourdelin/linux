@@ -93,6 +93,11 @@ struct rdma_restrack_entry {
 	 * @user: user resource
 	 */
 	bool			user;
+	/*
+	 * @id: unique to specific type identifier, for HW-capable devices,
+	 * drivers are supposed to update it, because it is used as an index.
+	 */
+	u32 id;
 };
 
 int rdma_restrack_init(struct ib_device *dev);
@@ -103,6 +108,14 @@ int rdma_restrack_count(struct ib_device *dev,
 
 void rdma_restrack_kadd(struct rdma_restrack_entry *res);
 void rdma_restrack_uadd(struct rdma_restrack_entry *res);
+
+/**
+ * Addition of entry is performed in two steps approach:
+ * 1. Driver creates ID and allocates resource entry.
+ * 2. IB/core marks such entry as user/kernel and exports to nldev.c
+ */
+#define RES_VISIBLE	XA_MARK_2
+int rdma_restrack_add(struct rdma_restrack_entry *res);
 
 /**
  * rdma_restrack_del() - delete object from the reource tracking database

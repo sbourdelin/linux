@@ -21,6 +21,30 @@ struct rt_xa_limit {
 	u32 min;
 	u32 max;
 };
+static int rt_xa_alloc_cyclic(struct xarray *xa, u32 *id, void *entry,
+			      const struct rt_xa_limit *limit, u32 *next,
+			      gfp_t gfp)
+{
+	int err;
+
+	if (*next < limit->max)
+		*id = *next;
+	else
+		*id = limit->min;
+
+	xa_lock(xa);
+	err = __xa_alloc(xa, id, limit->max, entry, gfp);
+
+	if (err && *next > limit->min) {
+		*id = limit->min;
+		err = __xa_alloc(xa, id, limit->max, entry, gfp);
+	}
+
+	if (!err)
+		*next = *id + 1;
+	xa_unlock(xa);
+	return err;
+}
 
 /**
  * struct rdma_restrack_root - main resource tracking management
@@ -40,6 +64,10 @@ struct rdma_restrack_root {
 	 * @range: Allocation ID range between min and max
 	 */
 	struct rt_xa_limit range;
+	/**
+	 * @next_id: Next ID to support cyclic allocation
+	 */
+	u32 next_id;
 };
 
 /**
@@ -187,7 +215,7 @@ int rdma_restrack_count(struct ib_device *dev, enum rdma_restrack_type type,
 	u32 cnt = 0;
 
 	rdma_rt_read_lock(dev, type);
-	xa_for_each(xa, e, index, ULONG_MAX, XA_PRESENT) {
+	xa_for_each(xa, e, index, ULONG_MAX, RES_VISIBLE) {
 		if (ns == &init_pid_ns ||
 		    (!rdma_is_kernel_res(e) &&
 		     ns == task_active_pid_ns(e->task)))
@@ -261,38 +289,57 @@ void rdma_restrack_set_task(struct rdma_restrack_entry *res,
 }
 EXPORT_SYMBOL(rdma_restrack_set_task);
 
-static unsigned long res_to_id(struct rdma_restrack_entry *res)
-{
-	switch (res->type) {
-	case RDMA_RESTRACK_PD:
-	case RDMA_RESTRACK_MR:
-	case RDMA_RESTRACK_CM_ID:
-	case RDMA_RESTRACK_CTX:
-	case RDMA_RESTRACK_CQ:
-	case RDMA_RESTRACK_QP:
-		return (unsigned long)res;
-	default:
-		WARN_ONCE(true, "Wrong resource tracking type %u\n", res->type);
-		return 0;
-	}
-}
-
-static void rdma_restrack_add(struct rdma_restrack_entry *res)
+/**
+ * rdma_restrack_add() - add new resoruce to DB and get ID in return
+ * @res: resoruce to add
+ *
+ * Return: 0 on success
+ */
+int rdma_restrack_add(struct rdma_restrack_entry *res)
 {
 	struct ib_device *dev = res_to_dev(res);
 	struct xarray *xa = rdma_dev_to_xa(dev, res->type);
+	struct rdma_restrack_root *rt = dev->res;
 	int ret;
+
+	/*
+	 * Once all drivers are converted, we can remove this check
+	 * and remove call to rdma_restrack_add() from rdma_restrack_kadd()
+	 * and rdma_restrack_uadd()
+	 */
+	if (xa_load(xa, res->id))
+		return 0;
 
 	kref_init(&res->kref);
 	init_completion(&res->comp);
 	res->valid = true;
 
-	ret = xa_insert(xa, res_to_id(res), res, GFP_KERNEL);
-	WARN_ONCE(ret == -EEXIST, "Tried to add non-unique type %d entry\n",
-		  res->type);
+	if (rt[res->type].range.max) {
+		/* Not HW-capable device */
+		ret = rt_xa_alloc_cyclic(xa, &res->id, res,
+					 &rt[res->type].range,
+					 &rt[res->type].next_id, GFP_KERNEL);
+	} else {
+		ret = xa_insert(xa, res->id, res, GFP_KERNEL);
+	}
+
+	/*
+	 * WARNs below indicates an error in driver code.
+	 * The check of -EEXIST is never occuried and added here
+	 * to allow simple removal of xa_load above.
+	 */
+	WARN_ONCE(ret == -EEXIST, "Tried to add non-unique %s entry %u\n",
+		  type2str(res->type), res->id);
+	WARN_ONCE(ret == -ENOSPC,
+		  "There are no more free indexes for type %s entry %u\n",
+		  type2str(res->type), res->id);
+
 	if (ret)
 		res->valid = false;
+
+	return ret;
 }
+EXPORT_SYMBOL(rdma_restrack_add);
 
 /**
  * rdma_restrack_kadd() - add kernel object to the reource tracking database
@@ -300,10 +347,20 @@ static void rdma_restrack_add(struct rdma_restrack_entry *res)
  */
 void rdma_restrack_kadd(struct rdma_restrack_entry *res)
 {
+	struct ib_device *dev = res_to_dev(res);
+	struct xarray *xa = rdma_dev_to_xa(dev, res->type);
+
 	res->task = NULL;
 	set_kern_name(res);
 	res->user = false;
-	rdma_restrack_add(res);
+	/*
+	 * Temporaly, we are not intested in return value,
+	 * once conversion will be finished, it will be checked by drivers.
+	 */
+	if (rdma_restrack_add(res))
+		return;
+
+	xa_set_mark(xa, res->id, RES_VISIBLE);
 }
 EXPORT_SYMBOL(rdma_restrack_kadd);
 
@@ -313,6 +370,9 @@ EXPORT_SYMBOL(rdma_restrack_kadd);
  */
 void rdma_restrack_uadd(struct rdma_restrack_entry *res)
 {
+	struct ib_device *dev = res_to_dev(res);
+	struct xarray *xa = rdma_dev_to_xa(dev, res->type);
+
 	if (res->type != RDMA_RESTRACK_CM_ID)
 		res->task = NULL;
 
@@ -321,7 +381,14 @@ void rdma_restrack_uadd(struct rdma_restrack_entry *res)
 	res->kern_name = NULL;
 
 	res->user = true;
-	rdma_restrack_add(res);
+	/*
+	 * Temporaly, we are not intested in return value,
+	 * once conversion will be finished, it will be checked by drivers.
+	 */
+	if (rdma_restrack_add(res))
+		return;
+
+	xa_set_mark(xa, res->id, RES_VISIBLE);
 }
 EXPORT_SYMBOL(rdma_restrack_uadd);
 
@@ -347,7 +414,8 @@ rdma_restrack_get_byid(struct ib_device *dev,
 	struct rdma_restrack_entry *res;
 
 	res = xa_load(xa, id);
-	if (!res || xa_is_err(res) || !rdma_restrack_get(res))
+	if (!res || !rdma_restrack_get(res) ||
+	    !xa_get_mark(xa, res->id, RES_VISIBLE))
 		return ERR_PTR(-ENOENT);
 	return res;
 }
@@ -371,7 +439,6 @@ void rdma_restrack_del(struct rdma_restrack_entry *res)
 {
 	struct ib_device *dev = res_to_dev(res);
 	struct xarray *xa;
-	unsigned long id;
 
 	if (!res->valid)
 		goto out;
@@ -393,8 +460,7 @@ void rdma_restrack_del(struct rdma_restrack_entry *res)
 		return;
 
 	xa = rdma_dev_to_xa(dev, res->type);
-	id = res_to_id(res);
-	if (!xa_load(xa, id))
+	if (!xa_load(xa, res->id))
 		goto out;
 
 	rdma_restrack_put(res);
@@ -402,7 +468,7 @@ void rdma_restrack_del(struct rdma_restrack_entry *res)
 	wait_for_completion(&res->comp);
 
 	down_write(&dev->res[res->type].rwsem);
-	xa_erase(xa, id);
+	xa_erase(xa, res->id);
 	res->valid = false;
 	up_write(&dev->res[res->type].rwsem);
 
@@ -430,5 +496,6 @@ void rdma_rt_set_id_range(struct ib_device *dev, enum rdma_restrack_type type,
 
 	rt[type].range.max = max;
 	rt[type].range.min = reserved;
+	rt[type].next_id = reserved;
 }
 EXPORT_SYMBOL(rdma_rt_set_id_range);
