@@ -24,13 +24,9 @@ struct rdma_restrack_root {
 	 */
 	struct rw_semaphore	rwsem;
 	/**
-	 * @xa: Array of XArray structures to hold restrack entries.
-	 * We want to use array of XArrays because insertion is type
-	 * dependent. For types with xisiting unique ID (like QPN),
-	 * we will insert to that unique index. For other types,
-	 * we insert based on pointers and auto-allocate unique index.
+	 * @xa: Array of XArray structure to hold restrack entries.
 	 */
-	struct xarray xa[RDMA_RESTRACK_MAX];
+	struct xarray xa;
 };
 
 /**
@@ -44,15 +40,16 @@ int rdma_restrack_init(struct ib_device *dev)
 	struct rdma_restrack_root *rt;
 	int i;
 
-	dev->res = kzalloc(sizeof(*rt), GFP_KERNEL);
+	dev->res = kcalloc(RDMA_RESTRACK_MAX, sizeof(*rt), GFP_KERNEL);
 	if (!dev->res)
 		return -ENOMEM;
 
 	rt = dev->res;
 
-	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++)
-		xa_init_flags(&rt->xa[i], XA_FLAGS_ALLOC);
-	init_rwsem(&rt->rwsem);
+	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++) {
+		init_rwsem(&rt[i].rwsem);
+		xa_init_flags(&rt[i].xa, XA_FLAGS_ALLOC);
+	}
 
 	return 0;
 }
@@ -81,7 +78,7 @@ static const char *type2str(enum rdma_restrack_type type)
 struct xarray *rdma_dev_to_xa(struct ib_device *dev,
 			      enum rdma_restrack_type type)
 {
-	return &dev->res->xa[type];
+	return &dev->res[type].xa;
 
 }
 EXPORT_SYMBOL(rdma_dev_to_xa);
@@ -94,7 +91,7 @@ EXPORT_SYMBOL(rdma_dev_to_xa);
  */
 void rdma_rt_read_lock(struct ib_device *dev, enum rdma_restrack_type type)
 {
-	down_read(&dev->res->rwsem);
+	down_read(&dev->res[type].rwsem);
 }
 EXPORT_SYMBOL(rdma_rt_read_lock);
 
@@ -106,7 +103,7 @@ EXPORT_SYMBOL(rdma_rt_read_lock);
  */
 void rdma_rt_read_unlock(struct ib_device *dev, enum rdma_restrack_type type)
 {
-	up_read(&dev->res->rwsem);
+	up_read(&dev->res[type].rwsem);
 }
 EXPORT_SYMBOL(rdma_rt_read_unlock);
 
@@ -397,10 +394,10 @@ void rdma_restrack_del(struct rdma_restrack_entry *res)
 
 	wait_for_completion(&res->comp);
 
-	down_write(&dev->res->rwsem);
+	down_write(&dev->res[res->type].rwsem);
 	xa_erase(xa, id);
 	res->valid = false;
-	up_write(&dev->res->rwsem);
+	up_write(&dev->res[res->type].rwsem);
 
 out:
 	if (res->task) {
