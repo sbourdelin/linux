@@ -157,4 +157,6 @@ struct xarray *rdma_dev_to_xa(struct ib_device *dev,
 			      enum rdma_restrack_type type);
 void rdma_rt_read_lock(struct ib_device *dev, enum rdma_restrack_type type);
 void rdma_rt_read_unlock(struct ib_device *dev, enum rdma_restrack_type type);
+void rdma_rt_set_id_range(struct ib_device *dev, enum rdma_restrack_type type,
+			  u32 reserved, u32 max);
 #endif /* _RDMA_RESTRACK_H_ */

@@ -14,6 +14,15 @@
 #include "cma_priv.h"
 
 /**
+ * FIXME: Replace with official xa_array_cyclic(), once it is merged
+ * http://git.infradead.org/users/willy/linux-dax.git/commit/8bcca93a53949d20877e82c2aaae0fd7c385b90d
+ */
+struct rt_xa_limit {
+	u32 min;
+	u32 max;
+};
+
+/**
  * struct rdma_restrack_root - main resource tracking management
  * entity, per-device
  */
@@ -27,6 +36,10 @@ struct rdma_restrack_root {
 	 * @xa: Array of XArray structure to hold restrack entries.
 	 */
 	struct xarray xa;
+	/**
+	 * @range: Allocation ID range between min and max
+	 */
+	struct rt_xa_limit range;
 };
 
 /**
@@ -49,6 +62,7 @@ int rdma_restrack_init(struct ib_device *dev)
 	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++) {
 		init_rwsem(&rt[i].rwsem);
 		xa_init_flags(&rt[i].xa, XA_FLAGS_ALLOC);
+		rt[i].range.max = U32_MAX;
 	}
 
 	return 0;
@@ -399,3 +413,22 @@ out:
 	}
 }
 EXPORT_SYMBOL(rdma_restrack_del);
+
+/**
+ * rdma_rt_set_id_range() - initialize IDs range. Devices which are able
+ *                          to manage thos IDs in HW will leave max and reserved
+ *                          as zero.
+ * @dev: IB device to work
+ * @type: resource track type
+ * @reserved: number of entries to keep aside
+ * @max: maximal possible value
+ */
+void rdma_rt_set_id_range(struct ib_device *dev, enum rdma_restrack_type type,
+			  u32 reserved, u32 max)
+{
+	struct rdma_restrack_root *rt = dev->res;
+
+	rt[type].range.max = max;
+	rt[type].range.min = reserved;
+}
+EXPORT_SYMBOL(rdma_rt_set_id_range);
