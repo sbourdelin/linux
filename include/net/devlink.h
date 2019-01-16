@@ -424,6 +424,13 @@ enum devlink_param_generic_id {
 /* Revision of board design */
 #define DEVLINK_VERSION_GENERIC_BOARD_REV	"board.rev"
 
+/* Control processor FW version, FW is responsible for house keeping tasks,
+ * PHY control etc.
+ */
+#define DEVLINK_VERSION_GENERIC_FW_MGMT		"fw.mgmt"
+/* Data path microcode controlling high-speed packet processing */
+#define DEVLINK_VERSION_GENERIC_FW_APP		"fw.app"
+
 enum devlink_version_type {
 	DEVLINK_VERSION_FIXED,
 	DEVLINK_VERSION_STORED,

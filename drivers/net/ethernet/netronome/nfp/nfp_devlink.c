@@ -207,11 +207,54 @@ nfp_devlink_versions_get_hwinfo(struct nfp_pf *pf, struct devlink_info_req *req)
 	return 0;
 }
 
+static const struct nfp_devlink_versions {
+	enum nfp_nsp_versions id;
+	const char *key;
+} nfp_devlink_versions_nsp[] = {
+	{ NFP_VERSIONS_BSP,	DEVLINK_VERSION_GENERIC_FW_MGMT, },
+	{ NFP_VERSIONS_CPLD,	"fw.cpld", },
+	{ NFP_VERSIONS_APP,	DEVLINK_VERSION_GENERIC_FW_APP, },
+};
+
+static int
+nfp_devlink_versions_get_nsp(struct devlink_info_req *req, bool flash,
+			     const u8 *buf, unsigned int size)
+{
+	enum devlink_version_type type;
+	unsigned int i;
+	int err;
+
+	type = flash ? DEVLINK_VERSION_STORED : DEVLINK_VERSION_RUNNING;
+
+	for (i = 0; i < ARRAY_SIZE(nfp_devlink_versions_nsp); i++) {
+		const struct nfp_devlink_versions *info;
+		const char *version;
+
+		info = &nfp_devlink_versions_nsp[i];
+
+		version = nfp_nsp_versions_get(info->id, flash, buf, size);
+		if (IS_ERR(version)) {
+			if (PTR_ERR(version) == -ENOENT)
+				continue;
+			else
+				return PTR_ERR(version);
+		}
+
+		err = devlink_info_report_version(req, type,
+						  info->key, version);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
 static int
 nfp_devlink_info_get(struct devlink *devlink, struct devlink_info_req *req,
 		     struct netlink_ext_ack *extack)
 {
 	struct nfp_pf *pf = devlink_priv(devlink);
+	struct nfp_nsp *nsp;
 	const char *sn;
 	int err;
 
@@ -226,7 +269,37 @@ nfp_devlink_info_get(struct devlink *devlink, struct devlink_info_req *req,
 			return err;
 	}
 
+	nsp = nfp_nsp_open(pf->cpp);
+	if (IS_ERR(nsp)) {
+		NL_SET_ERR_MSG_MOD(extack, "can't access NSP");
+		return PTR_ERR(nsp);
+	}
+
+	if (nfp_nsp_has_versions(nsp)) {
+		char buf[512] = {};
+
+		err = nfp_nsp_versions(nsp, buf, sizeof(buf));
+		if (err)
+			goto err_close_nsp;
+
+		err = nfp_devlink_versions_get_nsp(req, false,
+						   buf, sizeof(buf));
+		if (err)
+			goto err_close_nsp;
+
+		err = nfp_devlink_versions_get_nsp(req, true,
+						   buf, sizeof(buf));
+		if (err)
+			goto err_close_nsp;
+	}
+
+	nfp_nsp_close(nsp);
+
 	return nfp_devlink_versions_get_hwinfo(pf, req);
+
+err_close_nsp:
+	nfp_nsp_close(nsp);
+	return err;
 }
 
 const struct devlink_ops nfp_devlink_ops = {
