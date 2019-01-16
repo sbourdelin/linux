@@ -89,6 +89,8 @@ enum devlink_command {
 	DEVLINK_CMD_REGION_DEL,
 	DEVLINK_CMD_REGION_READ,
 
+	DEVLINK_CMD_INFO_GET,
+
 	/* add new commands above here */
 	__DEVLINK_CMD_MAX,
 	DEVLINK_CMD_MAX = __DEVLINK_CMD_MAX - 1
@@ -284,6 +286,9 @@ enum devlink_attr {
 	DEVLINK_ATTR_REGION_CHUNK_DATA,         /* binary */
 	DEVLINK_ATTR_REGION_CHUNK_ADDR,         /* u64 */
 	DEVLINK_ATTR_REGION_CHUNK_LEN,          /* u64 */
+
+	DEVLINK_ATTR_INFO_DRV_NAME,		/* string */
+	DEVLINK_ATTR_INFO_SERIAL_NUMBER,	/* string */
 
 	/* add new attributes above here, update the policy in devlink.c */
 
