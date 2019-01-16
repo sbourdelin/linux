@@ -1640,6 +1640,35 @@ int b53_fdb_dump(struct dsa_switch *ds, int port,
 }
 EXPORT_SYMBOL(b53_fdb_dump);
 
+int b53_multicast_toggle(struct dsa_switch *ds, int port,
+			 bool mc_disabled)
+{
+	struct b53_device *dev = ds->priv;
+	u16 mc_ctrl;
+
+	if (is5325(dev) || is5365(dev))
+		return -EOPNOTSUPP;
+
+	/* Allow port to flood multicast */
+	b53_read16(dev, B53_CTRL_PAGE, B53_MC_FLOOD_MASK, &mc_ctrl);
+	if (mc_disabled)
+		mc_ctrl |= BIT(port);
+	else
+		mc_ctrl &= ~BIT(port);
+	b53_write16(dev, B53_CTRL_PAGE, B53_MC_FLOOD_MASK, mc_ctrl);
+
+	/* And flood IP multicast as well */
+	b53_read16(dev, B53_CTRL_PAGE, B53_IPMC_FLOOD_MASK, &mc_ctrl);
+	if (mc_disabled)
+		mc_ctrl |= BIT(port);
+	else
+		mc_ctrl &= ~BIT(port);
+	b53_write16(dev, B53_CTRL_PAGE, B53_IPMC_FLOOD_MASK, mc_ctrl);
+
+	return 0;
+}
+EXPORT_SYMBOL(b53_multicast_toggle);
+
 int b53_mdb_prepare(struct dsa_switch *ds, int port,
 		    const struct switchdev_obj_port_mdb *mdb)
 {
@@ -2025,6 +2054,7 @@ static const struct dsa_switch_ops b53_switch_ops = {
 	.port_mirror_add	= b53_mirror_add,
 	.port_mirror_del	= b53_mirror_del,
 	.port_mdb_prepare	= b53_mdb_prepare,
+	.port_multicast_toggle	= b53_multicast_toggle,
 	.port_mdb_add		= b53_mdb_add,
 	.port_mdb_del		= b53_mdb_del,
 };
