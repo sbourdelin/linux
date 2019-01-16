@@ -983,10 +983,13 @@ EXPORT_SYMBOL(phy_connect);
  */
 void phy_disconnect(struct phy_device *phydev)
 {
-	if (phydev->irq > 0)
-		phy_stop_interrupts(phydev);
+	if (phy_is_started(phydev)) {
+		phydev_warn(phydev, "phy_stop should have been called before phy_disconnect!\n");
+		phy_stop(phydev);
+	}
 
-	phy_stop_machine(phydev);
+	if (phy_interrupt_is_valid(phydev))
+		free_irq(phydev->irq, phydev);
 
 	phydev->adjust_link = NULL;
 
