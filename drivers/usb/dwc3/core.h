@@ -606,6 +606,14 @@
 #define DWC3_OSTS_VBUSVLD		BIT(1)
 #define DWC3_OSTS_CONIDSTS		BIT(0)
 
+/* Partial XHCI Register and Bit fields for quirk */
+#define XHCI_HCSPARAMS1		0x4
+#define XHCI_PORTSC_BASE	0x400
+#define PORT_POWER			(1 << 9)
+#define HCS_MAX_PORTS(p)	(((p) >> 24) & 0x7f)
+#define XHCI_HC_LENGTH(p)	(((p)>>00)&0x00ff)
+#define HC_LENGTH(p)		XHCI_HC_LENGTH(p)
+
 /* Structures */
 
 struct dwc3_trb;
@@ -1209,6 +1217,7 @@ struct dwc3 {
 	unsigned		tx_de_emphasis:2;
 
 	unsigned		dis_metastability_quirk:1;
+	unsigned		avoid_vbus_glitch_when_set_host:1;
 
 	u16			imod_interval;
 };
@@ -1217,7 +1226,6 @@ struct dwc3 {
 #define INCRX_UNDEF_LENGTH_BURST_MODE 1
 
 #define work_to_dwc(w)		(container_of((w), struct dwc3, drd_work))
-
 /* -------------------------------------------------------------------------- */
 
 struct dwc3_event_type {
