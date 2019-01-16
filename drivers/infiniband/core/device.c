@@ -291,7 +291,10 @@ struct ib_device *ib_alloc_device(size_t size)
 	if (!device)
 		return NULL;
 
-	rdma_restrack_init(device);
+	if (rdma_restrack_init(device)) {
+		kfree(device);
+		return NULL;
+	}
 
 	device->dev.class = &ib_class;
 	device_initialize(&device->dev);

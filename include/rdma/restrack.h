@@ -7,7 +7,6 @@
 #define _RDMA_RESTRACK_H_
 
 #include <linux/typecheck.h>
-#include <linux/rwsem.h>
 #include <linux/sched.h>
 #include <linux/kref.h>
 #include <linux/completion.h>
@@ -50,27 +49,6 @@ enum rdma_restrack_type {
 };
 
 struct ib_device;
-struct rdma_restrack_entry;
-
-/**
- * struct rdma_restrack_root - main resource tracking management
- * entity, per-device
- */
-struct rdma_restrack_root {
-	/*
-	 * @rwsem: Read/write lock to protect erase of entry.
-	 * Lists and insertions are protected by XArray internal lock.
-	 */
-	struct rw_semaphore	rwsem;
-	/**
-	 * @xa: Array of XArray structures to hold restrack entries.
-	 * We want to use array of XArrays because insertion is type
-	 * dependent. For types with xisiting unique ID (like QPN),
-	 * we will insert to that unique index. For other types,
-	 * we insert based on pointers and auto-allocate unique index.
-	 */
-	struct xarray xa[RDMA_RESTRACK_MAX];
-};
 
 /**
  * struct rdma_restrack_entry - metadata per-entry
@@ -117,7 +95,7 @@ struct rdma_restrack_entry {
 	bool			user;
 };
 
-void rdma_restrack_init(struct ib_device *dev);
+int rdma_restrack_init(struct ib_device *dev);
 void rdma_restrack_clean(struct ib_device *dev);
 int rdma_restrack_count(struct ib_device *dev,
 			enum rdma_restrack_type type,
@@ -175,4 +153,8 @@ int rdma_nl_put_driver_u64_hex(struct sk_buff *msg, const char *name,
 struct rdma_restrack_entry *rdma_restrack_get_byid(struct ib_device *dev,
 						   enum rdma_restrack_type type,
 						   u32 id);
+struct xarray *rdma_dev_to_xa(struct ib_device *dev,
+			      enum rdma_restrack_type type);
+void rdma_rt_read_lock(struct ib_device *dev, enum rdma_restrack_type type);
+void rdma_rt_read_unlock(struct ib_device *dev, enum rdma_restrack_type type);
 #endif /* _RDMA_RESTRACK_H_ */

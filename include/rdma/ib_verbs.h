@@ -2517,6 +2517,8 @@ struct ib_device_ops {
 			      struct rdma_restrack_entry *entry);
 };
 
+struct rdma_restrack_root;
+
 struct ib_device {
 	/* Do not access @dma_device directly from ULP nor from HW drivers. */
 	struct device                *dma_device;
@@ -2581,10 +2583,7 @@ struct ib_device {
 #endif
 
 	u32                          index;
-	/*
-	 * Implementation details of the RDMA core, don't use in drivers
-	 */
-	struct rdma_restrack_root     res;
+	struct rdma_restrack_root *res;
 
 	const struct uapi_definition   *driver_def;
 	enum rdma_driver_id		driver_id;
