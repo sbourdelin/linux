@@ -238,7 +238,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
  * or for 1.4 devices that support it, training Pattern 3 for HBR2
  * or 1.2 devices that support it, Training Pattern 2 otherwise.
  */
-static u32 intel_dp_training_pattern(struct intel_dp *intel_dp)
+u32 intel_dp_training_pattern(struct intel_dp *intel_dp)
 {
 	bool source_tps3, sink_tps3, source_tps4, sink_tps4;
 

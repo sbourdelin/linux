@@ -411,6 +411,7 @@ static void hsw_activate_psr1(struct intel_dp *intel_dp)
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	u32 max_sleep_time = 0x1f;
 	u32 val = EDP_PSR_ENABLE;
+	u32 tp;
 
 	/* Let's use 6 as the minimum to cover all known cases including the
 	 * off-by-one issue that HW has in some cases.
@@ -431,13 +432,24 @@ static void hsw_activate_psr1(struct intel_dp *intel_dp)
 		val |= EDP_PSR_LINK_STANDBY;
 
 	val |= dev_priv->vbt.psr.tp1_wakeup_time << EDP_PSR_TP1_TIME_SHIFT;
-	val |= dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time << EDP_PSR_TP2_TP3_TIME_SHIFT;
 
-	if (intel_dp_source_supports_hbr2(intel_dp) &&
-	    drm_dp_tps3_supported(intel_dp->dpcd))
-		val |= EDP_PSR_TP1_TP3_SEL;
-	else
-		val |= EDP_PSR_TP1_TP2_SEL;
+	tp = intel_dp_training_pattern(intel_dp);
+	if (tp == DP_TRAINING_PATTERN_4) {
+		/*
+		 * TP4 is selected by setting EDP_PSR_TP4_TIME with other value
+		 * than PSR_TP_WAKEUP_TIME_NONE
+		 */
+		val |= dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time << EDP_PSR_TP4_TIME_SHIFT;
+	} else {
+		if (INTEL_GEN(dev_priv) >= 11)
+			val |= PSR_TP_WAKEUP_TIME_NONE << EDP_PSR_TP4_TIME_SHIFT;
+
+		val |= dev_priv->vbt.psr.tp2_tp3_tp4_wakeup_time << EDP_PSR_TP2_TP3_TIME_SHIFT;
+		if (tp == DP_TRAINING_PATTERN_3)
+			val |= EDP_PSR_TP1_TP3_SEL;
+		else
+			val |= EDP_PSR_TP1_TP2_SEL;
+	}
 
 	if (INTEL_GEN(dev_priv) >= 8)
 		val |= EDP_PSR_CRC_ENABLE;

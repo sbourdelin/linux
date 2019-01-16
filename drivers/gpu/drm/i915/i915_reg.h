@@ -4138,6 +4138,7 @@ enum {
 #define   EDP_PSR_TP1_TP3_SEL			(1 << 11)
 #define   EDP_PSR_CRC_ENABLE			(1 << 10) /* BDW+ */
 #define   EDP_PSR_TP2_TP3_TIME_SHIFT		(8)
+#define   EDP_PSR_TP4_TIME_SHIFT		(6) /* ICL+ */
 #define   EDP_PSR_TP1_TIME_SHIFT		(4)
 #define   EDP_PSR_IDLE_FRAME_SHIFT		0
 
