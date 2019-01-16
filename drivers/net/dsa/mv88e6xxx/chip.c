@@ -442,15 +442,21 @@ static int mv88e6xxx_g1_irq_setup(struct mv88e6xxx_chip *chip)
 	return err;
 }
 
+static void mv88e6xxx_do_irq_poll(struct mv88e6xxx_chip *chip)
+{
+	mv88e6xxx_g1_irq_thread_work(chip);
+
+	kthread_queue_delayed_work(chip->kworker, &chip->irq_poll_work,
+				   msecs_to_jiffies(100));
+}
+
 static void mv88e6xxx_irq_poll(struct kthread_work *work)
 {
 	struct mv88e6xxx_chip *chip = container_of(work,
 						   struct mv88e6xxx_chip,
 						   irq_poll_work.work);
-	mv88e6xxx_g1_irq_thread_work(chip);
 
-	kthread_queue_delayed_work(chip->kworker, &chip->irq_poll_work,
-				   msecs_to_jiffies(100));
+	mv88e6xxx_do_irq_poll(chip);
 }
 
 static int mv88e6xxx_irq_poll_setup(struct mv88e6xxx_chip *chip)
@@ -4764,6 +4770,45 @@ static const void *pdata_device_get_match_data(struct device *dev)
 	return NULL;
 }
 
+static int __maybe_unused mv88e6xxx_suspend(struct device *dev)
+{
+	struct dsa_switch *ds = dev_get_drvdata(dev);
+	struct mv88e6xxx_chip *chip = ds->priv;
+
+	kthread_cancel_delayed_work_sync(&chip->irq_poll_work);
+
+	return dsa_switch_suspend(ds);
+}
+
+static int __maybe_unused mv88e6xxx_resume(struct device *dev)
+{
+	struct dsa_switch *ds = dev_get_drvdata(dev);
+	struct mv88e6xxx_chip *chip = ds->priv;
+	int ret;
+
+	mv88e6xxx_phy_init(chip);
+
+	mutex_lock(&chip->reg_lock);
+	ret = mv88e6xxx_switch_reset(chip);
+	mutex_unlock(&chip->reg_lock);
+	if (ret) {
+		dev_err(dev, "Failed to reset the switch\n");
+		return ret;
+	}
+
+	ret = mv88e6xxx_setup(ds);
+	if (ret) {
+		dev_err(dev, "Failed to setup the switch\n");
+		return ret;
+	}
+
+	mv88e6xxx_do_irq_poll(chip);
+
+	return dsa_switch_resume(ds);
+}
+
+static SIMPLE_DEV_PM_OPS(mv88e6xxx_pm_ops, mv88e6xxx_suspend, mv88e6xxx_resume);
+
 static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 {
 	struct dsa_mv88e6xxx_pdata *pdata = mdiodev->dev.platform_data;
@@ -4948,6 +4993,7 @@ static struct mdio_driver mv88e6xxx_driver = {
 	.mdiodrv.driver = {
 		.name = "mv88e6085",
 		.of_match_table = mv88e6xxx_of_match,
+		.pm = &mv88e6xxx_pm_ops,
 	},
 };
 
