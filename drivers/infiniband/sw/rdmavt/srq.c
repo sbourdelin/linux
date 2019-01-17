@@ -77,6 +77,7 @@ struct ib_srq *rvt_create_srq(struct ib_pd *ibpd,
 			      struct ib_udata *udata)
 {
 	struct rvt_dev_info *dev = ib_to_rvt(ibpd->device);
+	struct ib_ucontext *context;
 	struct rvt_srq *srq;
 	u32 sz;
 	struct ib_srq *ret;
@@ -118,9 +119,14 @@ struct ib_srq *rvt_create_srq(struct ib_pd *ibpd,
 		int err;
 		u32 s = sizeof(struct rvt_rwq) + srq->rq.size * sz;
 
+		context = rdma_get_ucontext(udata);
+		if (IS_ERR(context)) {
+			ret = ERR_CAST(context);
+			goto bail_wq;
+		}
+
 		srq->ip =
-		    rvt_create_mmap_info(dev, s, ibpd->uobject->context,
-					 srq->rq.wq);
+		    rvt_create_mmap_info(dev, s, context, srq->rq.wq);
 		if (!srq->ip) {
 			ret = ERR_PTR(-ENOMEM);
 			goto bail_wq;

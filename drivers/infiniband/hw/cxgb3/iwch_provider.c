@@ -796,6 +796,7 @@ static struct ib_qp *iwch_create_qp(struct ib_pd *pd,
 	struct iwch_cq *schp;
 	struct iwch_cq *rchp;
 	struct iwch_create_qp_resp uresp;
+	struct ib_ucontext *ib_ucontext;
 	int wqsize, sqsize, rqsize;
 	struct iwch_ucontext *ucontext;
 
@@ -836,7 +837,8 @@ static struct ib_qp *iwch_create_qp(struct ib_pd *pd,
 	 * Kernel users need more wq space for fastreg WRs which can take
 	 * 2 WR fragments.
 	 */
-	ucontext = udata ? to_iwch_ucontext(pd->uobject->context) : NULL;
+	ib_ucontext = rdma_get_ucontext(udata);
+	ucontext = IS_ERR(ib_ucontext) ? NULL : to_iwch_ucontext(ib_ucontext);
 	if (!ucontext && wqsize < (rqsize + (2 * sqsize)))
 		wqsize = roundup_pow_of_two(rqsize +
 				roundup_pow_of_two(attrs->cap.max_send_wr * 2));

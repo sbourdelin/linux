@@ -48,6 +48,9 @@ int mlx4_ib_db_map_user(struct mlx4_ib_ucontext *context,
 	struct mlx4_ib_user_db_page *page;
 	int err = 0;
 
+	if (!context)
+		return -EINVAL;
+
 	mutex_lock(&context->db_page_mutex);
 
 	list_for_each_entry(page, &context->db_page_list, list)
@@ -84,6 +87,9 @@ out:
 
 void mlx4_ib_db_unmap_user(struct mlx4_ib_ucontext *context, struct mlx4_db *db)
 {
+	if (WARN_ON(!context))
+		return;
+
 	mutex_lock(&context->db_page_mutex);
 
 	if (!--db->u.user_page->refcnt) {

@@ -2137,6 +2137,7 @@ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
 	struct c4iw_create_qp_resp uresp;
 	unsigned int sqsize, rqsize = 0;
 	struct c4iw_ucontext *ucontext;
+	struct ib_ucontext *ib_ucontext;
 	int ret;
 	struct c4iw_mm_entry *sq_key_mm, *rq_key_mm = NULL, *sq_db_key_mm;
 	struct c4iw_mm_entry *rq_db_key_mm = NULL, *ma_sync_key_mm = NULL;
@@ -2170,7 +2171,8 @@ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
 	if (sqsize < 8)
 		sqsize = 8;
 
-	ucontext = udata ? to_c4iw_ucontext(pd->uobject->context) : NULL;
+	ib_ucontext = rdma_get_ucontext(udata);
+	ucontext = IS_ERR(ib_ucontext) ? NULL : to_c4iw_ucontext(ib_ucontext);
 
 	qhp = kzalloc(sizeof(*qhp), GFP_KERNEL);
 	if (!qhp)
@@ -2697,6 +2699,7 @@ struct ib_srq *c4iw_create_srq(struct ib_pd *pd, struct ib_srq_init_attr *attrs,
 	struct c4iw_create_srq_resp uresp;
 	struct c4iw_ucontext *ucontext;
 	struct c4iw_mm_entry *srq_key_mm, *srq_db_key_mm;
+	struct ib_ucontext *ib_ucontext;
 	int rqsize;
 	int ret;
 	int wr_len;
@@ -2719,7 +2722,8 @@ struct ib_srq *c4iw_create_srq(struct ib_pd *pd, struct ib_srq_init_attr *attrs,
 	rqsize = attrs->attr.max_wr + 1;
 	rqsize = roundup_pow_of_two(max_t(u16, rqsize, 16));
 
-	ucontext = udata ? to_c4iw_ucontext(pd->uobject->context) : NULL;
+	ib_ucontext = rdma_get_ucontext(udata);
+	ucontext = IS_ERR(ib_ucontext) ? NULL : to_c4iw_ucontext(ib_ucontext);
 
 	srq = kzalloc(sizeof(*srq), GFP_KERNEL);
 	if (!srq)

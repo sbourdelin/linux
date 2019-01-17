@@ -554,7 +554,9 @@ static int mthca_path_set(struct mthca_dev *dev, const struct rdma_ah_attr *ah,
 
 static int __mthca_modify_qp(struct ib_qp *ibqp,
 			     const struct ib_qp_attr *attr, int attr_mask,
-			     enum ib_qp_state cur_state, enum ib_qp_state new_state)
+			     enum ib_qp_state cur_state,
+			     enum ib_qp_state new_state,
+			     struct ib_udata *udata)
 {
 	struct mthca_dev *dev = to_mdev(ibqp->device);
 	struct mthca_qp *qp = to_mqp(ibqp);
@@ -563,6 +565,7 @@ static int __mthca_modify_qp(struct ib_qp *ibqp,
 	struct mthca_qp_context *qp_context;
 	u32 sqd_event = 0;
 	int err = -EINVAL;
+	struct ib_ucontext *context;
 
 	mailbox = mthca_alloc_mailbox(dev, GFP_KERNEL);
 	if (IS_ERR(mailbox)) {
@@ -618,10 +621,15 @@ static int __mthca_modify_qp(struct ib_qp *ibqp,
 
 	/* leave arbel_sched_queue as 0 */
 
-	if (qp->ibqp.uobject)
+	if (udata) {
+		context = rdma_get_ucontext(udata);
+		if (IS_ERR(context)) {
+			err = PTR_ERR(context);
+			goto out_mailbox;
+		}
 		qp_context->usr_page =
-			cpu_to_be32(to_mucontext(qp->ibqp.uobject->context)->uar.index);
-	else
+			cpu_to_be32(to_mucontext(context)->uar.index);
+	} else
 		qp_context->usr_page = cpu_to_be32(dev->driver_uar.index);
 	qp_context->local_qpn  = cpu_to_be32(qp->qpn);
 	if (attr_mask & IB_QP_DEST_QPN) {
@@ -913,7 +921,8 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask,
 		goto out;
 	}
 
-	err = __mthca_modify_qp(ibqp, attr, attr_mask, cur_state, new_state);
+	err = __mthca_modify_qp(ibqp, attr, attr_mask, cur_state, new_state,
+				udata);
 
 out:
 	mutex_unlock(&qp->mutex);

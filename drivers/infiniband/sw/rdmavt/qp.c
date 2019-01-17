@@ -948,6 +948,7 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 			    struct ib_qp_init_attr *init_attr,
 			    struct ib_udata *udata)
 {
+	struct ib_ucontext *context;
 	struct rvt_qp *qp;
 	int err;
 	struct rvt_swqe *swq = NULL;
@@ -1127,8 +1128,13 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 		} else {
 			u32 s = sizeof(struct rvt_rwq) + qp->r_rq.size * sz;
 
-			qp->ip = rvt_create_mmap_info(rdi, s,
-						      ibpd->uobject->context,
+			context = rdma_get_ucontext(udata);
+			if (IS_ERR(context)) {
+				ret = PTR_ERR(context);
+				goto bail_qpn;
+			}
+
+			qp->ip = rvt_create_mmap_info(rdi, s, context,
 						      qp->r_rq.wq);
 			if (!qp->ip) {
 				ret = ERR_PTR(-ENOMEM);

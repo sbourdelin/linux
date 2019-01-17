@@ -542,11 +542,18 @@ static int hns_roce_create_qp_common(struct hns_roce_dev *hr_dev,
 	struct device *dev = hr_dev->dev;
 	struct hns_roce_ib_create_qp ucmd;
 	struct hns_roce_ib_create_qp_resp resp = {};
+	struct ib_ucontext *ucontext;
 	unsigned long qpn = 0;
 	int ret = 0;
 	u32 page_shift;
 	u32 npages;
 	int i;
+
+	ucontext = rdma_get_ucontext(udata);
+	if (IS_ERR(ucontext)) {
+		ret = PTR_ERR(ucontext);
+		goto err_out;
+	}
 
 	mutex_init(&hr_qp->mutex);
 	spin_lock_init(&hr_qp->sq.lock);
@@ -653,7 +660,7 @@ static int hns_roce_create_qp_common(struct hns_roce_dev *hr_dev,
 		    (udata->outlen >= sizeof(resp)) &&
 		    hns_roce_qp_has_sq(init_attr)) {
 			ret = hns_roce_db_map_user(
-				to_hr_ucontext(ib_pd->uobject->context), udata,
+				to_hr_ucontext(ucontext), udata,
 				ucmd.sdb_addr, &hr_qp->sdb);
 			if (ret) {
 				dev_err(dev, "sq record doorbell map failed!\n");
@@ -669,7 +676,7 @@ static int hns_roce_create_qp_common(struct hns_roce_dev *hr_dev,
 		    (udata->outlen >= sizeof(resp)) &&
 		    hns_roce_qp_has_rq(init_attr)) {
 			ret = hns_roce_db_map_user(
-				to_hr_ucontext(ib_pd->uobject->context), udata,
+				to_hr_ucontext(ucontext), udata,
 				ucmd.db_addr, &hr_qp->rdb);
 			if (ret) {
 				dev_err(dev, "rq record doorbell map failed!\n");
@@ -815,7 +822,7 @@ err_wrid:
 		    (udata->outlen >= sizeof(resp)) &&
 		    hns_roce_qp_has_rq(init_attr))
 			hns_roce_db_unmap_user(
-					to_hr_ucontext(ib_pd->uobject->context),
+					to_hr_ucontext(ucontext),
 					&hr_qp->rdb);
 	} else {
 		kfree(hr_qp->sq.wrid);
@@ -829,7 +836,7 @@ err_sq_dbmap:
 		    (udata->outlen >= sizeof(resp)) &&
 		    hns_roce_qp_has_sq(init_attr))
 			hns_roce_db_unmap_user(
-					to_hr_ucontext(ib_pd->uobject->context),
+					to_hr_ucontext(ucontext),
 					&hr_qp->sdb);
 
 err_mtt:

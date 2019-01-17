@@ -47,6 +47,7 @@ static int create_srq_user(struct ib_pd *pd, struct mlx5_ib_srq *srq,
 {
 	struct mlx5_ib_dev *dev = to_mdev(pd->device);
 	struct mlx5_ib_create_srq ucmd = {};
+	struct ib_ucontext *context;
 	size_t ucmdlen;
 	int err;
 	int npages;
@@ -54,6 +55,10 @@ static int create_srq_user(struct ib_pd *pd, struct mlx5_ib_srq *srq,
 	int ncont;
 	u32 offset;
 	u32 uidx = MLX5_IB_DEFAULT_UIDX;
+
+	context = rdma_get_ucontext(udata);
+	if (IS_ERR(context))
+		return PTR_ERR(context);
 
 	ucmdlen = min(udata->inlen, sizeof(ucmd));
 
@@ -71,8 +76,8 @@ static int create_srq_user(struct ib_pd *pd, struct mlx5_ib_srq *srq,
 		return -EINVAL;
 
 	if (in->type != IB_SRQT_BASIC) {
-		err = get_srq_user_index(to_mucontext(pd->uobject->context),
-					 &ucmd, udata->inlen, &uidx);
+		err = get_srq_user_index(to_mucontext(context), &ucmd,
+					 udata->inlen, &uidx);
 		if (err)
 			return err;
 	}
@@ -103,8 +108,8 @@ static int create_srq_user(struct ib_pd *pd, struct mlx5_ib_srq *srq,
 
 	mlx5_ib_populate_pas(dev, srq->umem, page_shift, in->pas, 0);
 
-	err = mlx5_ib_db_map_user(to_mucontext(pd->uobject->context), udata,
-				  ucmd.db_addr, &srq->db);
+	err = mlx5_ib_db_map_user(to_mucontext(context), udata, ucmd.db_addr,
+				  &srq->db);
 	if (err) {
 		mlx5_ib_dbg(dev, "map doorbell failed\n");
 		goto err_in;

@@ -580,10 +580,15 @@ static struct ib_qp *i40iw_create_qp(struct ib_pd *ibpd,
 	struct i40iw_create_qp_info *qp_info;
 	struct i40iw_cqp_request *cqp_request;
 	struct cqp_commands_info *cqp_info;
+	struct ib_ucontext *ib_ucontext;
 
 	struct i40iw_qp_host_ctx_info *ctx_info;
 	struct i40iwarp_offload_info *iwarp_info;
 	unsigned long flags;
+
+	ib_ucontext = rdma_get_ucontext(udata);
+	if (udata && IS_ERR(ib_ucontext))
+		return ERR_CAST(ib_ucontext);
 
 	if (iwdev->closing)
 		return ERR_PTR(-ENODEV);
@@ -674,7 +679,7 @@ static struct ib_qp *i40iw_create_qp(struct ib_pd *ibpd,
 		}
 		iwqp->ctx_info.qp_compl_ctx = req.user_compl_ctx;
 		iwqp->user_mode = 1;
-		ucontext = to_ucontext(ibpd->uobject->context);
+		ucontext = to_ucontext(ib_ucontext);
 
 		if (req.user_wqe_buffers) {
 			struct i40iw_pbl *iwpbl;
@@ -1832,6 +1837,7 @@ static struct ib_mr *i40iw_reg_user_mr(struct ib_pd *pd,
 	struct i40iw_pd *iwpd = to_iwpd(pd);
 	struct i40iw_device *iwdev = to_iwdev(pd->device);
 	struct i40iw_ucontext *ucontext;
+	struct ib_ucontext *ib_ucontext;
 	struct i40iw_pble_alloc *palloc;
 	struct i40iw_pbl *iwpbl;
 	struct i40iw_mr *iwmr;
@@ -1846,6 +1852,12 @@ static struct ib_mr *i40iw_reg_user_mr(struct ib_pd *pd,
 	int err = -ENOSYS;
 	int ret;
 	int pg_shift;
+
+	ib_ucontext = rdma_get_ucontext(udata);
+	if (IS_ERR(ib_ucontext))
+		return ERR_CAST(ib_ucontext);
+
+	ucontext = to_ucontext(ib_ucontext);
 
 	if (iwdev->closing)
 		return ERR_PTR(-ENODEV);
@@ -1872,7 +1884,6 @@ static struct ib_mr *i40iw_reg_user_mr(struct ib_pd *pd,
 	iwmr->region = region;
 	iwmr->ibmr.pd = pd;
 	iwmr->ibmr.device = pd->device;
-	ucontext = to_ucontext(pd->uobject->context);
 
 	iwmr->page_size = PAGE_SIZE;
 	iwmr->page_msk = PAGE_MASK;

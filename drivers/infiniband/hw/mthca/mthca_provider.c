@@ -446,6 +446,7 @@ static struct ib_srq *mthca_create_srq(struct ib_pd *pd,
 {
 	struct mthca_create_srq ucmd;
 	struct mthca_ucontext *context = NULL;
+	struct ib_ucontext *ib_ucontext;
 	struct mthca_srq *srq;
 	int err;
 
@@ -457,7 +458,12 @@ static struct ib_srq *mthca_create_srq(struct ib_pd *pd,
 		return ERR_PTR(-ENOMEM);
 
 	if (udata) {
-		context = to_mucontext(pd->uobject->context);
+		ib_ucontext = rdma_get_ucontext(udata);
+		if (IS_ERR(ib_ucontext)) {
+			err = PTR_ERR(ib_ucontext);
+			goto err_free;
+		}
+		context = to_mucontext(ib_ucontext);
 
 		if (ib_copy_from_udata(&ucmd, udata, sizeof ucmd)) {
 			err = -EFAULT;
@@ -520,6 +526,7 @@ static struct ib_qp *mthca_create_qp(struct ib_pd *pd,
 				     struct ib_qp_init_attr *init_attr,
 				     struct ib_udata *udata)
 {
+	struct ib_ucontext *ib_ucontext;
 	struct mthca_create_qp ucmd;
 	struct mthca_qp *qp;
 	int err;
@@ -532,14 +539,17 @@ static struct ib_qp *mthca_create_qp(struct ib_pd *pd,
 	case IB_QPT_UC:
 	case IB_QPT_UD:
 	{
-		struct mthca_ucontext *context;
+		struct mthca_ucontext *context = NULL;
 
 		qp = kmalloc(sizeof *qp, GFP_KERNEL);
 		if (!qp)
 			return ERR_PTR(-ENOMEM);
 
 		if (udata) {
-			context = to_mucontext(pd->uobject->context);
+			ib_ucontext = rdma_get_ucontext(udata);
+			if (IS_ERR(ib_ucontext))
+				return ERR_CAST(ib_ucontext);
+			context = to_mucontext(ib_ucontext);
 
 			if (ib_copy_from_udata(&ucmd, udata, sizeof ucmd)) {
 				kfree(qp);
@@ -577,9 +587,7 @@ static struct ib_qp *mthca_create_qp(struct ib_pd *pd,
 				     init_attr->qp_type, init_attr->sq_sig_type,
 				     &init_attr->cap, qp, udata);
 
-		if (err && udata) {
-			context = to_mucontext(pd->uobject->context);
-
+		if (err && context) {
 			mthca_unmap_user_db(to_mdev(pd->device),
 					    &context->uar,
 					    context->db_tab,
@@ -907,6 +915,7 @@ static struct ib_mr *mthca_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 				       u64 virt, int acc, struct ib_udata *udata)
 {
 	struct mthca_dev *dev = to_mdev(pd->device);
+	struct ib_ucontext *context;
 	struct scatterlist *sg;
 	struct mthca_mr *mr;
 	struct mthca_reg_mr ucmd;
@@ -917,12 +926,15 @@ static struct ib_mr *mthca_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	int write_mtt_size;
 
 	if (udata->inlen < sizeof ucmd) {
-		if (!to_mucontext(pd->uobject->context)->reg_mr_warned) {
+		context = rdma_get_ucontext(udata);
+		if (IS_ERR(context))
+			return ERR_CAST(context);
+		if (!to_mucontext(context)->reg_mr_warned) {
 			mthca_warn(dev, "Process '%s' did not pass in MR attrs.\n",
 				   current->comm);
 			mthca_warn(dev, "  Update libmthca to fix this.\n");
 		}
-		++to_mucontext(pd->uobject->context)->reg_mr_warned;
+		++to_mucontext(context)->reg_mr_warned;
 		ucmd.mr_attrs = 0;
 	} else if (ib_copy_from_udata(&ucmd, udata, sizeof ucmd))
 		return ERR_PTR(-EFAULT);

@@ -76,6 +76,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 	struct mlx4_ib_srq *srq;
 	struct mlx4_wqe_srq_next_seg *next;
 	struct mlx4_wqe_data_seg *scatter;
+	struct ib_ucontext *ib_ucontext;
 	u32 cqn;
 	u16 xrcdn;
 	int desc_size;
@@ -108,6 +109,12 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 	if (udata) {
 		struct mlx4_ib_create_srq ucmd;
 
+		ib_ucontext = rdma_get_ucontext(udata);
+		if (IS_ERR(ib_ucontext)) {
+			err = PTR_ERR(ib_ucontext);
+			goto err_srq;
+		}
+
 		if (ib_copy_from_udata(&ucmd, udata, sizeof ucmd)) {
 			err = -EFAULT;
 			goto err_srq;
@@ -128,8 +135,8 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 		if (err)
 			goto err_mtt;
 
-		err = mlx4_ib_db_map_user(to_mucontext(pd->uobject->context),
-					  udata, ucmd.db_addr, &srq->db);
+		err = mlx4_ib_db_map_user(to_mucontext(ib_ucontext), udata,
+					  ucmd.db_addr, &srq->db);
 		if (err)
 			goto err_mtt;
 	} else {
@@ -202,7 +209,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 
 err_wrid:
 	if (udata)
-		mlx4_ib_db_unmap_user(to_mucontext(pd->uobject->context), &srq->db);
+		mlx4_ib_db_unmap_user(to_mucontext(ib_ucontext), &srq->db);
 	else
 		kvfree(srq->wrid);
 

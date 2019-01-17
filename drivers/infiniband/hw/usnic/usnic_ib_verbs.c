@@ -501,10 +501,15 @@ struct ib_qp *usnic_ib_create_qp(struct ib_pd *pd,
 	struct usnic_vnic_res_spec res_spec;
 	struct usnic_ib_create_qp_cmd cmd;
 	struct usnic_transport_spec trans_spec;
+	struct ib_ucontext *context;
 
 	usnic_dbg("\n");
 
-	ucontext = to_uucontext(pd->uobject->context);
+	context = rdma_get_ucontext(udata);
+	if (IS_ERR(context))
+		return ERR_CAST(context);
+
+	ucontext = to_uucontext(context);
 	us_ibdev = to_usdev(pd->device);
 
 	if (init_attr->create_flags)
