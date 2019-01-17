@@ -2351,13 +2351,19 @@ static int srp_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
 	u32 tag;
 	u16 idx;
 	int len, ret;
-	const bool in_scsi_eh = !in_interrupt() && current == shost->ehandler;
+	const bool in_scsi_eh = !in_interrupt() && current == shost->ehandler
+		&& rcu_preempt_depth() == 0;
 
 	/*
-	 * The SCSI EH thread is the only context from which srp_queuecommand()
-	 * can get invoked for blocked devices (SDEV_BLOCK /
+	 * The scsi_send_eh_cmnd() function is the only function that can call
+	 * .queuecommand() for blocked devices (SDEV_BLOCK /
 	 * SDEV_CREATED_BLOCK). Avoid racing with srp_reconnect_rport() by
-	 * locking the rport mutex if invoked from inside the SCSI EH.
+	 * locking the rport mutex if invoked from inside that function.
+	 * Recognize this context by checking whether called from the SCSI EH
+	 * thread and whether no RCU read lock is held. If
+	 * blk_mq_run_hw_queues() is called from the context of the SCSI EH
+	 * thread then an RCU read lock is held around scsi_queue_rq() calls
+	 * becase the SRP driver does not set BLK_MQ_F_BLOCKING.
 	 */
 	if (in_scsi_eh)
 		mutex_lock(&rport->mutex);
