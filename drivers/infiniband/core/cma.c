@@ -885,6 +885,7 @@ struct rdma_cm_id *__rdma_create_id(struct net *net,
 	id_priv->id.ps = ps;
 	id_priv->id.qp_type = qp_type;
 	id_priv->tos_set = false;
+	id_priv->timeout_set = false;
 	id_priv->gid_type = IB_GID_TYPE_IB;
 	spin_lock_init(&id_priv->lock);
 	mutex_init(&id_priv->qp_mutex);
@@ -1126,6 +1127,9 @@ int rdma_init_qp_attr(struct rdma_cm_id *id, struct ib_qp_attr *qp_attr,
 		*qp_attr_mask |= IB_QP_PORT;
 	} else
 		ret = -ENOSYS;
+
+	if ((*qp_attr_mask & IB_QP_TIMEOUT) && id_priv->timeout_set)
+		qp_attr->timeout = id_priv->timeout;
 
 	return ret;
 }
@@ -2486,6 +2490,16 @@ void rdma_set_service_type(struct rdma_cm_id *id, int tos)
 	id_priv->tos_set = true;
 }
 EXPORT_SYMBOL(rdma_set_service_type);
+
+void rdma_set_ack_timeout(struct rdma_cm_id *id, u8 timeout)
+{
+	struct rdma_id_private *id_priv;
+
+	id_priv = container_of(id, struct rdma_id_private, id);
+	id_priv->timeout = timeout;
+	id_priv->timeout_set = true;
+}
+EXPORT_SYMBOL(rdma_set_ack_timeout);
 
 static void cma_query_handler(int status, struct sa_path_rec *path_rec,
 			      void *context)

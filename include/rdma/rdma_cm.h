@@ -374,6 +374,13 @@ int rdma_set_reuseaddr(struct rdma_cm_id *id, int reuse);
  */
 int rdma_set_afonly(struct rdma_cm_id *id, int afonly);
 
+/**
+ * rdma_set_ack_timeout - Set the ack timeout of QP associated with a
+ *   connection identifier.
+ * @id: Communication identifier to associated with service type.
+ * @timeout: Ack timeout to set a QP.
+ */
+void rdma_set_ack_timeout(struct rdma_cm_id *id, u8 timeout);
  /**
  * rdma_get_service_id - Return the IB service ID for a specified address.
  * @id: Communication identifier associated with the address.
