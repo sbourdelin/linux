@@ -3035,9 +3035,11 @@ static int srp_abort(struct scsi_cmnd *scmnd)
 
 static int srp_reset_device(struct scsi_cmnd *scmnd)
 {
-	struct srp_target_port *target = host_to_target(scmnd->device->host);
+	struct scsi_device *sdev = scmnd->device;
+	struct srp_target_port *target = host_to_target(sdev->host);
 	struct srp_rdma_ch *ch;
-	int i, j;
+	struct request_queue *q = sdev->request_queue;
+	int time_left;
 	u8 status;
 
 	shost_printk(KERN_ERR, target->scsi_host, "SRP reset_device called\n");
@@ -3049,16 +3051,12 @@ static int srp_reset_device(struct scsi_cmnd *scmnd)
 	if (status)
 		return FAILED;
 
-	for (i = 0; i < target->ch_count; i++) {
-		ch = &target->ch[i];
-		for (j = 0; j < target->req_ring_size; ++j) {
-			struct srp_request *req = &ch->req_ring[j];
+	/* Check whether all requests have finished. */
+	blk_freeze_queue_start(q);
+	time_left = blk_mq_freeze_queue_wait_timeout(q, 1 * HZ);
+	blk_mq_unfreeze_queue(q);
 
-			srp_finish_req(ch, req, scmnd->device, DID_RESET << 16);
-		}
-	}
-
-	return SUCCESS;
+	return time_left > 0 ? SUCCESS : FAILED;
 }
 
 static int srp_reset_host(struct scsi_cmnd *scmnd)
