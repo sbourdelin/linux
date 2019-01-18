@@ -9,6 +9,7 @@
  */
 #include <linux/acpi.h>
 #include <linux/delay.h>
+#include <linux/firmware.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -17,6 +18,8 @@
 #include <asm/unaligned.h>
 #include "ucsi.h"
 
+static int secondary_fw_min_ver = 41;
+module_param(secondary_fw_min_ver, int, 0660);
 #define CCGX_RAB_DEVICE_MODE			0x0000
 #define CCGX_RAB_INTR_REG			0x0006
 #define  DEV_INT				BIT(0)
@@ -68,6 +71,27 @@
 #define FW2_METADATA_ROW        0x1FE
 #define FW_CFG_TABLE_SIG_SIZE	256
 
+enum enum_fw_mode {
+	BOOT,   /* bootloader */
+	FW1,    /* FW partition-1 */
+	FW2,    /* FW partition-2 */
+	FW_INVALID,
+};
+
+enum enum_flash_mode {
+	SECONDARY_BL,	/* update secondary using bootloader */
+	SECONDARY,	/* update secondary using primary */
+	PRIMARY,	/* update primary */
+	FLASH_NOT_NEEDED,	/* update not required */
+	FLASH_INVALID,
+};
+
+static const char * const ccg_fw_names[] = {
+	/* 0x00 */ "ccg_boot.cyacd",
+	/* 0x01 */ "ccg_2.cyacd",
+	/* 0x02 */ "ccg_1.cyacd",
+};
+
 struct ccg_dev_info {
 	u8 fw_mode:2;
 	u8 two_pd_ports:2;
@@ -93,6 +117,20 @@ struct version_format {
 struct version_info {
 	struct version_format base;
 	struct version_format app;
+};
+
+struct fw_config_table {
+	u32 identity;
+	u16 table_size;
+	u8 fwct_version;
+	u8 is_key_change;
+	u8 guid[16];
+	struct version_format base;
+	struct version_format app;
+	u8 primary_fw_digest[32];
+	u32 key_exp_length;
+	u8 key_modulus[256];
+	u8 key_exp[4];
 };
 
 /* CCGx response codes */
@@ -734,6 +772,107 @@ static int ccg_cmd_validate_fw(struct ucsi_ccg *uc, unsigned int fwid)
 	if (ret != CMD_SUCCESS)
 		return ret;
 
+	return 0;
+}
+
+static bool ccg_check_fw_version(struct ucsi_ccg *uc, const char *fw_name,
+				 struct version_format *app)
+{
+	const struct firmware *fw = NULL;
+	struct device *dev = uc->dev;
+	struct fw_config_table fw_cfg;
+	u32 cur_version, new_version;
+	bool is_later = false;
+
+	if (request_firmware(&fw, fw_name, dev) != 0) {
+		dev_err(dev, "error: Failed to open cyacd file %s\n", fw_name);
+		return false;
+	}
+
+	/*
+	 * check if signed fw
+	 * last part of fw image is fw cfg table and signature
+	 */
+	if (fw->size < sizeof(fw_cfg) + FW_CFG_TABLE_SIG_SIZE)
+		goto not_signed_fw;
+
+	memcpy((uint8_t *)&fw_cfg, fw->data + fw->size -
+	       sizeof(fw_cfg) - FW_CFG_TABLE_SIG_SIZE, sizeof(fw_cfg));
+
+	if (fw_cfg.identity != ('F' | ('W' << 8) | ('C' << 16) | ('T' << 24))) {
+		dev_info(dev, "not a signed image\n");
+		goto not_signed_fw;
+	}
+
+	/* compare input version with FWCT version */
+	cur_version = app->build | (app->patch << 16) |
+			((app->min | (app->maj << 4)) << 24);
+
+	new_version = fw_cfg.app.build | (fw_cfg.app.patch << 16) |
+			((fw_cfg.app.min | (fw_cfg.app.maj << 4)) << 24);
+
+	dev_dbg(dev, "compare current %08x and new version %08x\n",
+		cur_version, new_version);
+
+	if (new_version > cur_version) {
+		dev_dbg(dev, "new firmware file version is later\n");
+		is_later = true;
+	} else {
+		dev_dbg(dev, "new firmware file version is same or earlier\n");
+	}
+
+not_signed_fw:
+	release_firmware(fw);
+	return is_later;
+}
+
+static int ccg_fw_update_needed(struct ucsi_ccg *uc,
+				enum enum_flash_mode *mode)
+{
+	struct device *dev = uc->dev;
+	int err;
+	struct version_info version[3];
+
+	err = ccg_read(uc, CCGX_RAB_DEVICE_MODE, (u8 *)(&uc->info),
+		       sizeof(uc->info));
+	if (err) {
+		dev_err(dev, "read device mode failed\n");
+		return err;
+	}
+
+	err = ccg_read(uc, CCGX_RAB_READ_ALL_VER, (u8 *)version,
+		       sizeof(version));
+	if (err) {
+		dev_err(dev, "read device mode failed\n");
+		return err;
+	}
+
+	dev_dbg(dev, "check if fw upgrade required %x %x %x %x %x %x %x %x\n",
+		version[FW1].base.build, version[FW1].base.patch,
+		version[FW1].base.min, version[FW1].base.maj,
+		version[FW2].app.build, version[FW2].app.patch,
+		version[FW2].app.min, version[FW2].app.maj);
+
+	if (memcmp(&version[FW1], "\0\0\0\0\0\0\0\0",
+		   sizeof(struct version_info)) == 0) {
+		dev_info(dev, "secondary fw is not flashed\n");
+		*mode = SECONDARY_BL;
+	} else if (version[FW1].base.build < secondary_fw_min_ver) {
+		dev_info(dev, "secondary fw version is too low (< %d)\n",
+			 secondary_fw_min_ver);
+		*mode = SECONDARY;
+	} else if (memcmp(&version[FW2], "\0\0\0\0\0\0\0\0",
+		   sizeof(struct version_info)) == 0) {
+		dev_info(dev, "primary fw is not flashed\n");
+		*mode = PRIMARY;
+	} else if (ccg_check_fw_version(uc, ccg_fw_names[PRIMARY],
+		   &version[FW2].app)) {
+		dev_info(dev, "found primary fw with later version\n");
+		*mode = PRIMARY;
+	} else {
+		dev_info(dev, "secondary and primary fw are the latest\n");
+		*mode = FLASH_NOT_NEEDED;
+	}
 	return 0;
 }
 
