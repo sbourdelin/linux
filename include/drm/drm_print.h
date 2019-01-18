@@ -285,6 +285,22 @@ void drm_err(const char *format, ...);
 #define _DRM_PRINTK(once, level, fmt, ...)				\
 	printk##once(KERN_##level "[" DRM_NAME "] " fmt, ##__VA_ARGS__)
 
+/**
+ * Rate limited output.  Like _DRM_PRINTK() but won't flood the log.
+ *
+ * @dev: device pointer
+ * @fmt: printf() like format string.
+ */
+#define _DRM_DEV_PRINTK_RATELIMITED(dev, level, fmt, ...)		\
+({									\
+	static DEFINE_RATELIMIT_STATE(_rs,				\
+				      DEFAULT_RATELIMIT_INTERVAL,	\
+				      DEFAULT_RATELIMIT_BURST);		\
+									\
+	if (__ratelimit(&_rs))						\
+		drm_dev_printk(dev, level, fmt, ##__VA_ARGS__);		\
+})
+
 #define DRM_INFO(fmt, ...)						\
 	_DRM_PRINTK(, INFO, fmt, ##__VA_ARGS__)
 #define DRM_NOTE(fmt, ...)						\
@@ -317,19 +333,16 @@ void drm_err(const char *format, ...);
  * @fmt: printf() like format string.
  */
 #define DRM_DEV_ERROR_RATELIMITED(dev, fmt, ...)			\
-({									\
-	static DEFINE_RATELIMIT_STATE(_rs,				\
-				      DEFAULT_RATELIMIT_INTERVAL,	\
-				      DEFAULT_RATELIMIT_BURST);		\
-									\
-	if (__ratelimit(&_rs))						\
-		DRM_DEV_ERROR(dev, fmt, ##__VA_ARGS__);			\
-})
+	_DRM_DEV_PRINTK_RATELIMITED(dev, KERN_ERR, "*ERROR*" fmt, ##__VA_ARGS__)
+
 #define DRM_ERROR_RATELIMITED(fmt, ...)					\
 	DRM_DEV_ERROR_RATELIMITED(NULL, fmt, ##__VA_ARGS__)
 
 #define DRM_DEV_INFO(dev, fmt, ...)					\
 	drm_dev_printk(dev, KERN_INFO, fmt, ##__VA_ARGS__)
+
+#define DRM_DEV_INFO_RATELIMITED(dev, fmt, ...)				\
+	_DRM_DEV_PRINTK_RATELIMITED(dev, KERN_INFO, fmt, ##__VA_ARGS__)
 
 #define DRM_DEV_INFO_ONCE(dev, fmt, ...)				\
 ({									\
