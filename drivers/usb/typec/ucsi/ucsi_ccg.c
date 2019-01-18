@@ -775,6 +775,30 @@ static int ccg_cmd_validate_fw(struct ucsi_ccg *uc, unsigned int fwid)
 	return 0;
 }
 
+static bool ccg_check_vendor_version(struct ucsi_ccg *uc,
+				     struct version_format *app,
+				     struct fw_config_table *fw_cfg)
+{
+	struct device *dev = uc->dev;
+
+	/* Check if the fw build is for supported vendors.
+	 * Add all supported vendors here.
+	 */
+	if (app->build != (('n' << 8) | 'v')) {
+		dev_info(dev, "current fw is not from supported vendor\n");
+		return false;
+	}
+
+	/* Check if the new fw build is for supported vendors
+	 * Add all supported vendors here.
+	 */
+	if (fw_cfg->app.build != (('n' << 8) | 'v')) {
+		dev_info(dev, "new fw is not from supported vendor\n");
+		return false;
+	}
+	return true;
+}
+
 static bool ccg_check_fw_version(struct ucsi_ccg *uc, const char *fw_name,
 				 struct version_format *app)
 {
@@ -814,6 +838,9 @@ static bool ccg_check_fw_version(struct ucsi_ccg *uc, const char *fw_name,
 	dev_dbg(dev, "compare current %08x and new version %08x\n",
 		cur_version, new_version);
 
+	if (!ccg_check_vendor_version(uc, app, &fw_cfg))
+		goto not_supported_version;
+
 	if (new_version > cur_version) {
 		dev_dbg(dev, "new firmware file version is later\n");
 		is_later = true;
@@ -821,6 +848,7 @@ static bool ccg_check_fw_version(struct ucsi_ccg *uc, const char *fw_name,
 		dev_dbg(dev, "new firmware file version is same or earlier\n");
 	}
 
+not_supported_version:
 not_signed_fw:
 	release_firmware(fw);
 	return is_later;
