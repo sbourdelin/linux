@@ -17,6 +17,29 @@
 #include <asm/unaligned.h>
 #include "ucsi.h"
 
+#define CCGX_RAB_DEVICE_MODE			0x0000
+#define CCGX_RAB_INTR_REG			0x0006
+#define  DEV_INT				BIT(0)
+#define  PORT0_INT				BIT(1)
+#define  PORT1_INT				BIT(2)
+#define  UCSI_READ_INT				BIT(7)
+#define CCGX_RAB_READ_ALL_VER			0x0010
+#define CCGX_RAB_READ_FW2_VER			0x0020
+#define CCGX_RAB_UCSI_CONTROL			0x0039
+#define CCGX_RAB_UCSI_CONTROL_START		BIT(0)
+#define CCGX_RAB_UCSI_CONTROL_STOP		BIT(1)
+#define CCGX_RAB_UCSI_DATA_BLOCK(offset)	(0xf000 | ((offset) & 0xff))
+#define DEV_REG_IDX				CCGX_RAB_DEVICE_MODE
+#define CCGX_RAB_RESPONSE			0x007E
+#define  ASYNC_EVENT				BIT(7)
+
+/* CCGx events & async msg codes */
+#define RESET_COMPLETE		0x80
+#define EVENT_INDEX		RESET_COMPLETE
+#define PORT_CONNECT_DET	0x84
+#define PORT_DISCONNECT_DET	0x85
+#define ROLE_SWAP_COMPELETE	0x87
+
 struct ccg_dev_info {
 	u8 fw_mode:2;
 	u8 two_pd_ports:2;
@@ -44,22 +67,112 @@ struct version_info {
 	struct version_format app;
 };
 
+/* CCGx response codes */
+enum ccg_resp_code {
+	CMD_NO_RESP             = 0x00,
+	CMD_SUCCESS             = 0x02,
+	FLASH_DATA_AVAILABLE    = 0x03,
+	CMD_INVALID             = 0x05,
+	FLASH_UPDATE_FAIL       = 0x07,
+	INVALID_FW              = 0x08,
+	INVALID_ARG             = 0x09,
+	CMD_NOT_SUPPORT         = 0x0A,
+	TRANSACTION_FAIL        = 0x0C,
+	PD_CMD_FAIL             = 0x0D,
+	UNDEF_ERROR             = 0x0F,
+	INVALID_RESP		= 0x10,
+};
+
+static const char * const ccg_resp_strs[] = {
+	/* 0x00 */ "No Response.",
+	/* 0x01 */ "0x01",
+	/* 0x02 */ "HPI Command Success.",
+	/* 0x03 */ "Flash Data Available in data memory.",
+	/* 0x04 */ "0x04",
+	/* 0x05 */ "Invalid Command.",
+	/* 0x06 */ "0x06",
+	/* 0x07 */ "Flash write operation failed.",
+	/* 0x08 */ "Firmware validity check failed.",
+	/* 0x09 */ "Command failed due to invalid arguments.",
+	/* 0x0A */ "Command not supported in the current mode.",
+	/* 0x0B */ "0x0B",
+	/* 0x0C */ "Transaction Failed. GOOD_CRC was not received.",
+	/* 0x0D */ "PD Command Failed.",
+	/* 0x0E */ "0x0E",
+	/* 0x0F */ "Undefined Error",
+};
+
+static const char * const ccg_evt_strs[] = {
+	/* 0x80 */ "Reset Complete.",
+	/* 0x81 */ "Message queue overflow detected.",
+	/* 0x82 */ "Overcurrent Detected",
+	/* 0x83 */ "Overvoltage Detected",
+	/* 0x84 */ "Type-C Port Connect Detected",
+	/* 0x85 */ "Type-C Port Disconnect Detected",
+	/* 0x86 */ "PD Contract Negotiation Complete",
+	/* 0x87 */ "SWAP Complete",
+	/* 0x88 */ "0x88",
+	/* 0x89 */ "0x89",
+	/* 0x8A */ "PS_RDY Message Received",
+	/* 0x8B */ "GotoMin Message Received.",
+	/* 0x8C */ "Accept Message Received",
+	/* 0x8D */ "Reject Message Received",
+	/* 0x8E */ "Wait Message Received",
+	/* 0x8F */ "Hard Reset Received",
+	/* 0x90 */ "VDM Received",
+	/* 0x91 */ "Source Capabilities Message Received",
+	/* 0x92 */ "Sink Capabilities Message Received",
+	/* 0x93 */ "Display Port Alternate Mode entered",
+	/* 0x94 */ "Display Port device connected at UFP_U",
+	/* 0x95 */ "Display port device not connected at UFP_U",
+	/* 0x96 */ "Display port SID not found in Discover SID process",
+	/* 0x97 */ "Multiple SVIDs discovered along with DisplayPort SID",
+	/* 0x98 */ "DP Functionality not supported by Cable",
+	/* 0x99 */ "Display Port Configuration not supported by UFP",
+	/* 0x9A */ "Hard Reset Sent to Port Partner",
+	/* 0x9B */ "Soft Reset Sent to Port Partner",
+	/* 0x9C */ "Cable Reset Sent to EMCA",
+	/* 0x9D */ "Source Disabled State Entered",
+	/* 0x9E */ "Sender Response Timer Timeout",
+	/* 0x9F */ "No VDM Response Received",
+	/* 0xA0 */ "Unexpected Voltage on Vbus",
+	/* 0xA1 */ "Type-C Error Recovery",
+	/* 0xA2 */ "0xA2",
+	/* 0xA3 */ "0xA3",
+	/* 0xA4 */ "0xA4",
+	/* 0xA5 */ "0xA5",
+	/* 0xA6 */ "EMCA Detected",
+	/* 0xA7 */ "0xA7",
+	/* 0xA8 */ "0xA8",
+	/* 0xA9 */ "0xA9",
+	/* 0xAA */ "Rp Change Detected",
+};
+
+struct ccg_cmd {
+	u16 reg;
+	u32 data;
+	int len;
+	int delay; /* ms delay for cmd timeout  */
+};
+
+struct ccg_resp {
+	u8 code;
+	u8 length;
+};
+
 struct ucsi_ccg {
 	struct device *dev;
 	struct ucsi *ucsi;
 	struct ucsi_ppm ppm;
 	struct i2c_client *client;
 	struct ccg_dev_info info;
+	/* CCG HPI communication flags */
+	unsigned long flags;
+#define RESET_PENDING	0
+#define DEV_CMD_PENDING	1
+	struct ccg_resp dev_resp;
+	u8 cmd_resp;
 };
-
-#define CCGX_RAB_DEVICE_MODE			0x0000
-#define CCGX_RAB_INTR_REG			0x0006
-#define CCGX_RAB_READ_ALL_VER			0x0010
-#define CCGX_RAB_READ_FW2_VER			0x0020
-#define CCGX_RAB_UCSI_CONTROL			0x0039
-#define CCGX_RAB_UCSI_CONTROL_START		BIT(0)
-#define CCGX_RAB_UCSI_CONTROL_STOP		BIT(1)
-#define CCGX_RAB_UCSI_DATA_BLOCK(offset)	(0xf000 | ((offset) & 0xff))
 
 static int ccg_read(struct ucsi_ccg *uc, u16 rab, u8 *data, u32 len)
 {
@@ -284,6 +397,127 @@ static int get_fw_info(struct ucsi_ccg *uc)
 	dev_dbg(dev, "silicon_id: 0x%04x\n", uc->info.silicon_id);
 
 	return 0;
+}
+
+static inline bool invalid_resp(int code)
+{
+	return (code >= INVALID_RESP);
+}
+
+static inline bool invalid_evt(int code)
+{
+	unsigned long num_of_events = ARRAY_SIZE(ccg_evt_strs);
+
+	return (code >= (EVENT_INDEX + num_of_events)) || (code < EVENT_INDEX);
+}
+
+static void ccg_process_response(struct ucsi_ccg *uc)
+{
+	struct device *dev = uc->dev;
+
+	if (uc->dev_resp.code & ASYNC_EVENT) {
+		if (uc->dev_resp.code == RESET_COMPLETE) {
+			if (test_bit(RESET_PENDING, &uc->flags))
+				uc->cmd_resp = uc->dev_resp.code;
+			dev_info(dev, "CCG reset complete\n");
+			get_fw_info(uc);
+		}
+
+		if (!invalid_evt(uc->dev_resp.code))
+			dev_dbg(dev, "%s\n",
+				ccg_evt_strs[uc->dev_resp.code - EVENT_INDEX]);
+		else
+			dev_err(dev, "invalid evt %d\n", uc->dev_resp.code);
+	} else {
+		if (test_bit(DEV_CMD_PENDING, &uc->flags)) {
+			uc->cmd_resp = uc->dev_resp.code;
+			clear_bit(DEV_CMD_PENDING, &uc->flags);
+		} else {
+			dev_err(dev, "dev resp 0x%04x but no cmd pending\n",
+				uc->dev_resp.code);
+		}
+	}
+}
+
+static int ccg_read_response(struct ucsi_ccg *uc)
+{
+	unsigned long target = jiffies + msecs_to_jiffies(1000);
+	struct device *dev = uc->dev;
+	u8 intval;
+	int status;
+
+	/* wait for interrupt status to get updated */
+	do {
+		status = ccg_read(uc, CCGX_RAB_INTR_REG, &intval,
+				  sizeof(intval));
+		if (status < 0)
+			return status;
+
+		if (intval & DEV_INT)
+			break;
+		usleep_range(500, 600);
+	} while (time_is_after_jiffies(target));
+
+	if (time_is_before_jiffies(target)) {
+		dev_err(dev, "response timeout error\n");
+		return -ETIME;
+	}
+
+	status = ccg_read(uc, CCGX_RAB_RESPONSE, (u8 *)&uc->dev_resp,
+			  sizeof(uc->dev_resp));
+	if (status < 0)
+		return status;
+
+	dev_dbg(dev, "dev event code: 0x%02x, data len: %d\n",
+		uc->dev_resp.code, uc->dev_resp.length);
+
+	status = ccg_write(uc, CCGX_RAB_INTR_REG, &intval, sizeof(intval));
+	if (status < 0)
+		return status;
+
+	return 0;
+}
+
+/* Caller must hold uc->lock */
+static int ccg_send_command(struct ucsi_ccg *uc, struct ccg_cmd *cmd)
+{
+	struct device *dev = uc->dev;
+	int ret;
+
+	switch (cmd->reg & 0xF000) {
+	case DEV_REG_IDX:
+		set_bit(DEV_CMD_PENDING, &uc->flags);
+		break;
+	default:
+		dev_err(dev, "invalid cmd register\n");
+		break;
+	}
+
+	ret = ccg_write(uc, cmd->reg, (u8 *)&cmd->data, cmd->len);
+	if (ret < 0)
+		return ret;
+
+	dev_dbg(dev, "reg=0x%04x data=0x%08x delay=%d\n",
+		cmd->reg, cmd->data, cmd->delay);
+
+	msleep(cmd->delay);
+
+	ret = ccg_read_response(uc);
+	if (ret < 0) {
+		dev_err(dev, "response read error\n");
+		switch (cmd->reg & 0xF000) {
+		case DEV_REG_IDX:
+			clear_bit(DEV_CMD_PENDING, &uc->flags);
+			break;
+		default:
+			dev_err(dev, "invalid cmd register\n");
+			break;
+		}
+		return -EIO;
+	}
+	ccg_process_response(uc);
+
+	return uc->cmd_resp;
 }
 
 static int ucsi_ccg_probe(struct i2c_client *client,
