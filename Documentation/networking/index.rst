@@ -32,6 +32,7 @@ Contents:
    alias
    bridge
    snmp_counter
+   scaling
 
 .. only::  subproject
 
