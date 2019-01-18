@@ -56,6 +56,16 @@ static struct sec_name_test tests[] = {
 		{0, BPF_CGROUP_INET_SOCK_CREATE},
 	},
 	{
+		"cgroup/sock_release4",
+		{0, BPF_PROG_TYPE_CGROUP_SOCK, BPF_CGROUP_INET4_SOCK_RELEASE},
+		{0, BPF_CGROUP_INET4_SOCK_RELEASE},
+	},
+	{
+		"cgroup/sock_release6",
+		{0, BPF_PROG_TYPE_CGROUP_SOCK, BPF_CGROUP_INET6_SOCK_RELEASE},
+		{0, BPF_CGROUP_INET6_SOCK_RELEASE},
+	},
+	{
 		"cgroup/post_bind4",
 		{0, BPF_PROG_TYPE_CGROUP_SOCK, BPF_CGROUP_INET4_POST_BIND},
 		{0, BPF_CGROUP_INET4_POST_BIND},
