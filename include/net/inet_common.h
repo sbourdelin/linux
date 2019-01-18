@@ -17,6 +17,7 @@ struct sockaddr;
 struct socket;
 
 int inet_release(struct socket *sock);
+int __inet_release(struct socket *sock);
 int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 			int addr_len, int flags);
 int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,

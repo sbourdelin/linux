@@ -464,13 +464,16 @@ int inet6_release(struct socket *sock)
 	if (!sk)
 		return -EINVAL;
 
+	if (!sk->sk_kern_sock)
+		BPF_CGROUP_RUN_PROG_INET6_SOCK_RELEASE(sock->sk);
+
 	/* Free mc lists */
 	ipv6_sock_mc_close(sk);
 
 	/* Free ac lists */
 	ipv6_sock_ac_close(sk);
 
-	return inet_release(sock);
+	return __inet_release(sock);
 }
 EXPORT_SYMBOL(inet6_release);
 

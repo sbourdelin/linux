@@ -403,7 +403,7 @@ out_rcu_unlock:
  *	function we are destroying the object and from then on nobody
  *	should refer to it.
  */
-int inet_release(struct socket *sock)
+int __inet_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 
@@ -428,6 +428,17 @@ int inet_release(struct socket *sock)
 		sk->sk_prot->close(sk, timeout);
 	}
 	return 0;
+}
+EXPORT_SYMBOL(__inet_release);
+
+int inet_release(struct socket *sock)
+{
+	struct sock *sk = sock->sk;
+
+	if (sk && !sk->sk_kern_sock)
+		BPF_CGROUP_RUN_PROG_INET4_SOCK_RELEASE(sk);
+
+	return __inet_release(sock);
 }
 EXPORT_SYMBOL(inet_release);
 
