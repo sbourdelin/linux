@@ -82,6 +82,9 @@ struct sock_addr_test {
 	} expected_result;
 };
 
+/* Per-test storage for additional cgroup storage map */
+static int cg_storage_fd;
+
 static int bind4_prog_load(const struct sock_addr_test *test);
 static int bind6_prog_load(const struct sock_addr_test *test);
 static int connect4_prog_load(const struct sock_addr_test *test);
@@ -94,6 +97,7 @@ static int sendmsg6_rw_asm_prog_load(const struct sock_addr_test *test);
 static int sendmsg6_rw_c_prog_load(const struct sock_addr_test *test);
 static int sendmsg6_rw_v4mapped_prog_load(const struct sock_addr_test *test);
 static int sendmsg6_rw_wildcard_prog_load(const struct sock_addr_test *test);
+static int release46_prog_load(const struct sock_addr_test *test);
 
 static struct sock_addr_test tests[] = {
 	/* bind */
@@ -507,6 +511,35 @@ static struct sock_addr_test tests[] = {
 		SRC6_REWRITE_IP,
 		SYSCALL_EPERM,
 	},
+	/* release */
+	{
+		"release4: make sure the hook triggers",
+		release46_prog_load,
+		BPF_CGROUP_INET4_SOCK_RELEASE,
+		BPF_CGROUP_INET4_SOCK_RELEASE,
+		AF_INET,
+		SOCK_STREAM,
+		SERV4_REWRITE_IP,
+		0,
+		SERV4_REWRITE_IP,
+		0,
+		NULL,
+		SUCCESS,
+	},
+	{
+		"release6: make sure the hook triggers",
+		release46_prog_load,
+		BPF_CGROUP_INET6_SOCK_RELEASE,
+		BPF_CGROUP_INET6_SOCK_RELEASE,
+		AF_INET6,
+		SOCK_DGRAM,
+		SERV6_REWRITE_IP,
+		0,
+		SERV6_REWRITE_IP,
+		0,
+		NULL,
+		SUCCESS,
+	},
 };
 
 static int mk_sockaddr(int domain, const char *ip, unsigned short port,
@@ -554,7 +587,15 @@ static int load_insns(const struct sock_addr_test *test,
 	int ret;
 
 	memset(&load_attr, 0, sizeof(struct bpf_load_program_attr));
-	load_attr.prog_type = BPF_PROG_TYPE_CGROUP_SOCK_ADDR;
+	switch (test->expected_attach_type) {
+	case BPF_CGROUP_INET4_SOCK_RELEASE:
+	case BPF_CGROUP_INET6_SOCK_RELEASE:
+		load_attr.prog_type = BPF_PROG_TYPE_CGROUP_SOCK;
+		break;
+	default:
+		load_attr.prog_type = BPF_PROG_TYPE_CGROUP_SOCK_ADDR;
+		break;
+	}
 	load_attr.expected_attach_type = test->expected_attach_type;
 	load_attr.insns = insns;
 	load_attr.insns_cnt = insns_cnt;
@@ -914,6 +955,35 @@ static int sendmsg6_rw_wildcard_prog_load(const struct sock_addr_test *test)
 static int sendmsg6_rw_c_prog_load(const struct sock_addr_test *test)
 {
 	return load_path(test, SENDMSG6_PROG_PATH);
+}
+
+static int release46_prog_load(const struct sock_addr_test *test)
+{
+	struct bpf_cgroup_storage_key key;
+	unsigned long long value;
+	struct bpf_insn insns[] = {
+		BPF_LD_MAP_FD(BPF_REG_1, 0), /* map fd */
+		BPF_MOV64_IMM(BPF_REG_2, 0), /* flags, not used */
+		BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+			     BPF_FUNC_get_local_storage),
+		BPF_MOV64_IMM(BPF_REG_1, 1),
+		BPF_STX_XADD(BPF_DW, BPF_REG_0, BPF_REG_1, 0),
+		BPF_LDX_MEM(BPF_W, BPF_REG_1, BPF_REG_0, 0),
+		BPF_ALU64_IMM(BPF_AND, BPF_REG_1, 0x1),
+		BPF_MOV64_REG(BPF_REG_0, BPF_REG_1),
+		BPF_EXIT_INSN(),
+	};
+
+	cg_storage_fd = bpf_create_map(BPF_MAP_TYPE_CGROUP_STORAGE, sizeof(key),
+				sizeof(value), 0, 0);
+	if (cg_storage_fd < 0) {
+		printf("Failed to create map: %s\n", strerror(errno));
+		return -1;
+	}
+
+	insns[0].imm = cg_storage_fd;
+
+	return load_insns(test, insns, sizeof(insns) / sizeof(struct bpf_insn));
 }
 
 static int cmp_addr(const struct sockaddr_storage *addr1,
@@ -1346,6 +1416,57 @@ out:
 	return err;
 }
 
+static int run_release_test_case(const struct sock_addr_test *test)
+{
+	socklen_t addr_len = sizeof(struct sockaddr_storage);
+	struct sockaddr_storage requested_addr;
+	struct sockaddr_storage expected_addr;
+	struct bpf_cgroup_storage_key key;
+	unsigned long long value;
+	int servfd = -1;
+
+	if (bpf_map_get_next_key(cg_storage_fd, NULL, &key)) {
+		printf("Failed to get the first key in cgroup storage\n");
+		return -1;
+	}
+
+	if (bpf_map_lookup_elem(cg_storage_fd, &key, &value)) {
+		printf("Failed to lookup cgroup storage 0\n");
+		return -1;
+	}
+
+	if (value != 0) {
+		printf("Unexpected data in the cgroup storage: %llu\n", value);
+		return -1;
+	}
+
+	if (init_addrs(test, &requested_addr, &expected_addr, NULL))
+		return -1;
+
+	servfd = start_server(test->type, &requested_addr, addr_len);
+	if (servfd < 0)
+		return -1;
+
+	close(servfd);
+
+	if (bpf_map_get_next_key(cg_storage_fd, NULL, &key)) {
+		printf("Failed to get the first key in cgroup storage\n");
+		return -1;
+	}
+
+	if (bpf_map_lookup_elem(cg_storage_fd, &key, &value)) {
+		printf("Failed to lookup cgroup storage 0\n");
+		return -1;
+	}
+
+	if (value != 1) {
+		printf("Unexpected data in the cgroup storage: %llu\n", value);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int run_test_case(int cgfd, const struct sock_addr_test *test)
 {
 	int progfd = -1;
@@ -1381,6 +1502,10 @@ static int run_test_case(int cgfd, const struct sock_addr_test *test)
 	case BPF_CGROUP_UDP6_SENDMSG:
 		err = run_sendmsg_test_case(test);
 		break;
+	case BPF_CGROUP_INET4_SOCK_RELEASE:
+	case BPF_CGROUP_INET6_SOCK_RELEASE:
+		err = run_release_test_case(test);
+		break;
 	default:
 		goto err;
 	}
@@ -1405,6 +1530,10 @@ out:
 	/* Detaching w/o checking return code: best effort attempt. */
 	if (progfd != -1)
 		bpf_prog_detach(cgfd, test->attach_type);
+	if (cg_storage_fd > 0) {
+		close(cg_storage_fd);
+		cg_storage_fd = 0;
+	}
 	close(progfd);
 	printf("[%s]\n", err ? "FAIL" : "PASS");
 	return err;
