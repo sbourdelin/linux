@@ -4262,7 +4262,7 @@ BPF_CALL_5(bpf_getsockopt, struct bpf_sock_ops_kern *, bpf_sock,
 
 			if (!icsk->icsk_ca_ops || optlen <= 1)
 				goto err_clear;
-			strncpy(optval, icsk->icsk_ca_ops->name, optlen);
+			strncpy(optval, icsk->icsk_ca_ops->name, optlen - 1);
 			optval[optlen - 1] = 0;
 			break;
 		case TCP_SAVED_SYN:
