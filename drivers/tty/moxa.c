@@ -42,7 +42,7 @@
 #include <linux/slab.h>
 #include <linux/ratelimit.h>
 
-#include <asm/io.h>
+#include <linux/io.h>
 #include <linux/uaccess.h>
 
 #include "moxa.h"
@@ -74,8 +74,7 @@ enum {
 	MOXA_BOARD_CP204J,
 };
 
-static char *moxa_brdname[] =
-{
+static const char * const moxa_brdname[] = {
 	"C218 Turbo PCI series",
 	"C218 Turbo ISA series",
 	"C320 Turbo PCI series",
@@ -1159,9 +1158,8 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	int port;
 
 	port = tty->index;
-	if (port == MAX_PORTS) {
+	if (port == MAX_PORTS)
 		return capable(CAP_SYS_ADMIN) ? 0 : -EPERM;
-	}
 	if (mutex_lock_interruptible(&moxa_openlock))
 		return -ERESTARTSYS;
 	brd = &moxa_boards[port / MAX_PORTS_PER_BOARD];
@@ -1357,9 +1355,9 @@ static void moxa_new_dcdstate(struct moxa_port *p, u8 dcd)
         	spin_unlock_irqrestore(&p->port.lock, flags);
 		if (!dcd)
 			tty_port_tty_hangup(&p->port, true);
-	}
-	else
+	} else {
 		spin_unlock_irqrestore(&p->port.lock, flags);
+	}
 }
 
 static int moxa_poll_port(struct moxa_port *p, unsigned int handle,
@@ -1625,10 +1623,10 @@ static void MoxaPortFlushData(struct moxa_port *port, int mode)
  *      Syntax:
  *      void MoxaPortFlushData(int port, int mode);
  *           int port           : port number (0 - 127)
- *           int mode    
- *                      0       : flush the Rx buffer 
- *                      1       : flush the Tx buffer 
- *                      2       : flush the Rx and Tx buffer 
+ *           int mode
+ *                      0       : flush the Rx buffer
+ *                      1       : flush the Tx buffer
+ *                      2       : flush the Rx and Tx buffer
  *
  *
  *      Function 20:    Write data.
