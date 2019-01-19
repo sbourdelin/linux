@@ -560,8 +560,8 @@ unsetup_vb2:
 static void csi_idmac_unsetup(struct csi_priv *priv,
 			      enum vb2_buffer_state state)
 {
-	ipu_idmac_disable_channel(priv->idmac_ch);
 	ipu_smfc_disable(priv->smfc);
+	ipu_idmac_disable_channel(priv->idmac_ch);
 
 	csi_idmac_unsetup_vb2_buf(priv, state);
 }
