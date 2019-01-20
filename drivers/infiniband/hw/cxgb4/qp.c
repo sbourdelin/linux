@@ -2598,8 +2598,6 @@ static int alloc_srq_queue(struct c4iw_srq *srq, struct c4iw_dev_ucontext *uctx,
 	wr_len = sizeof(*res_wr) + sizeof(*res);
 
 	skb = alloc_skb(wr_len, GFP_KERNEL | __GFP_NOFAIL);
-	if (!skb)
-		goto err_free_queue;
 	set_wr_txq(skb, CPL_PRIORITY_CONTROL, 0);
 
 	res_wr = (struct fw_ri_res_wr *)__skb_put(skb, wr_len);
