@@ -99,6 +99,7 @@ show up in /proc/sys/kernel:
 - unknown_nmi_panic
 - watchdog
 - watchdog_thresh
+- cgroup_default_retry
 - version
 
 ==============================================================
@@ -1135,5 +1136,14 @@ is 10 seconds.
 
 The softlockup threshold is (2 * watchdog_thresh). Setting this
 tunable to zero will disable lockup detection altogether.
+
+==============================================================
+
+cgroup_default_retry:
+
+This value can be used to control the default of memory cgroup reclaim
+times . The default value is 0 .
+
+the max value is 16 the min value is 0.
 
 ==============================================================

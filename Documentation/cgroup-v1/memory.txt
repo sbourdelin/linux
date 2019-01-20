@@ -452,11 +452,14 @@ About use_hierarchy, see Section 6.
 
 5.1 force_empty
   memory.force_empty interface is provided to make cgroup's memory usage empty.
-  When writing anything to this
+  When writing o or 1 or >18 to this
 
   # echo 0 > memory.force_empty
 
-  the cgroup will be reclaimed and as many pages reclaimed as possible.
+  the cgroup will be reclaimed and as many pages reclaimed as possible
+  synchronously.
+  writing 2 to 18 to this, the cgroup will delay the memory reclaim to css offline.
+  if memory reclaim fail one call, will delay to workqueue to recalaim as many as value.
 
   The typical use case for this interface is before calling rmdir().
   Because rmdir() moves all pages to parent, some out-of-use page caches can be

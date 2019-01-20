@@ -311,9 +311,15 @@ struct mem_cgroup {
 	struct list_head event_list;
 	spinlock_t event_list_lock;
 
+	int max_retry;
+	int current_retry;
+
 	struct mem_cgroup_per_node *nodeinfo[0];
 	/* WARNING: nodeinfo must be the last member here */
 };
+extern int sysctl_cgroup_default_retry;
+extern int sysctl_cgroup_default_retry_min;
+extern int sysctl_cgroup_default_retry_max;
 
 /*
  * size of first charge trial. "32" comes from vmscan.c's magic value.

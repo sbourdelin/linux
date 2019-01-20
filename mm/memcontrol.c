@@ -77,6 +77,10 @@
 struct cgroup_subsys memory_cgrp_subsys __read_mostly;
 EXPORT_SYMBOL(memory_cgrp_subsys);
 
+int sysctl_cgroup_default_retry __read_mostly;
+int sysctl_cgroup_default_retry_min;
+int sysctl_cgroup_default_retry_max = 16;
+
 struct mem_cgroup *root_mem_cgroup __read_mostly;
 
 #define MEM_CGROUP_RECLAIM_RETRIES	5
@@ -2911,10 +2915,21 @@ static ssize_t mem_cgroup_force_empty_write(struct kernfs_open_file *of,
 					    char *buf, size_t nbytes,
 					    loff_t off)
 {
+	unsigned long val;
+	ssize_t ret;
 	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
 
 	if (mem_cgroup_is_root(memcg))
 		return -EINVAL;
+
+	buf = strstrip(buf);
+	ret = kstrtoul(buf, 10, &val);
+	if (ret < 0)
+		return ret;
+	if (val > 1 && val < 18) {
+		memcg->max_retry = val - 1;
+		return nbytes;
+	}
 	return mem_cgroup_force_empty(memcg) ?: nbytes;
 }
 
@@ -4521,6 +4536,8 @@ mem_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 
 	if (cgroup_subsys_on_dfl(memory_cgrp_subsys) && !cgroup_memory_nosocket)
 		static_branch_inc(&memcg_sockets_enabled_key);
+	memcg->max_retry = sysctl_cgroup_default_retry;
+	memcg->current_retry  = 0;
 
 	return &memcg->css;
 fail:

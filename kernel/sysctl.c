@@ -1252,6 +1252,15 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &one,
 	},
 #endif
+	{
+		.procname       = "cgroup_default_retry",
+		.data           = &sysctl_cgroup_default_retry,
+		.maxlen         = sizeof(unsigned int),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_minmax,
+		.extra1         = &sysctl_cgroup_default_retry_min,
+		.extra2         = &sysctl_cgroup_default_retry_max,
+	},
 	{ }
 };
 
