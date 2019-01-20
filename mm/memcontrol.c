@@ -57,6 +57,7 @@
 #include <linux/sort.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/proc_fs.h>
 #include <linux/vmpressure.h>
 #include <linux/mm_inline.h>
 #include <linux/swap_cgroup.h>
@@ -6440,6 +6441,140 @@ void mem_cgroup_uncharge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages)
 	refill_stock(memcg, nr_pages);
 }
 
+#ifdef CONFIG_PROC_FS
+static void print_memcg_header(struct seq_file *m)
+{
+	seq_puts(m, "address,css_ref,mem_ref,current_retry,max_retry\n");
+}
+
+static void memcgroup_show(struct mem_cgroup *memcg,
+		struct seq_file *m, bool header)
+{
+	if (header)
+		print_memcg_header(m);
+	seq_printf(m, "%p,%lu,%lu,%d,%d\n", memcg,
+			atomic_long_read(&memcg->css.refcnt.count),
+			page_counter_read(&memcg->memory),
+			memcg->current_retry, memcg->max_retry);
+}
+
+void *fail_start(struct seq_file *m, loff_t *pos)
+{
+	mutex_lock(&offline_cgroup_mutex);
+	return seq_list_start(&empty_fail_list, *pos);
+}
+
+void *fail_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	return seq_list_next(p, &empty_fail_list, pos);
+}
+
+void fail_stop(struct seq_file *m, void *p)
+{
+	mutex_unlock(&offline_cgroup_mutex);
+}
+
+static int fail_show(struct seq_file *m, void *p)
+{
+	struct mem_cgroup *memcg = list_entry(p, struct mem_cgroup,
+			empty_fail_node);
+	if (p == empty_fail_list.next)
+		memcgroup_show(memcg, m, true);
+	else
+		memcgroup_show(memcg, m, false);
+
+	return 0;
+}
+
+static const struct seq_operations fail_list_op = {
+	.start = fail_start,
+	.next = fail_next,
+	.stop = fail_stop,
+	.show = fail_show,
+};
+
+static int fail_list_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &fail_list_op);
+}
+
+ssize_t fail_list_write(struct file *file, const char __user *buffer,
+	size_t count, loff_t *ppos)
+{
+	struct list_head *pos, *n;
+	struct mem_cgroup *memcg;
+
+	mutex_lock(&offline_cgroup_mutex);
+	list_for_each_safe(pos, n, &empty_fail_list) {
+		memcg = container_of(pos, struct mem_cgroup, empty_fail_node);
+		if (atomic_long_add_unless(&memcg->css.refcnt.count,
+					1, 0) == 0) {
+			continue;
+		} else if (!queue_work(memcg_force_empty_wq,
+					&memcg->force_empty_work)) {
+			css_put(&memcg->css);
+		}
+	}
+	mutex_unlock(&offline_cgroup_mutex);
+	return count;
+}
+
+static const struct file_operations proc_fail_list_operations = {
+	.open = fail_list_open,
+	.read = seq_read,
+	.write = fail_list_write,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+void *empty_start(struct seq_file *m, loff_t *pos)
+{
+	mutex_lock(&offline_cgroup_mutex);
+	return seq_list_start(&force_empty_list, *pos);
+}
+
+void *empty_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	return seq_list_next(p, &force_empty_list, pos);
+}
+
+void empty_stop(struct seq_file *m, void *p)
+{
+	mutex_unlock(&offline_cgroup_mutex);
+}
+
+static int empty_show(struct seq_file *m, void *p)
+{
+	struct mem_cgroup *memcg = list_entry(p,
+			struct mem_cgroup, force_empty_node);
+	if (p == force_empty_list.next)
+		memcgroup_show(memcg, m, true);
+	else
+		memcgroup_show(memcg, m, false);
+
+	return 0;
+}
+
+static const struct seq_operations empty_list_op = {
+	.start = empty_start,
+	.next = empty_next,
+	.stop = empty_stop,
+	.show = empty_show,
+};
+
+static int empty_list_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &empty_list_op);
+}
+
+static const struct file_operations proc_empty_list_operations = {
+	.open = empty_list_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+#endif
+
 static int __init cgroup_memory(char *s)
 {
 	char *token;
@@ -6482,6 +6617,11 @@ static int __init mem_cgroup_init(void)
 	BUG_ON(!memcg_force_empty_wq);
 	INIT_WORK(&timer_poll_work, trigger_force_empty);
 	timer_setup(&empty_trigger, empty_timer_trigger, 0);
+
+#ifdef CONFIG_PROC_FS
+	proc_create("cgroups_wait_empty", 0, NULL, &proc_empty_list_operations);
+	proc_create("cgroups_empty_fail", 0, NULL, &proc_fail_list_operations);
+#endif
 
 	cpuhp_setup_state_nocalls(CPUHP_MM_MEMCQ_DEAD, "mm/memctrl:dead", NULL,
 				  memcg_hotplug_cpu_dead);
