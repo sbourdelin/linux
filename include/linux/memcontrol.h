@@ -315,6 +315,10 @@ struct mem_cgroup {
 	int current_retry;
 	unsigned long timer_jiffies;
 
+	struct list_head force_empty_node;
+	struct list_head empty_fail_node;
+	struct work_struct force_empty_work;
+
 	struct mem_cgroup_per_node *nodeinfo[0];
 	/* WARNING: nodeinfo must be the last member here */
 };
