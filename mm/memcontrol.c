@@ -81,6 +81,8 @@ int sysctl_cgroup_default_retry __read_mostly;
 int sysctl_cgroup_default_retry_min;
 int sysctl_cgroup_default_retry_max = 16;
 
+struct timer_list empty_trigger;
+
 struct mem_cgroup *root_mem_cgroup __read_mostly;
 
 #define MEM_CGROUP_RECLAIM_RETRIES	5
@@ -2933,6 +2935,11 @@ static ssize_t mem_cgroup_force_empty_write(struct kernfs_open_file *of,
 	return mem_cgroup_force_empty(memcg) ?: nbytes;
 }
 
+static void add_force_empty_list(struct mem_cgroup *memcg)
+{
+
+}
+
 static u64 mem_cgroup_hierarchy_read(struct cgroup_subsys_state *css,
 				     struct cftype *cft)
 {
@@ -4566,10 +4573,25 @@ static int mem_cgroup_css_online(struct cgroup_subsys_state *css)
 	return 0;
 }
 
+void empty_timer_trigger(struct timer_list *t)
+{
+
+}
+
 static void mem_cgroup_css_offline(struct cgroup_subsys_state *css)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
 	struct mem_cgroup_event *event, *tmp;
+
+	if (memcg->max_retry != 0) {
+		memcg->current_retry = 1;
+		mem_cgroup_force_empty(memcg);
+		if (page_counter_read(&memcg->memory) &&
+				memcg->max_retry != 1) {
+			memcg->timer_jiffies = jiffies + HZ;
+			add_force_empty_list(memcg);
+		}
+	}
 
 	/*
 	 * Unregister events and notify userspace.
@@ -6368,6 +6390,7 @@ static int __init mem_cgroup_init(void)
 	memcg_kmem_cache_wq = alloc_workqueue("memcg_kmem_cache", 0, 1);
 	BUG_ON(!memcg_kmem_cache_wq);
 #endif
+	timer_setup(&empty_trigger, empty_timer_trigger, 0);
 
 	cpuhp_setup_state_nocalls(CPUHP_MM_MEMCQ_DEAD, "mm/memctrl:dead", NULL,
 				  memcg_hotplug_cpu_dead);

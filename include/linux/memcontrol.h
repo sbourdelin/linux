@@ -313,6 +313,7 @@ struct mem_cgroup {
 
 	int max_retry;
 	int current_retry;
+	unsigned long timer_jiffies;
 
 	struct mem_cgroup_per_node *nodeinfo[0];
 	/* WARNING: nodeinfo must be the last member here */
