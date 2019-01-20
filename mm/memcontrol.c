@@ -82,6 +82,7 @@ int sysctl_cgroup_default_retry_min;
 int sysctl_cgroup_default_retry_max = 16;
 
 struct timer_list empty_trigger;
+struct work_struct timer_poll_work;
 
 struct mem_cgroup *root_mem_cgroup __read_mostly;
 
@@ -320,6 +321,7 @@ DEFINE_STATIC_KEY_FALSE(memcg_kmem_enabled_key);
 EXPORT_SYMBOL(memcg_kmem_enabled_key);
 
 struct workqueue_struct *memcg_kmem_cache_wq;
+struct workqueue_struct *memcg_force_empty_wq;
 
 static int memcg_shrinker_map_size;
 static DEFINE_MUTEX(memcg_shrinker_map_mutex);
@@ -4573,9 +4575,14 @@ static int mem_cgroup_css_online(struct cgroup_subsys_state *css)
 	return 0;
 }
 
-void empty_timer_trigger(struct timer_list *t)
+static void trigger_force_empty(struct work_struct *work)
 {
 
+}
+
+static void empty_timer_trigger(struct timer_list *t)
+{
+	queue_work(memcg_force_empty_wq, &timer_poll_work);
 }
 
 static void mem_cgroup_css_offline(struct cgroup_subsys_state *css)
@@ -6390,6 +6397,9 @@ static int __init mem_cgroup_init(void)
 	memcg_kmem_cache_wq = alloc_workqueue("memcg_kmem_cache", 0, 1);
 	BUG_ON(!memcg_kmem_cache_wq);
 #endif
+	memcg_force_empty_wq = alloc_workqueue("memcg_force_empty_wq", 0, 1);
+	BUG_ON(!memcg_force_empty_wq);
+	INIT_WORK(&timer_poll_work, trigger_force_empty);
 	timer_setup(&empty_trigger, empty_timer_trigger, 0);
 
 	cpuhp_setup_state_nocalls(CPUHP_MM_MEMCQ_DEAD, "mm/memctrl:dead", NULL,
