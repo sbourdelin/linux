@@ -1,0 +1,32 @@
+Realtek bluetooth devices connected via a UART.
+These devices typically also have a wi-fi connected via sdio - the
+compatible described here is used just for referencing the bluetooth.
+
+- compatible: should be "realtek,<name>-bt"
+  except for "realtek,trl8761atv" - which only has a serial bluetooth connection
+       "realtek,rtl8723as-bt"
+       "realtek,rtl8723bs-bt"
+       "realtek,rtl8723ds-bt"
+       "realtek,rtl8761atv"
+       "realtek,rtl8821as-bt"
+       "realtek,rtl8821cs-bt"
+       "realtek,rtl8822bs-bt"
+
+Example:
+
+&uart0 {
+	status = "okay";
+	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>;
+	bluetooth {
+		compatible = "realtek,rtl8723bs-bluetooth";
+		uart_rts_gpios = <&gpio4 19 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default","rts_gpio";
+		pinctrl-0 = <&uart0_rts>;
+		pinctrl-1 = <&uart0_gpios>;
+		BT,reset_gpio    = <&gpio4 29 GPIO_ACTIVE_HIGH>;
+		BT,wake_gpio     = <&gpio4 26 GPIO_ACTIVE_HIGH>;
+		BT,wake_host_irq = <&gpio4 31 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+this ensures that the bluetooth device is tied to the correct uart
