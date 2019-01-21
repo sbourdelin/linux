@@ -1,0 +1,51 @@
+/*
+ * extcon-ptn5150.h
+ *
+ * Copyright (c) 2018-2019 by Vijai Kumar K
+ * Author: Vijai Kumar K <vijaikumar.kanagarajan@gmail.com>
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ */
+
+#ifndef __LINUX_EXTCON_PTN5150_H
+#define __LINUX_EXTCON_PTN5150_H
+
+enum ptn5150_types {
+	TYPE_PTN5150A,
+};
+
+/* PTN5150 registers */
+enum ptn5150_reg {
+	PTN5150_REG_DEVICE_ID = 0x01,
+	PTN5150_REG_CONTROL,
+	PTN5150_REG_INT_STATUS,
+	PTN5150_REG_CC_STATUS,
+	PTN5150_REG_CON_DET = 0x09,
+	PTN5150_REG_VCONN_STATUS,
+	PTN5150_REG_RESET,
+	PTN5150_REG_INT_MASK = 0x18,
+	PTN5150_REG_INT_REG_STATUS,
+	PTN5150_REG_END,
+};
+
+#define PTN5150_DFP_ATTACHED			0x1
+#define PTN5150_UFP_ATTACHED			0x2
+
+/* Define PTN5150 MASK/SHIFT constant */
+#define PTN5150_REG_DEVICE_ID_VENDOR_SHIFT	0
+#define PTN5150_REG_DEVICE_ID_VERSION_SHIFT	3
+#define PTN5150_REG_DEVICE_ID_VENDOR_MASK	(0x3 << PTN5150_REG_DEVICE_ID_VENDOR_SHIFT)
+#define PTN5150_REG_DEVICE_ID_VERSION_MASK	(0x1f << PTN5150_REG_DEVICE_ID_VERSION_SHIFT)
+
+#define PTN5150_REG_CC_PORT_ATTACHMENT_SHIFT	2
+#define PTN5150_REG_CC_PORT_ATTACHMENT_MASK	(0x7 << PTN5150_REG_CC_PORT_ATTACHMENT_SHIFT)
+#define PTN5150_REG_CC_VBUS_DETECTION_SHIFT	7
+#define PTN5150_REG_CC_VBUS_DETECTION_MASK	(0x1 << PTN5150_REG_CC_VBUS_DETECTION_SHIFT)
+#define PTN5150_REG_INT_CABLE_ATTACH_SHIFT	0
+#define PTN5150_REG_INT_CABLE_ATTACH_MASK	(0x1 << PTN5150_REG_INT_CABLE_ATTACH_SHIFT)
+#define PTN5150_REG_INT_CABLE_DETACH_SHIFT	1
+#define PTN5150_REG_INT_CABLE_DETACH_MASK	(0x1 << PTN5150_REG_CC_CABLE_DETACH_SHIFT)
+#endif /*  __LINUX_EXTCON_PTN5150_H */

@@ -1,0 +1,22 @@
+
+* PTN5150 CC logic device
+PTN5150A is a small thin low power CC Logic chip supporting the USB Type-C
+connector application with Configuration Channel (CC) control logic detection and
+indication functions. It is Interfaced to the host controller using an I2C interface.
+
+Required properties:
+- compatible: Should be "nxp,ptn5150"
+- reg: Specifies the I2C slave address of the device
+- int-gpio: GPIO to which INTB is connected
+- vbus-gpio: GPIO which controls VBUS on/off
+
+Example:
+		ptn5150@1d  {
+			compatible = "nxp,ptn5150";
+			reg = <0x1d>;
+			int-gpio = <&msmgpio 78 GPIO_ACTIVE_HIGH>;
+			vbus-gpio = <&msmgpio 148 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&ptn5150_default>;
+			status = "okay";
+		};
