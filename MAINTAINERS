@@ -15675,9 +15675,9 @@ F:	drivers/visorbus/
 F:	drivers/staging/unisys/
 
 UNIVERSAL FLASH STORAGE HOST CONTROLLER DRIVER
-M:	Vinayak Holikatti <vinholikatti@gmail.com>
+M:	Martin K. Petersen <martin.petersen@oracle.com>
 L:	linux-scsi@vger.kernel.org
-S:	Supported
+S:	Odd Fixes
 F:	Documentation/scsi/ufs.txt
 F:	drivers/scsi/ufs/
 
