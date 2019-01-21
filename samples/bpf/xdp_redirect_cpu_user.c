@@ -24,12 +24,8 @@ static const char *__doc__ =
 /* How many xdp_progs are defined in _kern.c */
 #define MAX_PROG 6
 
-/* Wanted to get rid of bpf_load.h and fake-"libbpf.h" (and instead
- * use bpf/libbpf.h), but cannot as (currently) needed for XDP
- * attaching to a device via bpf_set_link_xdp_fd()
- */
 #include <bpf/bpf.h>
-#include "bpf_load.h"
+#include "bpf/libbpf.h"
 
 #include "bpf_util.h"
 
@@ -38,6 +34,15 @@ static char ifname_buf[IF_NAMESIZE];
 static char *ifname;
 
 static __u32 xdp_flags;
+static int cpu_map_fd;
+static int rx_cnt_map_fd;
+static int redirect_err_cnt_map_fd;
+static int cpumap_enqueue_cnt_map_fd;
+static int cpumap_kthread_cnt_map_fd;
+static int cpus_available_map_fd;
+static int cpus_count_map_fd;
+static int cpus_iterator_map_fd;
+static int exception_cnt_map_fd;
 
 /* Exit return codes */
 #define EXIT_OK		0
@@ -423,20 +428,20 @@ static void stats_collect(struct stats_record *rec)
 {
 	int fd, i;
 
-	fd = map_fd[1]; /* map: rx_cnt */
+	fd = rx_cnt_map_fd;
 	map_collect_percpu(fd, 0, &rec->rx_cnt);
 
-	fd = map_fd[2]; /* map: redirect_err_cnt */
+	fd = redirect_err_cnt_map_fd;
 	map_collect_percpu(fd, 1, &rec->redir_err);
 
-	fd = map_fd[3]; /* map: cpumap_enqueue_cnt */
+	fd = cpumap_enqueue_cnt_map_fd;
 	for (i = 0; i < MAX_CPUS; i++)
 		map_collect_percpu(fd, i, &rec->enq[i]);
 
-	fd = map_fd[4]; /* map: cpumap_kthread_cnt */
+	fd = cpumap_kthread_cnt_map_fd;
 	map_collect_percpu(fd, 0, &rec->kthread);
 
-	fd = map_fd[8]; /* map: exception_cnt */
+	fd = exception_cnt_map_fd;
 	map_collect_percpu(fd, 0, &rec->exception);
 }
 
@@ -461,7 +466,7 @@ static int create_cpu_entry(__u32 cpu, __u32 queue_size,
 	/* Add a CPU entry to cpumap, as this allocate a cpu entry in
 	 * the kernel for the cpu.
 	 */
-	ret = bpf_map_update_elem(map_fd[0], &cpu, &queue_size, 0);
+	ret = bpf_map_update_elem(cpu_map_fd, &cpu, &queue_size, 0);
 	if (ret) {
 		fprintf(stderr, "Create CPU entry failed (err:%d)\n", ret);
 		exit(EXIT_FAIL_BPF);
@@ -470,23 +475,22 @@ static int create_cpu_entry(__u32 cpu, __u32 queue_size,
 	/* Inform bpf_prog's that a new CPU is available to select
 	 * from via some control maps.
 	 */
-	/* map_fd[5] = cpus_available */
-	ret = bpf_map_update_elem(map_fd[5], &avail_idx, &cpu, 0);
+	ret = bpf_map_update_elem(cpus_available_map_fd, &avail_idx, &cpu, 0);
 	if (ret) {
 		fprintf(stderr, "Add to avail CPUs failed\n");
 		exit(EXIT_FAIL_BPF);
 	}
 
 	/* When not replacing/updating existing entry, bump the count */
-	/* map_fd[6] = cpus_count */
-	ret = bpf_map_lookup_elem(map_fd[6], &key, &curr_cpus_count);
+	ret = bpf_map_lookup_elem(cpus_count_map_fd, &key, &curr_cpus_count);
 	if (ret) {
 		fprintf(stderr, "Failed reading curr cpus_count\n");
 		exit(EXIT_FAIL_BPF);
 	}
 	if (new) {
 		curr_cpus_count++;
-		ret = bpf_map_update_elem(map_fd[6], &key, &curr_cpus_count, 0);
+		ret = bpf_map_update_elem(cpus_count_map_fd, &key,
+					  &curr_cpus_count, 0);
 		if (ret) {
 			fprintf(stderr, "Failed write curr cpus_count\n");
 			exit(EXIT_FAIL_BPF);
@@ -509,8 +513,8 @@ static void mark_cpus_unavailable(void)
 	int ret, i;
 
 	for (i = 0; i < MAX_CPUS; i++) {
-		/* map_fd[5] = cpus_available */
-		ret = bpf_map_update_elem(map_fd[5], &i, &invalid_cpu, 0);
+		ret = bpf_map_update_elem(cpus_available_map_fd, &i,
+					  &invalid_cpu, 0);
 		if (ret) {
 			fprintf(stderr, "Failed marking CPU unavailable\n");
 			exit(EXIT_FAIL_BPF);
@@ -556,17 +560,50 @@ static void stats_poll(int interval, bool use_separators, int prog_num,
 	free_stats_record(prev);
 }
 
+static int init_map_fds(struct bpf_object *obj)
+{
+	cpu_map_fd = bpf_object__find_map_fd_by_name(obj, "cpu_map");
+	rx_cnt_map_fd = bpf_object__find_map_fd_by_name(obj, "rx_cnt");
+	redirect_err_cnt_map_fd =
+		bpf_object__find_map_fd_by_name(obj, "redirect_err_cnt");
+	cpumap_enqueue_cnt_map_fd =
+		bpf_object__find_map_fd_by_name(obj, "cpumap_enqueue_cnt");
+	cpumap_kthread_cnt_map_fd =
+		bpf_object__find_map_fd_by_name(obj, "cpumap_kthread_cnt");
+	cpus_available_map_fd =
+		bpf_object__find_map_fd_by_name(obj, "cpus_available");
+	cpus_count_map_fd = bpf_object__find_map_fd_by_name(obj, "cpus_count");
+	cpus_iterator_map_fd =
+		bpf_object__find_map_fd_by_name(obj, "cpus_iterator");
+	exception_cnt_map_fd =
+		bpf_object__find_map_fd_by_name(obj, "exception_cnt");
+
+	if (cpu_map_fd < 0 || rx_cnt_map_fd < 0 ||
+	    redirect_err_cnt_map_fd < 0 || cpumap_enqueue_cnt_map_fd < 0 ||
+	    cpumap_kthread_cnt_map_fd < 0 || cpus_available_map_fd < 0 ||
+	    cpus_count_map_fd < 0 || cpus_iterator_map_fd < 0 ||
+	    exception_cnt_map_fd < 0)
+		return -ENOENT;
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	struct rlimit r = {10 * 1024 * 1024, RLIM_INFINITY};
+	struct bpf_prog_load_attr prog_load_attr = {
+		.prog_type	= BPF_PROG_TYPE_UNSPEC,
+	};
 	bool use_separators = true;
 	bool stress_mode = false;
+	struct bpf_object *obj;
 	char filename[256];
 	int added_cpus = 0;
 	int longindex = 0;
 	int interval = 2;
 	int prog_num = 5;
 	int add_cpu = -1;
+	int prog_fd;
 	__u32 qsize;
 	int opt;
 
@@ -579,22 +616,25 @@ int main(int argc, char **argv)
 	qsize = 128+64;
 
 	snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
+	prog_load_attr.file = filename;
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
 		perror("setrlimit(RLIMIT_MEMLOCK)");
 		return 1;
 	}
 
-	if (load_bpf_file(filename)) {
-		fprintf(stderr, "ERR in load_bpf_file(): %s", bpf_log_buf);
+	if (bpf_prog_load_xattr(&prog_load_attr, &obj, &prog_fd))
+		return EXIT_FAIL;
+
+	if (prog_fd < 0) {
+		fprintf(stderr, "ERR: bpf_prog_load_xattr: %s\n",
+			strerror(errno));
 		return EXIT_FAIL;
 	}
-
-	if (!prog_fd[0]) {
-		fprintf(stderr, "ERR: load_bpf_file: %s\n", strerror(errno));
+	if (init_map_fds(obj) < 0) {
+		fprintf(stderr, "bpf_object__find_map_fd_by_name failed\n");
 		return EXIT_FAIL;
 	}
-
 	mark_cpus_unavailable();
 
 	/* Parse commands line args */
@@ -678,7 +718,13 @@ int main(int argc, char **argv)
 	signal(SIGINT, int_exit);
 	signal(SIGTERM, int_exit);
 
-	if (bpf_set_link_xdp_fd(ifindex, prog_fd[prog_num], xdp_flags) < 0) {
+	prog_fd = bpf_object__get_prog_fd_by_num(obj, prog_num);
+	if (prog_fd < 0) {
+		fprintf(stderr, "bpf_object__get_prog_fd_by_num failed\n");
+		return EXIT_FAIL;
+	}
+
+	if (bpf_set_link_xdp_fd(ifindex, prog_fd, xdp_flags) < 0) {
 		fprintf(stderr, "link set xdp fd failed\n");
 		return EXIT_FAIL_XDP;
 	}
