@@ -370,7 +370,6 @@ static int scif_create_remote_lookup(struct scif_dev *remote_dev,
 {
 	int i, j, err = 0;
 	int nr_pages = window->nr_pages;
-	bool vmalloc_dma_phys, vmalloc_num_pages;
 
 	might_sleep();
 	/* Map window */
@@ -403,23 +402,14 @@ static int scif_create_remote_lookup(struct scif_dev *remote_dev,
 		goto error_window;
 	}
 
-	vmalloc_dma_phys = is_vmalloc_addr(&window->dma_addr[0]);
-	vmalloc_num_pages = is_vmalloc_addr(&window->num_pages[0]);
-
 	/* Now map each of the pages containing physical addresses */
 	for (i = 0, j = 0; i < nr_pages; i += SCIF_NR_ADDR_IN_PAGE, j++) {
 		err = scif_map_page(&window->dma_addr_lookup.lookup[j],
-				    vmalloc_dma_phys ?
-				    vmalloc_to_page(&window->dma_addr[i]) :
-				    virt_to_page(&window->dma_addr[i]),
-				    remote_dev);
+				kv_to_page(&window->dma_addr[i]), remote_dev);
 		if (err)
 			goto error_window;
 		err = scif_map_page(&window->num_pages_lookup.lookup[j],
-				    vmalloc_num_pages ?
-				    vmalloc_to_page(&window->num_pages[i]) :
-				    virt_to_page(&window->num_pages[i]),
-				    remote_dev);
+				kv_to_page(&window->num_pages[i]), remote_dev);
 		if (err)
 			goto error_window;
 	}
@@ -1327,7 +1317,6 @@ int __scif_pin_pages(void *addr, size_t len, int *out_prot,
 {
 	struct scif_pinned_pages *pinned_pages;
 	int nr_pages, err = 0, i;
-	bool vmalloc_addr = false;
 	bool try_upgrade = false;
 	int prot = *out_prot;
 	int ulimit = 0;
@@ -1358,16 +1347,9 @@ int __scif_pin_pages(void *addr, size_t len, int *out_prot,
 		return -ENOMEM;
 
 	if (map_flags & SCIF_MAP_KERNEL) {
-		if (is_vmalloc_addr(addr))
-			vmalloc_addr = true;
-
 		for (i = 0; i < nr_pages; i++) {
-			if (vmalloc_addr)
-				pinned_pages->pages[i] =
-					vmalloc_to_page(addr + (i * PAGE_SIZE));
-			else
-				pinned_pages->pages[i] =
-					virt_to_page(addr + (i * PAGE_SIZE));
+			pinned_pages->pages[i] =
+				kv_to_page(addr + (i * PAGE_SIZE));
 		}
 		pinned_pages->nr_pages = nr_pages;
 		pinned_pages->map_flags = SCIF_MAP_KERNEL;

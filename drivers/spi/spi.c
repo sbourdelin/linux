@@ -833,10 +833,7 @@ int spi_map_buf(struct spi_controller *ctlr, struct device *dev,
 			min = min_t(size_t, desc_len,
 				    min_t(size_t, len,
 					  PAGE_SIZE - offset_in_page(buf)));
-			if (vmalloced_buf)
-				vm_page = vmalloc_to_page(buf);
-			else
-				vm_page = kmap_to_page(buf);
+			vm_page = kv_to_page(buf);
 			if (!vm_page) {
 				sg_free_table(sgt);
 				return -ENOMEM;

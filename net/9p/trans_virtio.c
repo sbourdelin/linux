@@ -377,10 +377,7 @@ static int p9_get_mapped_pages(struct virtio_chan *chan,
 		*need_drop = 0;
 		p -= (*offs = offset_in_page(p));
 		for (index = 0; index < nr_pages; index++) {
-			if (is_vmalloc_addr(p))
-				(*pages)[index] = vmalloc_to_page(p);
-			else
-				(*pages)[index] = kmap_to_page(p);
+			(*pages)[index] = kv_to_page(p);
 			p += PAGE_SIZE;
 		}
 		return len;

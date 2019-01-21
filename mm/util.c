@@ -446,6 +446,18 @@ void kvfree(const void *addr)
 }
 EXPORT_SYMBOL(kvfree);
 
+/**
+ * kv_to_page() - Return the struct page for a virtual address
+ * @addr: Virtual address
+ */
+struct page *kv_to_page(const void *addr)
+{
+	if (is_vmalloc_addr(addr))
+		return vmalloc_to_page(addr);
+	return kmap_to_page((void *)addr);
+}
+EXPORT_SYMBOL(kv_to_page);
+
 static inline void *__page_rmapping(struct page *page)
 {
 	unsigned long mapping;

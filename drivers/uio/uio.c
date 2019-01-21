@@ -692,10 +692,7 @@ static vm_fault_t uio_vma_fault(struct vm_fault *vmf)
 	offset = (vmf->pgoff - mi) << PAGE_SHIFT;
 
 	addr = (void *)(unsigned long)idev->info->mem[mi].addr + offset;
-	if (idev->info->mem[mi].memtype == UIO_MEM_LOGICAL)
-		page = virt_to_page(addr);
-	else
-		page = vmalloc_to_page(addr);
+	page = kv_to_page(addr);
 	get_page(page);
 	vmf->page = page;
 

@@ -308,10 +308,7 @@ static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
 	vaddr = dma_alloc_attrs(pool->dev, pool->size, &d_page->dma,
 				pool->gfp_flags, attrs);
 	if (vaddr) {
-		if (is_vmalloc_addr(vaddr))
-			d_page->p = vmalloc_to_page(vaddr);
-		else
-			d_page->p = virt_to_page(vaddr);
+		d_page->p = kv_to_page(vaddr);
 		d_page->vaddr = (unsigned long)vaddr;
 		if (pool->type & IS_HUGE)
 			d_page->vaddr |= VADDR_FLAG_HUGE_POOL;

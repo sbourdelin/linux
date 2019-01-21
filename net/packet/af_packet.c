@@ -359,13 +359,6 @@ static void unregister_prot_hook(struct sock *sk, bool sync)
 		__unregister_prot_hook(sk, sync);
 }
 
-static inline struct page * __pure pgv_to_page(void *addr)
-{
-	if (is_vmalloc_addr(addr))
-		return vmalloc_to_page(addr);
-	return virt_to_page(addr);
-}
-
 static void __packet_set_status(struct packet_sock *po, void *frame, int status)
 {
 	union tpacket_uhdr h;
@@ -374,15 +367,15 @@ static void __packet_set_status(struct packet_sock *po, void *frame, int status)
 	switch (po->tp_version) {
 	case TPACKET_V1:
 		h.h1->tp_status = status;
-		flush_dcache_page(pgv_to_page(&h.h1->tp_status));
+		flush_dcache_page(kv_to_page(&h.h1->tp_status));
 		break;
 	case TPACKET_V2:
 		h.h2->tp_status = status;
-		flush_dcache_page(pgv_to_page(&h.h2->tp_status));
+		flush_dcache_page(kv_to_page(&h.h2->tp_status));
 		break;
 	case TPACKET_V3:
 		h.h3->tp_status = status;
-		flush_dcache_page(pgv_to_page(&h.h3->tp_status));
+		flush_dcache_page(kv_to_page(&h.h3->tp_status));
 		break;
 	default:
 		WARN(1, "TPACKET version not supported.\n");
@@ -401,13 +394,13 @@ static int __packet_get_status(struct packet_sock *po, void *frame)
 	h.raw = frame;
 	switch (po->tp_version) {
 	case TPACKET_V1:
-		flush_dcache_page(pgv_to_page(&h.h1->tp_status));
+		flush_dcache_page(kv_to_page(&h.h1->tp_status));
 		return h.h1->tp_status;
 	case TPACKET_V2:
-		flush_dcache_page(pgv_to_page(&h.h2->tp_status));
+		flush_dcache_page(kv_to_page(&h.h2->tp_status));
 		return h.h2->tp_status;
 	case TPACKET_V3:
-		flush_dcache_page(pgv_to_page(&h.h3->tp_status));
+		flush_dcache_page(kv_to_page(&h.h3->tp_status));
 		return h.h3->tp_status;
 	default:
 		WARN(1, "TPACKET version not supported.\n");
@@ -462,7 +455,7 @@ static __u32 __packet_set_timestamp(struct packet_sock *po, void *frame,
 	}
 
 	/* one flush is safe, as both fields always lie on the same cacheline */
-	flush_dcache_page(pgv_to_page(&h.h1->tp_sec));
+	flush_dcache_page(kv_to_page(&h.h1->tp_sec));
 	smp_wmb();
 
 	return ts_status;
@@ -728,7 +721,7 @@ static void prb_flush_block(struct tpacket_kbdq_core *pkc1,
 
 	end = (u8 *)PAGE_ALIGN((unsigned long)pkc1->pkblk_end);
 	for (; start < end; start += PAGE_SIZE)
-		flush_dcache_page(pgv_to_page(start));
+		flush_dcache_page(kv_to_page(start));
 
 	smp_wmb();
 #endif
@@ -741,7 +734,7 @@ static void prb_flush_block(struct tpacket_kbdq_core *pkc1,
 
 #if ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE == 1
 	start = (u8 *)pbd1;
-	flush_dcache_page(pgv_to_page(start));
+	flush_dcache_page(kv_to_page(start));
 
 	smp_wmb();
 #endif
@@ -2352,7 +2345,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 					macoff + snaplen);
 
 		for (start = h.raw; start < end; start += PAGE_SIZE)
-			flush_dcache_page(pgv_to_page(start));
+			flush_dcache_page(kv_to_page(start));
 	}
 	smp_wmb();
 #endif
@@ -2508,7 +2501,7 @@ static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
 			return -EFAULT;
 		}
 
-		page = pgv_to_page(data);
+		page = kv_to_page(data);
 		data += len;
 		flush_dcache_page(page);
 		get_page(page);
@@ -4427,7 +4420,7 @@ static int packet_mmap(struct file *file, struct socket *sock,
 			int pg_num;
 
 			for (pg_num = 0; pg_num < rb->pg_vec_pages; pg_num++) {
-				page = pgv_to_page(kaddr);
+				page = kv_to_page(kaddr);
 				err = vm_insert_page(vma, start, page);
 				if (unlikely(err))
 					goto out;

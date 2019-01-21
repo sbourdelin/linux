@@ -275,10 +275,7 @@ static int fpga_mgr_buf_load(struct fpga_manager *mgr,
 
 	p = buf - offset_in_page(buf);
 	for (index = 0; index < nr_pages; index++) {
-		if (is_vmalloc_addr(p))
-			pages[index] = vmalloc_to_page(p);
-		else
-			pages[index] = kmap_to_page((void *)p);
+		pages[index] = kv_to_page(p);
 		if (!pages[index]) {
 			kfree(pages);
 			return -EFAULT;

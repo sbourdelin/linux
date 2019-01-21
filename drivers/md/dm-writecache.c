@@ -318,19 +318,6 @@ static void persistent_memory_release(struct dm_writecache *wc)
 		vunmap(wc->memory_map - ((size_t)wc->start_sector << SECTOR_SHIFT));
 }
 
-static struct page *persistent_memory_page(void *addr)
-{
-	if (is_vmalloc_addr(addr))
-		return vmalloc_to_page(addr);
-	else
-		return virt_to_page(addr);
-}
-
-static unsigned persistent_memory_page_offset(void *addr)
-{
-	return (unsigned long)addr & (PAGE_SIZE - 1);
-}
-
 static void persistent_memory_flush_cache(void *ptr, size_t size)
 {
 	if (is_vmalloc_addr(ptr))
@@ -1439,8 +1426,8 @@ static bool wc_add_block(struct writeback_struct *wb, struct wc_entry *e, gfp_t 
 	void *address = memory_data(wc, e);
 
 	persistent_memory_flush_cache(address, block_size);
-	return bio_add_page(&wb->bio, persistent_memory_page(address),
-			    block_size, persistent_memory_page_offset(address)) != 0;
+	return bio_add_page(&wb->bio, kv_to_page(address), block_size,
+			offset_in_page(address)) != 0;
 }
 
 struct writeback_list {

@@ -244,10 +244,7 @@ void bch_bio_map(struct bio *bio, void *base)
 start:		bv->bv_len	= min_t(size_t, PAGE_SIZE - bv->bv_offset,
 					size);
 		if (base) {
-			bv->bv_page = is_vmalloc_addr(base)
-				? vmalloc_to_page(base)
-				: virt_to_page(base);
-
+			bv->bv_page = kv_to_page(base);
 			base += bv->bv_len;
 		}
 

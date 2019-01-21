@@ -687,6 +687,8 @@ static inline struct page *virt_to_head_page(const void *x)
 	return compound_head(page);
 }
 
+struct page *kv_to_page(const void *addr);
+
 void __put_page(struct page *page);
 
 void put_pages_list(struct list_head *pages);

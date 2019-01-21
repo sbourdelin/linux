@@ -191,11 +191,7 @@ static int setup_sgtable(struct sg_table *sgt, struct scatterlist *prealloc_sg,
 		struct page *page;
 		unsigned int len = min(chunk_len - off, buf_len);
 
-		if (is_vmalloc)
-			page = vmalloc_to_page(buf);
-		else
-			page = virt_to_page(buf);
-
+		page = kv_to_page(buf);
 		sg_set_page(sg, page, len, off);
 
 		off = 0;

@@ -326,8 +326,6 @@ static void hgcm_call_init_linaddr(struct vmmdev_hgcm_call *call,
 	enum vmmdev_hgcm_function_parameter_type type, u32 *off_extra)
 {
 	struct vmmdev_hgcm_pagelist *dst_pg_lst;
-	struct page *page;
-	bool is_vmalloc;
 	u32 i, page_count;
 
 	dst_parm->type = type;
@@ -340,7 +338,6 @@ static void hgcm_call_init_linaddr(struct vmmdev_hgcm_call *call,
 
 	dst_pg_lst = (void *)call + *off_extra;
 	page_count = hgcm_call_buf_size_in_pages(buf, len);
-	is_vmalloc = is_vmalloc_addr(buf);
 
 	dst_parm->type = VMMDEV_HGCM_PARM_TYPE_PAGELIST;
 	dst_parm->u.page_list.size = len;
@@ -350,12 +347,7 @@ static void hgcm_call_init_linaddr(struct vmmdev_hgcm_call *call,
 	dst_pg_lst->page_count = page_count;
 
 	for (i = 0; i < page_count; i++) {
-		if (is_vmalloc)
-			page = vmalloc_to_page(buf);
-		else
-			page = virt_to_page(buf);
-
-		dst_pg_lst->pages[i] = page_to_phys(page);
+		dst_pg_lst->pages[i] = page_to_phys(kv_to_page(buf));
 		buf += PAGE_SIZE;
 	}
 
