@@ -688,7 +688,7 @@ reset_request(struct intel_engine_cs *engine,
 	if (i915_request_completed(rq)) {
 		GEM_TRACE("%s pardoned global=%d (fence %llx:%lld), current %d\n",
 			  engine->name, rq->global_seqno,
-			  rq->fence.context, rq->fence.seqno,
+			  (u64)rq->fence.context, (u64)rq->fence.seqno,
 			  intel_engine_get_seqno(engine));
 		stalled = false;
 	}
@@ -803,7 +803,7 @@ static void nop_submit_request(struct i915_request *request)
 
 	GEM_TRACE("%s fence %llx:%lld -> -EIO\n",
 		  request->engine->name,
-		  request->fence.context, request->fence.seqno);
+		  (u64)request->fence.context, (u64)request->fence.seqno);
 	dma_fence_set_error(&request->fence, -EIO);
 
 	spin_lock_irqsave(&request->engine->timeline.lock, flags);
