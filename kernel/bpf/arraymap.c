@@ -23,6 +23,8 @@
 
 #define ARRAY_CREATE_FLAG_MASK \
 	(BPF_F_NUMA_NODE | BPF_F_RDONLY | BPF_F_WRONLY)
+#define FD_ARRAY_CREATE_FLAG_MASK \
+	(ARRAY_CREATE_FLAG_MASK | BPF_F_FD_MAP_NO_UREF_FLUSH)
 
 static void bpf_array_free_percpu(struct bpf_array *array)
 {
@@ -54,7 +56,7 @@ static int bpf_array_alloc_percpu(struct bpf_array *array)
 }
 
 /* Called from syscall */
-int array_map_alloc_check(union bpf_attr *attr)
+static int __array_map_alloc_check(union bpf_attr *attr, u32 allowed_flags)
 {
 	bool percpu = attr->map_type == BPF_MAP_TYPE_PERCPU_ARRAY;
 	int numa_node = bpf_map_attr_numa_node(attr);
@@ -62,7 +64,7 @@ int array_map_alloc_check(union bpf_attr *attr)
 	/* check sanity of attributes */
 	if (attr->max_entries == 0 || attr->key_size != 4 ||
 	    attr->value_size == 0 ||
-	    attr->map_flags & ~ARRAY_CREATE_FLAG_MASK ||
+	    attr->map_flags & ~allowed_flags ||
 	    (percpu && numa_node != NUMA_NO_NODE))
 		return -EINVAL;
 
@@ -73,6 +75,11 @@ int array_map_alloc_check(union bpf_attr *attr)
 		return -E2BIG;
 
 	return 0;
+}
+
+int array_map_alloc_check(union bpf_attr *attr)
+{
+	return __array_map_alloc_check(attr, ARRAY_CREATE_FLAG_MASK);
 }
 
 static struct bpf_map *array_map_alloc(union bpf_attr *attr)
@@ -431,7 +438,7 @@ static int fd_array_map_alloc_check(union bpf_attr *attr)
 	/* only file descriptors can be stored in this type of map */
 	if (attr->value_size != sizeof(u32))
 		return -EINVAL;
-	return array_map_alloc_check(attr);
+	return __array_map_alloc_check(attr, FD_ARRAY_CREATE_FLAG_MASK);
 }
 
 static void fd_array_map_free(struct bpf_map *map)

@@ -291,6 +291,9 @@ enum bpf_attach_type {
 /* Zero-initialize hash function seed. This should only be used for testing. */
 #define BPF_F_ZERO_SEED		(1U << 6)
 
+/* Don't flush fd map when last reference is gone */
+#define BPF_F_FD_MAP_NO_UREF_FLUSH	(1U << 7)
+
 /* flags for BPF_PROG_QUERY */
 #define BPF_F_QUERY_EFFECTIVE	(1U << 0)
 

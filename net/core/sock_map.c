@@ -19,7 +19,8 @@ struct bpf_stab {
 };
 
 #define SOCK_CREATE_FLAG_MASK				\
-	(BPF_F_NUMA_NODE | BPF_F_RDONLY | BPF_F_WRONLY)
+	(BPF_F_NUMA_NODE | BPF_F_RDONLY | BPF_F_WRONLY | \
+	 BPF_F_FD_MAP_NO_UREF_FLUSH)
 
 static struct bpf_map *sock_map_alloc(union bpf_attr *attr)
 {

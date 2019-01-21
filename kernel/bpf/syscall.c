@@ -123,6 +123,12 @@ static struct bpf_map *find_and_alloc_map(union bpf_attr *attr)
 		err = ops->map_alloc_check(attr);
 		if (err)
 			return ERR_PTR(err);
+		/* Unprivileged users can't GET_FD_BY_ID so they always
+		 * need the flush protection.
+		 */
+		if ((attr->map_flags & BPF_F_FD_MAP_NO_UREF_FLUSH) &&
+		    !capable(CAP_SYS_ADMIN))
+			return ERR_PTR(-EPERM);
 	}
 	if (attr->map_ifindex)
 		ops = &bpf_map_offload_ops;
@@ -293,7 +299,8 @@ static void bpf_map_free_deferred(struct work_struct *work)
 static void bpf_map_put_uref(struct bpf_map *map)
 {
 	if (atomic_dec_and_test(&map->usercnt)) {
-		if (map->ops->map_release_uref)
+		if (map->ops->map_release_uref &&
+		    !(map->map_flags & BPF_F_FD_MAP_NO_UREF_FLUSH))
 			map->ops->map_release_uref(map);
 	}
 }
