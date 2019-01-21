@@ -11,7 +11,7 @@
 
 #ifdef CONFIG_ENERGY_MODEL
 /**
- * em_cap_state - Capacity state of a performance domain
+ * struct em_cap_state - Capacity state of a performance domain
  * @frequency:	The CPU frequency in KHz, for consistency with CPUFreq
  * @power:	The power consumed by 1 CPU at this level, in milli-watts
  * @cost:	The cost coefficient associated with this level, used during
@@ -24,7 +24,7 @@ struct em_cap_state {
 };
 
 /**
- * em_perf_domain - Performance domain
+ * struct em_perf_domain - Performance domain
  * @table:		List of capacity states, in ascending order
  * @nr_cap_states:	Number of capacity states
  * @cpus:		Cpumask covering the CPUs of the domain

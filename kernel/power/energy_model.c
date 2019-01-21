@@ -137,7 +137,7 @@ EXPORT_SYMBOL_GPL(em_cpu_get);
  * If multiple clients register the same performance domain, all but the first
  * registration will be ignored.
  *
- * Return 0 on success
+ * Return: 0 on success
  */
 int em_register_perf_domain(cpumask_t *span, unsigned int nr_states,
 						struct em_data_callback *cb)
