@@ -335,6 +335,7 @@ static void cp_unpin_free(struct channel_program *cp)
 	struct ccwchain *chain, *temp;
 	int i;
 
+	cp->initialized = false;
 	list_for_each_entry_safe(chain, temp, &cp->ccwchain_list, next) {
 		for (i = 0; i < chain->ch_len; i++) {
 			pfn_array_table_unpin_free(chain->ch_pat + i,
@@ -700,6 +701,8 @@ int cp_init(struct channel_program *cp, struct device *mdev, union orb *orb)
 	 * ccwchain_calc_length returns an error.
 	 */
 	cp->orb.cmd.c64 = 1;
+
+	cp->initialized = true;
 
 	return ret;
 }
