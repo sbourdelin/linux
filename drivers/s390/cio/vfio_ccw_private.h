@@ -31,9 +31,9 @@ struct vfio_ccw_private;
 struct vfio_ccw_region;
 
 struct vfio_ccw_regops {
-	size_t	(*read)(struct vfio_ccw_private *private, char __user *buf,
+	ssize_t	(*read)(struct vfio_ccw_private *private, char __user *buf,
 			size_t count, loff_t *ppos);
-	size_t	(*write)(struct vfio_ccw_private *private,
+	ssize_t	(*write)(struct vfio_ccw_private *private,
 			 const char __user *buf, size_t count, loff_t *ppos);
 	void	(*release)(struct vfio_ccw_private *private,
 			   struct vfio_ccw_region *region);
@@ -53,6 +53,8 @@ int vfio_ccw_register_dev_region(struct vfio_ccw_private *private,
 				 const struct vfio_ccw_regops *ops,
 				 size_t size, u32 flags, void *data);
 
+int vfio_ccw_register_async_dev_regions(struct vfio_ccw_private *private);
+
 /**
  * struct vfio_ccw_private
  * @sch: pointer to the subchannel
@@ -64,6 +66,7 @@ int vfio_ccw_register_dev_region(struct vfio_ccw_private *private,
  * @io_region: MMIO region to input/output I/O arguments/results
  * @io_mutex: protect against concurrent update of I/O structures
  * @region: additional regions for other subchannel operations
+ * @cmd_region: MMIO region for asynchronous I/O commands other than START
  * @num_regions: number of additional regions
  * @cp: channel program for the current I/O operation
  * @irb: irb info received from interrupt
@@ -81,6 +84,7 @@ struct vfio_ccw_private {
 	struct ccw_io_region	*io_region;
 	struct mutex		io_mutex;
 	struct vfio_ccw_region *region;
+	struct ccw_cmd_region	*cmd_region;
 	int num_regions;
 
 	struct channel_program	cp;
@@ -115,6 +119,7 @@ enum vfio_ccw_event {
 	VFIO_CCW_EVENT_NOT_OPER,
 	VFIO_CCW_EVENT_IO_REQ,
 	VFIO_CCW_EVENT_INTERRUPT,
+	VFIO_CCW_EVENT_ASYNC_REQ,
 	/* last element! */
 	NR_VFIO_CCW_EVENTS
 };
