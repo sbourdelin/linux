@@ -2840,6 +2840,18 @@ bpf_object__find_map_by_name(struct bpf_object *obj, const char *name)
 	return NULL;
 }
 
+int
+bpf_object__find_map_fd_by_name(struct bpf_object *obj, const char *name)
+{
+	struct bpf_map *pos;
+
+	bpf_map__for_each(pos, obj) {
+		if (pos->name && !strcmp(pos->name, name))
+			return bpf_map__fd(pos);
+	}
+	return -ENOENT;
+}
+
 struct bpf_map *
 bpf_object__find_map_by_offset(struct bpf_object *obj, size_t offset)
 {

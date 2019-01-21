@@ -124,3 +124,7 @@ LIBBPF_0.0.1 {
 	local:
 		*;
 };
+LIBBPF_0.0.2 {
+	global:
+		bpf_object__find_map_fd_by_name;
+} LIBBPF_0.0.1;
