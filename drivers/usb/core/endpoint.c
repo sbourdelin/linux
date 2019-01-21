@@ -182,6 +182,7 @@ int usb_create_ep_devs(struct device *parent,
 
 	ep_dev = kzalloc(sizeof(*ep_dev), GFP_KERNEL);
 	if (!ep_dev) {
+		dev_err(parent, "endpoint device alloc failed\n");
 		retval = -ENOMEM;
 		goto exit;
 	}
@@ -194,8 +195,10 @@ int usb_create_ep_devs(struct device *parent,
 	dev_set_name(&ep_dev->dev, "ep_%02x", endpoint->desc.bEndpointAddress);
 
 	retval = device_register(&ep_dev->dev);
-	if (retval)
+	if (retval) {
+		dev_err(parent, "endpoint device register failed\n");
 		goto error_register;
+	}
 
 	device_enable_async_suspend(&ep_dev->dev);
 	endpoint->ep_dev = ep_dev;
