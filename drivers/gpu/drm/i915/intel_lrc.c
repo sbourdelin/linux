@@ -190,6 +190,30 @@ static inline bool need_preempt(const struct intel_engine_cs *engine,
 		!i915_request_completed(last));
 }
 
+static inline bool check_preempt(const struct intel_engine_cs *engine,
+				 const struct i915_request *rq)
+{
+	const struct intel_context *ctx = rq->hw_context;
+	const int prio = rq_prio(rq);
+	struct rb_node *rb;
+	int idx;
+
+	list_for_each_entry_continue(rq, &engine->timeline.requests, link) {
+		GEM_BUG_ON(rq->hw_context == ctx);
+		if (rq_prio(rq) > prio)
+			return true;
+	}
+
+	rb = rb_first_cached(&engine->execlists.queue);
+	if (!rb)
+		return false;
+
+	priolist_for_each_request(rq, to_priolist(rb), idx)
+		return rq->hw_context != ctx && rq_prio(rq) > prio;
+
+	return false;
+}
+
 /*
  * The context descriptor encodes various attributes of a context,
  * including its GTT address and some flags. Because it's fairly
@@ -580,7 +604,8 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 		if (!execlists_is_active(execlists, EXECLISTS_ACTIVE_HWACK))
 			return;
 
-		if (need_preempt(engine, last, execlists->queue_priority)) {
+		if (need_preempt(engine, last, execlists->queue_priority) &&
+		    check_preempt(engine, last)) {
 			inject_preempt_context(engine);
 			return;
 		}
@@ -871,6 +896,8 @@ static void process_csb(struct intel_engine_cs *engine)
 	struct execlist_port *port = execlists->port;
 	const u32 * const buf = execlists->csb_status;
 	u8 head, tail;
+
+	lockdep_assert_held(&engine->timeline.lock);
 
 	/*
 	 * Note that csb_write, csb_status may be either in HWSP or mmio.
