@@ -212,6 +212,9 @@ static void bpf_fill_rand_ld_dw(struct bpf_test *self)
 	BPF_EMIT_CALL(BPF_FUNC_sk_lookup_tcp)
 
 static struct bpf_test tests[] = {
+#define FILL_ARRAY
+#include <verifier/tests.h>
+#undef FILL_ARRAY
 	{
 		"add+sub+mul",
 		.insns = {
