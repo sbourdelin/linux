@@ -309,6 +309,7 @@ struct nilfs_dir_entry {
 /*
  * NILFS directory file types.  Only the low 3 bits are used.  The
  * other bits are reserved for now.
+ * Values must match common file type values in fs_types.h.
  */
 enum {
 	NILFS_FT_UNKNOWN,
