@@ -1321,11 +1321,14 @@ retry:
 
 		obj = drm_mode_object_find(dev, file_priv, obj_id, DRM_MODE_OBJECT_ANY);
 		if (!obj) {
+			DRM_DEBUG_ATOMIC("Unknown object ID %d\n", obj_id);
 			ret = -ENOENT;
 			goto out;
 		}
 
 		if (!obj->properties) {
+			DRM_DEBUG_ATOMIC("Object ID %d has no properties\n",
+					 obj_id);
 			drm_mode_object_put(obj);
 			ret = -ENOENT;
 			goto out;
@@ -1352,6 +1355,8 @@ retry:
 
 			prop = drm_mode_obj_find_prop_id(obj, prop_id);
 			if (!prop) {
+				DRM_DEBUG_ATOMIC("Unknown property ID %d\n",
+						 prop_id);
 				drm_mode_object_put(obj);
 				ret = -ENOENT;
 				goto out;

@@ -410,8 +410,10 @@ int drm_mode_getcrtc(struct drm_device *dev,
 		return -EOPNOTSUPP;
 
 	crtc = drm_crtc_find(dev, file_priv, crtc_resp->crtc_id);
-	if (!crtc)
+	if (!crtc) {
+		DRM_DEBUG_KMS("Unknown CRTC ID %d\n", crtc_resp->crtc_id);
 		return -ENOENT;
+	}
 
 	plane = crtc->primary;
 
@@ -627,8 +629,8 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 		} else {
 			fb = drm_framebuffer_lookup(dev, file_priv, crtc_req->fb_id);
 			if (!fb) {
-				DRM_DEBUG_KMS("Unknown FB ID%d\n",
-						crtc_req->fb_id);
+				DRM_DEBUG_KMS("Unknown FB ID %d\n",
+					      crtc_req->fb_id);
 				ret = -ENOENT;
 				goto out;
 			}
@@ -723,8 +725,8 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 
 			connector = drm_connector_lookup(dev, file_priv, out_id);
 			if (!connector) {
-				DRM_DEBUG_KMS("Connector id %d unknown\n",
-						out_id);
+				DRM_DEBUG_KMS("Unknown connector ID %d\n",
+					      out_id);
 				ret = -ENOENT;
 				goto out;
 			}

@@ -245,8 +245,10 @@ int drm_mode_gamma_set_ioctl(struct drm_device *dev,
 		return -EOPNOTSUPP;
 
 	crtc = drm_crtc_find(dev, file_priv, crtc_lut->crtc_id);
-	if (!crtc)
+	if (!crtc) {
+		DRM_DEBUG_KMS("Unknown CRTC ID %d\n", crtc_lut->crtc_id);
 		return -ENOENT;
+	}
 
 	if (crtc->funcs->gamma_set == NULL)
 		return -ENOSYS;
@@ -313,8 +315,10 @@ int drm_mode_gamma_get_ioctl(struct drm_device *dev,
 		return -EOPNOTSUPP;
 
 	crtc = drm_crtc_find(dev, file_priv, crtc_lut->crtc_id);
-	if (!crtc)
+	if (!crtc) {
+		DRM_DEBUG_KMS("Unknown CRTC ID %d\n", crtc_lut->crtc_id);
 		return -ENOENT;
+	}
 
 	/* memcpy into gamma store */
 	if (crtc_lut->gamma_size != crtc->gamma_size)

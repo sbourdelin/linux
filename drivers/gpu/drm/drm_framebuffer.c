@@ -430,8 +430,10 @@ int drm_mode_rmfb(struct drm_device *dev, u32 fb_id,
 		return -EOPNOTSUPP;
 
 	fb = drm_framebuffer_lookup(dev, file_priv, fb_id);
-	if (!fb)
+	if (!fb) {
+		DRM_DEBUG_KMS("Unknown FB ID %d\n", fb_id);
 		return -ENOENT;
+	}
 
 	mutex_lock(&file_priv->fbs_lock);
 	list_for_each_entry(fbl, &file_priv->fbs, filp_head)

@@ -388,10 +388,13 @@ int drm_mode_obj_get_properties_ioctl(struct drm_device *dev, void *data,
 
 	obj = drm_mode_object_find(dev, file_priv, arg->obj_id, arg->obj_type);
 	if (!obj) {
+		DRM_DEBUG_KMS("Unknown object ID %d (type 0x%x)\n",
+			      arg->obj_id, arg->obj_type);
 		ret = -ENOENT;
 		goto out;
 	}
 	if (!obj->properties) {
+		DRM_DEBUG_KMS("Object ID %d has no properties\n", arg->obj_id);
 		ret = -EINVAL;
 		goto out_unref;
 	}
@@ -508,15 +511,23 @@ int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
 		return -EOPNOTSUPP;
 
 	arg_obj = drm_mode_object_find(dev, file_priv, arg->obj_id, arg->obj_type);
-	if (!arg_obj)
+	if (!arg_obj) {
+		DRM_DEBUG_KMS("Unknown object ID %d (type 0x%x)\n",
+			      arg->obj_id, arg->obj_type);
 		return -ENOENT;
+	}
 
-	if (!arg_obj->properties)
+	if (!arg_obj->properties) {
+		DRM_DEBUG_KMS("Object ID %d has no properties\n",
+			      arg->prop_id);
 		goto out_unref;
+	}
 
 	property = drm_mode_obj_find_prop_id(arg_obj, arg->prop_id);
-	if (!property)
+	if (!property) {
+		DRM_DEBUG_KMS("Unknown property ID %d\n", arg->prop_id);
 		goto out_unref;
+	}
 
 	if (drm_drv_uses_atomic_modeset(property->dev))
 		ret = set_property_atomic(arg_obj, property, arg->value);

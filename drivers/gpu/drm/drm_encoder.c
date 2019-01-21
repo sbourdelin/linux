@@ -225,8 +225,10 @@ int drm_mode_getencoder(struct drm_device *dev, void *data,
 		return -EOPNOTSUPP;
 
 	encoder = drm_encoder_find(dev, file_priv, enc_resp->encoder_id);
-	if (!encoder)
+	if (!encoder) {
+		DRM_DEBUG_KMS("Unknown encoder ID %d\n", enc_resp->encoder_id);
 		return -ENOENT;
+	}
 
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	crtc = drm_encoder_get_crtc(encoder);

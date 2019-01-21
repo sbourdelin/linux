@@ -1777,8 +1777,10 @@ int drm_crtc_get_sequence_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 
 	crtc = drm_crtc_find(dev, file_priv, get_seq->crtc_id);
-	if (!crtc)
+	if (!crtc) {
+		DRM_DEBUG_KMS("Unknown CRTC ID %d\n", get_seq->crtc_id);
 		return -ENOENT;
+	}
 
 	pipe = drm_crtc_index(crtc);
 
@@ -1835,8 +1837,10 @@ int drm_crtc_queue_sequence_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 
 	crtc = drm_crtc_find(dev, file_priv, queue_seq->crtc_id);
-	if (!crtc)
+	if (!crtc) {
+		DRM_DEBUG_KMS("Unknown CRTC ID %d\n", queue_seq->crtc_id);
 		return -ENOENT;
+	}
 
 	flags = queue_seq->flags;
 	/* Check valid flag bits */

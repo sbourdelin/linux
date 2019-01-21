@@ -1905,8 +1905,11 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	memset(&u_mode, 0, sizeof(struct drm_mode_modeinfo));
 
 	connector = drm_connector_lookup(dev, file_priv, out_resp->connector_id);
-	if (!connector)
+	if (!connector) {
+		DRM_DEBUG_KMS("Unknown connector ID %d\n",
+			      out_resp->connector_id);
 		return -ENOENT;
+	}
 
 	drm_connector_for_each_possible_encoder(connector, encoder, i)
 		encoders_count++;
