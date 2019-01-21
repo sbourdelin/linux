@@ -2667,10 +2667,31 @@ static const struct {
 #undef BPF_EAPROG_SEC
 #undef BPF_APROG_COMPAT
 
+#define MAX_TYPE_NAME_SIZE 32
+
+static char *libbpf_get_type_names(bool attach_type)
+{
+	int i, len = ARRAY_SIZE(section_names) * MAX_TYPE_NAME_SIZE;
+	char *buf = malloc(len);
+
+	buf[0] = '\0';
+       /* Forge string buf with all available names */
+       for (i = 0; i < ARRAY_SIZE(section_names); i++) {
+	       if (attach_type && !section_names[i].is_attachable)
+		       continue;
+
+               strcat(buf, " ");
+               strcat(buf, section_names[i].sec);
+       }
+
+       return buf;
+}
+
 int libbpf_prog_type_by_name(const char *name, enum bpf_prog_type *prog_type,
 			     enum bpf_attach_type *expected_attach_type)
 {
 	int i;
+	char *type_names;
 
 	if (!name)
 		return -EINVAL;
@@ -2682,6 +2703,11 @@ int libbpf_prog_type_by_name(const char *name, enum bpf_prog_type *prog_type,
 		*expected_attach_type = section_names[i].expected_attach_type;
 		return 0;
 	}
+	pr_warning("failed to guess program type based on ELF section name '%s'\n", name);
+	type_names = libbpf_get_type_names(false);
+	pr_info("supported section(type) names are:%s\n", type_names);
+	free(type_names);
+
 	return -EINVAL;
 }
 
@@ -2689,6 +2715,7 @@ int libbpf_attach_type_by_name(const char *name,
 			       enum bpf_attach_type *attach_type)
 {
 	int i;
+	char *type_names;
 
 	if (!name)
 		return -EINVAL;
@@ -2701,6 +2728,11 @@ int libbpf_attach_type_by_name(const char *name,
 		*attach_type = section_names[i].attach_type;
 		return 0;
 	}
+	pr_warning("failed to guess attach type based on ELF section name '%s'\n", name);
+	type_names = libbpf_get_type_names(true);
+	pr_info("attachable section(type) names are:%s\n", type_names);
+	free(type_names);
+
 	return -EINVAL;
 }
 
@@ -2907,8 +2939,6 @@ int bpf_prog_load_xattr(const struct bpf_prog_load_attr *attr,
 			err = bpf_program__identify_section(prog, &prog_type,
 							    &expected_attach_type);
 			if (err < 0) {
-				pr_warning("failed to guess program type based on section name %s\n",
-					   prog->section_name);
 				bpf_object__close(obj);
 				return -EINVAL;
 			}
