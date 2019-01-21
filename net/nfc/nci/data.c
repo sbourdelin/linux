@@ -116,13 +116,13 @@ static int nci_queue_tx_data_frags(struct nci_dev *ndev,
 
 	pr_debug("conn_id 0x%x, total_len %d\n", conn_id, total_len);
 
+	__skb_queue_head_init(&frags_q);
+
 	conn_info = nci_get_conn_info_by_conn_id(ndev, conn_id);
 	if (!conn_info) {
 		rc = -EPROTO;
 		goto free_exit;
 	}
-
-	__skb_queue_head_init(&frags_q);
 
 	while (total_len) {
 		frag_len =
