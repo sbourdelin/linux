@@ -1330,7 +1330,7 @@ retry:
 			DRM_DEBUG_ATOMIC("Object ID %d has no properties\n",
 					 obj_id);
 			drm_mode_object_put(obj);
-			ret = -ENOENT;
+			ret = -EINVAL;
 			goto out;
 		}
 

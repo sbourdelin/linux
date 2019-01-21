@@ -526,6 +526,7 @@ int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
 	property = drm_mode_obj_find_prop_id(arg_obj, arg->prop_id);
 	if (!property) {
 		DRM_DEBUG_KMS("Unknown property ID %d\n", arg->prop_id);
+		ret = -ENOENT;
 		goto out_unref;
 	}
 
