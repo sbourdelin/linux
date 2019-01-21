@@ -294,6 +294,8 @@ int drm_modeset_backoff(struct drm_modeset_acquire_ctx *ctx)
 {
 	struct drm_modeset_lock *contended = ctx->contended;
 
+	DRM_DEBUG_KMS("Retrying to avoid deadlock\n");
+
 	ctx->contended = NULL;
 
 	if (WARN_ON(!contended))
