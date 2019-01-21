@@ -27,11 +27,19 @@
 static int ifindex = -1;
 static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST;
 static int rxcnt_map_fd;
+static __u32 prog_id;
 
 static void int_exit(int sig)
 {
-	if (ifindex > -1)
-		bpf_set_link_xdp_fd(ifindex, -1, xdp_flags);
+	__u32 curr_prog_id;
+
+	if (ifindex > -1) {
+		bpf_get_link_xdp_id(ifindex, &curr_prog_id, xdp_flags);
+		if (prog_id == curr_prog_id)
+			bpf_set_link_xdp_fd(ifindex, -1, xdp_flags);
+		else
+			printf("program on interface changed, not removing\n");
+	}
 	exit(0);
 }
 
@@ -148,13 +156,15 @@ int main(int argc, char **argv)
 	int min_port = 0, max_port = 0, vip2tnl_map_fd;
 	const char *optstr = "i:a:p:s:d:m:T:P:FSNh";
 	unsigned char opt_flags[256] = {};
+	struct bpf_prog_info info = {};
+	__u32 info_len = sizeof(info);
 	unsigned int kill_after_s = 0;
 	struct iptnl_info tnl = {};
 	struct bpf_object *obj;
 	struct vip vip = {};
 	char filename[256];
 	int opt, prog_fd;
-	int i;
+	int i, err;
 
 	tnl.family = AF_UNSPEC;
 	vip.protocol = IPPROTO_TCP;
@@ -275,6 +285,13 @@ int main(int argc, char **argv)
 		printf("link set xdp fd failed\n");
 		return 1;
 	}
+
+	err = bpf_obj_get_info_by_fd(prog_fd, &info, &info_len);
+	if (err) {
+		printf("can't get prog info - %s\n", strerror(errno));
+		return err;
+	}
+	prog_id = info.id;
 
 	poll_stats(kill_after_s);
 

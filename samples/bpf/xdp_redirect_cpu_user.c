@@ -32,6 +32,7 @@ static const char *__doc__ =
 static int ifindex = -1;
 static char ifname_buf[IF_NAMESIZE];
 static char *ifname;
+static __u32 prog_id;
 
 static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST;
 static int cpu_map_fd;
@@ -68,11 +69,19 @@ static const struct option long_options[] = {
 
 static void int_exit(int sig)
 {
-	fprintf(stderr,
-		"Interrupted: Removing XDP program on ifindex:%d device:%s\n",
-		ifindex, ifname);
-	if (ifindex > -1)
-		bpf_set_link_xdp_fd(ifindex, -1, xdp_flags);
+	__u32 curr_prog_id;
+
+	if (ifindex > -1) {
+		bpf_get_link_xdp_id(ifindex, &curr_prog_id, xdp_flags);
+		if (prog_id == curr_prog_id) {
+			fprintf(stderr,
+				"Interrupted: Removing XDP program on ifindex:%d device:%s\n",
+				ifindex, ifname);
+			bpf_set_link_xdp_fd(ifindex, -1, xdp_flags);
+		} else {
+			printf("program on interface changed, not removing\n");
+		}
+	}
 	exit(EXIT_OK);
 }
 
@@ -595,6 +604,8 @@ int main(int argc, char **argv)
 	struct bpf_prog_load_attr prog_load_attr = {
 		.prog_type	= BPF_PROG_TYPE_UNSPEC,
 	};
+	struct bpf_prog_info info = {};
+	__u32 info_len = sizeof(info);
 	bool use_separators = true;
 	bool stress_mode = false;
 	struct bpf_object *obj;
@@ -604,9 +615,9 @@ int main(int argc, char **argv)
 	int interval = 2;
 	int prog_num = 5;
 	int add_cpu = -1;
+	int opt, err;
 	int prog_fd;
 	__u32 qsize;
-	int opt;
 
 	/* Notice: choosing he queue size is very important with the
 	 * ixgbe driver, because it's driver page recycling trick is
@@ -732,6 +743,13 @@ int main(int argc, char **argv)
 		fprintf(stderr, "link set xdp fd failed\n");
 		return EXIT_FAIL_XDP;
 	}
+
+	err = bpf_obj_get_info_by_fd(prog_fd, &info, &info_len);
+	if (err) {
+		printf("can't get prog info - %s\n", strerror(errno));
+		return err;
+	}
+	prog_id = info.id;
 
 	stats_poll(interval, use_separators, prog_num, stress_mode);
 	return EXIT_OK;
