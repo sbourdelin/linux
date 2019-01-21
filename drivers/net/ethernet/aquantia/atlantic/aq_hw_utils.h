@@ -23,7 +23,7 @@
 
 #define AQ_HW_SLEEP(_US_) mdelay(_US_)
 
-#define AQ_HW_WAIT_FOR(_B_, _US_, _N_) \
+#define AQ_HW_WAIT_FOR(_B_, _US_, _N_, _err_) \
 do { \
 	unsigned int AQ_HW_WAIT_FOR_i; \
 	for (AQ_HW_WAIT_FOR_i = _N_; (!(_B_)) && (AQ_HW_WAIT_FOR_i);\
@@ -31,7 +31,7 @@ do { \
 		udelay(_US_); \
 	} \
 	if (!AQ_HW_WAIT_FOR_i) {\
-		err = -ETIME; \
+		*(_err_) = -ETIME; \
 	} \
 } while (0)
 

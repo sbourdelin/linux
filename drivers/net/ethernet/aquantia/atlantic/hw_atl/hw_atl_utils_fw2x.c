@@ -79,10 +79,10 @@ static int aq_fw2x_init(struct aq_hw_s *self)
 	/* check 10 times by 1ms */
 	AQ_HW_WAIT_FOR(0U != (self->mbox_addr =
 		       aq_hw_read_reg(self, HW_ATL_FW2X_MPI_MBOX_ADDR)),
-		       1000U, 10U);
+		       1000U, 10U, &err);
 	AQ_HW_WAIT_FOR(0U != (self->rpc_addr =
 		       aq_hw_read_reg(self, HW_ATL_FW2X_MPI_RPC_ADDR)),
-		       1000U, 100U);
+		       1000U, 100U, &err);
 
 	return err;
 }
@@ -295,7 +295,7 @@ static int aq_fw2x_update_stats(struct aq_hw_s *self)
 	AQ_HW_WAIT_FOR(orig_stats_val !=
 		       (aq_hw_read_reg(self, HW_ATL_FW2X_MPI_STATE2_ADDR) &
 			BIT(CAPS_HI_STATISTICS)),
-		       1U, 10000U);
+		       1U, 10000U, &err);
 	if (err)
 		return err;
 
@@ -338,7 +338,7 @@ static int aq_fw2x_set_sleep_proxy(struct aq_hw_s *self, u8 *mac)
 	aq_hw_write_reg(self, HW_ATL_FW2X_MPI_CONTROL2_ADDR, mpi_opts);
 
 	AQ_HW_WAIT_FOR((aq_hw_read_reg(self, HW_ATL_FW2X_MPI_STATE2_ADDR) &
-			HW_ATL_FW2X_CTRL_SLEEP_PROXY), 1U, 10000U);
+			HW_ATL_FW2X_CTRL_SLEEP_PROXY), 1U, 10000U, &err);
 
 err_exit:
 	return err;
@@ -375,7 +375,7 @@ static int aq_fw2x_set_wol_params(struct aq_hw_s *self, u8 *mac)
 	aq_hw_write_reg(self, HW_ATL_FW2X_MPI_CONTROL2_ADDR, mpi_opts);
 
 	AQ_HW_WAIT_FOR((aq_hw_read_reg(self, HW_ATL_FW2X_MPI_STATE2_ADDR) &
-			HW_ATL_FW2X_CTRL_WOL), 1U, 10000U);
+			HW_ATL_FW2X_CTRL_WOL), 1U, 10000U, &err);
 
 err_exit:
 	return err;

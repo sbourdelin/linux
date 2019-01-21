@@ -262,7 +262,7 @@ int hw_atl_utils_soft_reset(struct aq_hw_s *self)
 		hw_atl_utils_mpi_set_state(self, MPI_DEINIT);
 		AQ_HW_WAIT_FOR((aq_hw_read_reg(self, HW_ATL_MPI_STATE_ADR) &
 				HW_ATL_MPI_STATE_MSK) == MPI_DEINIT,
-			       10, 1000U);
+			       10, 1000U, &err);
 		if (err)
 			return err;
 	}
@@ -280,7 +280,7 @@ int hw_atl_utils_fw_downld_dwords(struct aq_hw_s *self, u32 a,
 
 	AQ_HW_WAIT_FOR(hw_atl_reg_glb_cpu_sem_get(self,
 						  HW_ATL_FW_SM_RAM) == 1U,
-		       1U, 10000U);
+		       1U, 10000U, &err);
 
 	if (err < 0) {
 		bool is_locked;
@@ -301,11 +301,11 @@ int hw_atl_utils_fw_downld_dwords(struct aq_hw_s *self, u32 a,
 		if (IS_CHIP_FEATURE(REVISION_B1))
 			AQ_HW_WAIT_FOR(a != aq_hw_read_reg(self,
 							   HW_ATL_MIF_ADDR),
-				       1, 1000U);
+				       1, 1000U, &err);
 		else
 			AQ_HW_WAIT_FOR(!(0x100 & aq_hw_read_reg(self,
 							   HW_ATL_MIF_CMD)),
-				       1, 1000U);
+				       1, 1000U, &err);
 
 		*(p++) = aq_hw_read_reg(self, HW_ATL_MIF_VAL);
 		a += 4;
@@ -340,7 +340,7 @@ static int hw_atl_utils_fw_upload_dwords(struct aq_hw_s *self, u32 a, u32 *p,
 			AQ_HW_WAIT_FOR((aq_hw_read_reg(self,
 						       0x32C) & 0xF0000000) !=
 				       0x80000000,
-				       10, 1000);
+				       10, 1000, &err);
 		}
 	} else {
 		u32 offset = 0;
@@ -352,7 +352,7 @@ static int hw_atl_utils_fw_upload_dwords(struct aq_hw_s *self, u32 a, u32 *p,
 			aq_hw_write_reg(self, 0x200, 0xC000);
 
 			AQ_HW_WAIT_FOR((aq_hw_read_reg(self, 0x200U) &
-					0x100) == 0, 10, 1000);
+					0x100) == 0, 10, 1000, &err);
 		}
 	}
 
@@ -396,7 +396,7 @@ static int hw_atl_utils_init_ucp(struct aq_hw_s *self,
 
 	/* check 10 times by 1ms */
 	AQ_HW_WAIT_FOR(0U != (self->mbox_addr =
-			      aq_hw_read_reg(self, 0x360U)), 1000U, 10U);
+			      aq_hw_read_reg(self, 0x360U)), 1000U, 10U, &err);
 
 	return err;
 }
@@ -455,7 +455,7 @@ int hw_atl_utils_fw_rpc_wait(struct aq_hw_s *self,
 		AQ_HW_WAIT_FOR(sw.tid ==
 			       (fw.val =
 				aq_hw_read_reg(self, HW_ATL_RPC_STATE_ADR),
-				fw.tid), 1000U, 100U);
+				fw.tid), 1000U, 100U, &err);
 
 		if (fw.len == 0xFFFFU) {
 			err = hw_atl_utils_fw_rpc_call(self, sw.len);
@@ -562,7 +562,7 @@ static int hw_atl_utils_mpi_set_state(struct aq_hw_s *self,
 		AQ_HW_WAIT_FOR(transaction_id !=
 			       (hw_atl_utils_mpi_read_mbox(self, &mbox),
 				mbox.transaction_id),
-			       1000U, 100U);
+			       1000U, 100U, &err);
 		if (err < 0)
 			goto err_exit;
 	}

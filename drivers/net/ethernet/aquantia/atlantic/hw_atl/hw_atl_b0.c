@@ -181,7 +181,7 @@ static int hw_atl_b0_hw_rss_hash_set(struct aq_hw_s *self,
 		hw_atl_rpf_rss_key_addr_set(self, addr);
 		hw_atl_rpf_rss_key_wr_en_set(self, 1U);
 		AQ_HW_WAIT_FOR(hw_atl_rpf_rss_key_wr_en_get(self) == 0,
-			       1000U, 10U);
+			       1000U, 10U, &err);
 		if (err < 0)
 			goto err_exit;
 	}
@@ -215,7 +215,7 @@ static int hw_atl_b0_hw_rss_set(struct aq_hw_s *self,
 		hw_atl_rpf_rss_redir_tbl_addr_set(self, i);
 		hw_atl_rpf_rss_redir_wr_en_set(self, 1U);
 		AQ_HW_WAIT_FOR(hw_atl_rpf_rss_redir_wr_en_get(self) == 0,
-			       1000U, 10U);
+			       1000U, 10U, &err);
 		if (err < 0)
 			goto err_exit;
 	}
