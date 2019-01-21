@@ -125,6 +125,7 @@ static int vfio_ccw_sch_probe(struct subchannel *sch)
 
 	private->sch = sch;
 	dev_set_drvdata(&sch->dev, private);
+	mutex_init(&private->io_mutex);
 
 	spin_lock_irq(sch->lock);
 	private->state = VFIO_CCW_STATE_NOT_OPER;
