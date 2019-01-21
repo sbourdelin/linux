@@ -229,6 +229,7 @@ static struct pci_driver igb_driver = {
 	.id_table = igb_pci_tbl,
 	.probe    = igb_probe,
 	.remove   = igb_remove,
+	.driver.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 #ifdef CONFIG_PM
 	.driver.pm = &igb_pm_ops,
 #endif
