@@ -3620,7 +3620,8 @@ static u8 intel_enabled_dbuf_slices_num(struct drm_i915_private *dev_priv)
 	enabled_slices = 1;
 
 	/* Gen prior to GEN11 have only one DBuf slice */
-	if (INTEL_GEN(dev_priv) < 11)
+	/* FIXME dbuf slice code is broken: see intel_get_ddb_size() */
+	if (1 || INTEL_GEN(dev_priv) < 11)
 		return enabled_slices;
 
 	if (I915_READ(DBUF_CTL_S2) & DBUF_POWER_STATE)
@@ -3829,8 +3830,13 @@ static u16 intel_get_ddb_size(struct drm_i915_private *dev_priv,
 
 	/*
 	 * 12GB/s is maximum BW supported by single DBuf slice.
+	 *
+	 * FIXME dbuf slice code is broken:
+	 * - must wait for planes to stop using the slice before powering it off
+	 * - plane straddling both slices is illegal in multi-pipe scenarios
+	 * - should validate we stay within the hw bandwidth limits
 	 */
-	if (num_active > 1 || total_data_bw >= GBps(12)) {
+	if (0 && (num_active > 1 || total_data_bw >= GBps(12))) {
 		ddb->enabled_slices = 2;
 	} else {
 		ddb->enabled_slices = 1;
