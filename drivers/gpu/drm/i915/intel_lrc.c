@@ -133,6 +133,8 @@
  */
 #include <linux/interrupt.h>
 
+#include <trace/events/dma_fence.h>
+
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include "i915_gem_render_state.h"
@@ -351,11 +353,15 @@ execlists_context_schedule_in(struct i915_request *rq)
 	execlists_context_status_change(rq, INTEL_CONTEXT_SCHEDULE_IN);
 	intel_engine_context_in(rq->engine);
 	rq->hw_context->active = rq->engine;
+
+	trace_dma_fence_execute_start(&rq->fence, i915_trace_hwid(rq->engine));
 }
 
 static inline void
 execlists_context_schedule_out(struct i915_request *rq, unsigned long status)
 {
+	trace_dma_fence_execute_end(&rq->fence, i915_trace_hwid(rq->engine));
+
 	rq->hw_context->active = NULL;
 	intel_engine_context_out(rq->engine);
 	execlists_context_status_change(rq, status);

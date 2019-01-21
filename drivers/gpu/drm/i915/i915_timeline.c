@@ -4,6 +4,8 @@
  * Copyright © 2016-2018 Intel Corporation
  */
 
+#include <trace/events/dma_fence.h>
+
 #include "i915_drv.h"
 
 #include "i915_timeline.h"
@@ -30,6 +32,7 @@ void i915_timeline_init(struct drm_i915_private *i915,
 	/* Called during early_init before we know how many engines there are */
 
 	timeline->fence_context = dma_fence_context_alloc(1);
+	trace_dma_fence_context_create(timeline->fence_context, "i915", name);
 
 	spin_lock_init(&timeline->lock);
 
@@ -69,6 +72,8 @@ void i915_timelines_park(struct drm_i915_private *i915)
 void i915_timeline_fini(struct i915_timeline *timeline)
 {
 	GEM_BUG_ON(!list_empty(&timeline->requests));
+
+	trace_dma_fence_context_destroy(timeline->fence_context);
 
 	i915_syncmap_free(&timeline->sync);
 

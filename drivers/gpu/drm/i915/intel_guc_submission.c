@@ -535,6 +535,14 @@ static void guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 	client->submissions[engine->id] += 1;
 
 	spin_unlock(&client->wq_lock);
+
+	/*
+	 * XXX move to HW synthesis:
+	 * - emit SRM(RCS_TIMESTAMP) to per-context journal
+	 * - poll (maybe interrupt) journal from kthread, generating tracepoint
+	 * - notify callback for dma_fence tracepoint register
+	 */
+	trace_dma_fence_execute_start(&rq->fence, i915_trace_hwid(rq->engine));
 }
 
 /*
@@ -810,6 +818,8 @@ static void guc_submission_tasklet(unsigned long data)
 
 	rq = port_request(port);
 	while (rq && i915_request_completed(rq)) {
+		trace_dma_fence_execute_end(&rq->fence,
+					    i915_trace_hwid(rq->engine));
 		trace_i915_request_out(rq);
 		i915_request_put(rq);
 

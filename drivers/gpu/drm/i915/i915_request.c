@@ -28,6 +28,8 @@
 #include <linux/sched/clock.h>
 #include <linux/sched/signal.h>
 
+#include <trace/events/dma_fence.h>
+
 #include "i915_drv.h"
 #include "i915_reset.h"
 
@@ -254,8 +256,6 @@ static void i915_request_retire(struct i915_request *request)
 	GEM_BUG_ON(!i915_sw_fence_signaled(&request->submit));
 	GEM_BUG_ON(!i915_request_completed(request));
 
-	trace_i915_request_retire(request);
-
 	advance_ring(request);
 	free_capture_list(request);
 
@@ -376,8 +376,6 @@ void __i915_request_submit(struct i915_request *request)
 	/* Transfer from per-context onto the global per-engine timeline */
 	move_to_timeline(request, &engine->timeline);
 
-	trace_i915_request_execute(request);
-
 	wake_up_all(&request->execute);
 }
 
@@ -456,7 +454,8 @@ submit_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 
 	switch (state) {
 	case FENCE_COMPLETE:
-		trace_i915_request_submit(request);
+		trace_dma_fence_emit(&request->fence);
+
 		/*
 		 * We need to serialize use of the submit_request() callback
 		 * with its hotplugging performed during an emergency
@@ -763,6 +762,8 @@ i915_request_await_dma_fence(struct i915_request *rq, struct dma_fence *fence)
 		if (ret < 0)
 			return ret;
 
+		trace_dma_fence_await(&rq->fence, fence);
+
 		/* Record the latest fence used against each timeline */
 		if (fence->context != rq->i915->mm.unordered_timeline)
 			i915_timeline_sync_set(rq->timeline, fence);
@@ -871,7 +872,6 @@ void i915_request_add(struct i915_request *request)
 		  engine->name, request->fence.context, request->fence.seqno);
 
 	lockdep_assert_held(&request->i915->drm.struct_mutex);
-	trace_i915_request_add(request);
 
 	/*
 	 * Make sure that no request gazumped us - if it was allocated after
@@ -1132,7 +1132,7 @@ long i915_request_wait(struct i915_request *rq,
 	if (!timeout)
 		return -ETIME;
 
-	trace_i915_request_wait_begin(rq, flags);
+	trace_dma_fence_wait_start(&rq->fence);
 
 	add_wait_queue(&rq->execute, &exec);
 	if (flags & I915_WAIT_LOCKED)
@@ -1238,7 +1238,7 @@ complete:
 	if (flags & I915_WAIT_LOCKED)
 		remove_wait_queue(errq, &reset);
 	remove_wait_queue(&rq->execute, &exec);
-	trace_i915_request_wait_end(rq);
+	trace_dma_fence_wait_end(&rq->fence);
 
 	return timeout;
 }

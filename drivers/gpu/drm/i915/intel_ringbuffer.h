@@ -579,6 +579,8 @@ struct intel_engine_cs {
 	} stats;
 };
 
+#define i915_trace_hwid(e) ((e)->uabi_class << 16 | (e)->instance)
+
 static inline bool
 intel_engine_needs_cmd_parser(const struct intel_engine_cs *engine)
 {

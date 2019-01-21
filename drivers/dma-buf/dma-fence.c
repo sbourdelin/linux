@@ -27,8 +27,15 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/dma_fence.h>
 
+EXPORT_TRACEPOINT_SYMBOL(dma_fence_context_create);
+EXPORT_TRACEPOINT_SYMBOL(dma_fence_context_destroy);
+
+EXPORT_TRACEPOINT_SYMBOL(dma_fence_await);
 EXPORT_TRACEPOINT_SYMBOL(dma_fence_emit);
-EXPORT_TRACEPOINT_SYMBOL(dma_fence_enable_signal);
+EXPORT_TRACEPOINT_SYMBOL(dma_fence_execute_start);
+EXPORT_TRACEPOINT_SYMBOL(dma_fence_execute_end);
+EXPORT_TRACEPOINT_SYMBOL(dma_fence_wait_start);
+EXPORT_TRACEPOINT_SYMBOL(dma_fence_wait_end);
 
 static DEFINE_SPINLOCK(dma_fence_stub_lock);
 static struct dma_fence dma_fence_stub;

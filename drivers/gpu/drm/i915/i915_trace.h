@@ -584,82 +584,7 @@ TRACE_EVENT(i915_gem_evict_vm,
 	    TP_printk("dev=%d, vm=%p", __entry->dev, __entry->vm)
 );
 
-TRACE_EVENT(i915_request_queue,
-	    TP_PROTO(struct i915_request *rq, u32 flags),
-	    TP_ARGS(rq, flags),
-
-	    TP_STRUCT__entry(
-			     __field(u32, dev)
-			     __field(u32, hw_id)
-			     __field(u64, ctx)
-			     __field(u16, class)
-			     __field(u16, instance)
-			     __field(u32, seqno)
-			     __field(u32, flags)
-			     ),
-
-	    TP_fast_assign(
-			   __entry->dev = rq->i915->drm.primary->index;
-			   __entry->hw_id = rq->gem_context->hw_id;
-			   __entry->class = rq->engine->uabi_class;
-			   __entry->instance = rq->engine->instance;
-			   __entry->ctx = rq->fence.context;
-			   __entry->seqno = rq->fence.seqno;
-			   __entry->flags = flags;
-			   ),
-
-	    TP_printk("dev=%u, engine=%u:%u, hw_id=%u, ctx=%llu, seqno=%u, flags=0x%x",
-		      __entry->dev, __entry->class, __entry->instance,
-		      __entry->hw_id, __entry->ctx, __entry->seqno,
-		      __entry->flags)
-);
-
-DECLARE_EVENT_CLASS(i915_request,
-	    TP_PROTO(struct i915_request *rq),
-	    TP_ARGS(rq),
-
-	    TP_STRUCT__entry(
-			     __field(u32, dev)
-			     __field(u32, hw_id)
-			     __field(u64, ctx)
-			     __field(u16, class)
-			     __field(u16, instance)
-			     __field(u32, seqno)
-			     __field(u32, global)
-			     ),
-
-	    TP_fast_assign(
-			   __entry->dev = rq->i915->drm.primary->index;
-			   __entry->hw_id = rq->gem_context->hw_id;
-			   __entry->class = rq->engine->uabi_class;
-			   __entry->instance = rq->engine->instance;
-			   __entry->ctx = rq->fence.context;
-			   __entry->seqno = rq->fence.seqno;
-			   __entry->global = rq->global_seqno;
-			   ),
-
-	    TP_printk("dev=%u, engine=%u:%u, hw_id=%u, ctx=%llu, seqno=%u, global=%u",
-		      __entry->dev, __entry->class, __entry->instance,
-		      __entry->hw_id, __entry->ctx, __entry->seqno,
-		      __entry->global)
-);
-
-DEFINE_EVENT(i915_request, i915_request_add,
-	    TP_PROTO(struct i915_request *rq),
-	    TP_ARGS(rq)
-);
-
 #if defined(CONFIG_DRM_I915_LOW_LEVEL_TRACEPOINTS)
-DEFINE_EVENT(i915_request, i915_request_submit,
-	     TP_PROTO(struct i915_request *rq),
-	     TP_ARGS(rq)
-);
-
-DEFINE_EVENT(i915_request, i915_request_execute,
-	     TP_PROTO(struct i915_request *rq),
-	     TP_ARGS(rq)
-);
-
 TRACE_EVENT(i915_request_in,
 	    TP_PROTO(struct i915_request *rq, unsigned int port),
 	    TP_ARGS(rq, port),
@@ -729,16 +654,6 @@ TRACE_EVENT(i915_request_out,
 #else
 #if !defined(TRACE_HEADER_MULTI_READ)
 static inline void
-trace_i915_request_submit(struct i915_request *rq)
-{
-}
-
-static inline void
-trace_i915_request_execute(struct i915_request *rq)
-{
-}
-
-static inline void
 trace_i915_request_in(struct i915_request *rq, unsigned int port)
 {
 }
@@ -773,55 +688,6 @@ TRACE_EVENT(intel_engine_notify,
 	    TP_printk("dev=%u, engine=%u:%u, seqno=%u, waiters=%u",
 		      __entry->dev, __entry->class, __entry->instance,
 		      __entry->seqno, __entry->waiters)
-);
-
-DEFINE_EVENT(i915_request, i915_request_retire,
-	    TP_PROTO(struct i915_request *rq),
-	    TP_ARGS(rq)
-);
-
-TRACE_EVENT(i915_request_wait_begin,
-	    TP_PROTO(struct i915_request *rq, unsigned int flags),
-	    TP_ARGS(rq, flags),
-
-	    TP_STRUCT__entry(
-			     __field(u32, dev)
-			     __field(u32, hw_id)
-			     __field(u64, ctx)
-			     __field(u16, class)
-			     __field(u16, instance)
-			     __field(u32, seqno)
-			     __field(u32, global)
-			     __field(unsigned int, flags)
-			     ),
-
-	    /* NB: the blocking information is racy since mutex_is_locked
-	     * doesn't check that the current thread holds the lock. The only
-	     * other option would be to pass the boolean information of whether
-	     * or not the class was blocking down through the stack which is
-	     * less desirable.
-	     */
-	    TP_fast_assign(
-			   __entry->dev = rq->i915->drm.primary->index;
-			   __entry->hw_id = rq->gem_context->hw_id;
-			   __entry->class = rq->engine->uabi_class;
-			   __entry->instance = rq->engine->instance;
-			   __entry->ctx = rq->fence.context;
-			   __entry->seqno = rq->fence.seqno;
-			   __entry->global = rq->global_seqno;
-			   __entry->flags = flags;
-			   ),
-
-	    TP_printk("dev=%u, engine=%u:%u, hw_id=%u, ctx=%llu, seqno=%u, global=%u, blocking=%u, flags=0x%x",
-		      __entry->dev, __entry->class, __entry->instance,
-		      __entry->hw_id, __entry->ctx, __entry->seqno,
-		      __entry->global, !!(__entry->flags & I915_WAIT_LOCKED),
-		      __entry->flags)
-);
-
-DEFINE_EVENT(i915_request, i915_request_wait_end,
-	    TP_PROTO(struct i915_request *rq),
-	    TP_ARGS(rq)
 );
 
 TRACE_EVENT_CONDITION(i915_reg_rw,

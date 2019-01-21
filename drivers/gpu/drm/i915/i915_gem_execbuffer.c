@@ -2397,7 +2397,6 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	 */
 	eb.request->batch = eb.batch;
 
-	trace_i915_request_queue(eb.request, eb.batch_flags);
 	err = eb_submit(&eb);
 err_request:
 	i915_request_add(eb.request);

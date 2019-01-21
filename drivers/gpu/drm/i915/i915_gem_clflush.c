@@ -22,6 +22,8 @@
  *
  */
 
+#include <trace/events/dma_fence.h>
+
 #include "i915_drv.h"
 #include "intel_frontbuffer.h"
 #include "i915_gem_clflush.h"
@@ -73,6 +75,7 @@ static void i915_clflush_work(struct work_struct *work)
 	struct clflush *clflush = container_of(work, typeof(*clflush), work);
 	struct drm_i915_gem_object *obj = clflush->obj;
 
+	trace_dma_fence_execute_start(&clflush->dma, smp_processor_id());
 	if (i915_gem_object_pin_pages(obj)) {
 		DRM_ERROR("Failed to acquire obj->pages for clflushing\n");
 		goto out;
@@ -83,6 +86,7 @@ static void i915_clflush_work(struct work_struct *work)
 	i915_gem_object_unpin_pages(obj);
 
 out:
+	trace_dma_fence_execute_end(&clflush->dma, smp_processor_id());
 	i915_gem_object_put(obj);
 
 	dma_fence_signal(&clflush->dma);
@@ -97,6 +101,7 @@ i915_clflush_notify(struct i915_sw_fence *fence,
 
 	switch (state) {
 	case FENCE_COMPLETE:
+		trace_dma_fence_emit(&clflush->dma);
 		schedule_work(&clflush->work);
 		break;
 
