@@ -733,6 +733,12 @@ static int do_dentry_open(struct file *f,
 		return 0;
 	}
 
+	/* The file or a script interpreter has to be a regular file. */
+	if (unlikely(current->in_execve && !S_ISREG(inode->i_mode))) {
+		error = -EACCES;
+		goto cleanup_file;
+	}
+
 	if (f->f_mode & FMODE_WRITE && !special_file(inode->i_mode)) {
 		error = get_write_access(inode);
 		if (unlikely(error))
