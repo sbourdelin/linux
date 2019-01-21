@@ -2144,6 +2144,20 @@ static void its_cpu_init_lpis(void)
 	val |= GICR_CTLR_ENABLE_LPIS;
 	writel_relaxed(val, rbase + GICR_CTLR);
 
+	/*
+	 * Temporary workaround for vlpi drop on Hi1620.
+	 * IDbits must be set before any VLPI is sent to this CPU, or else the
+	 * VLPI will be considered as out of range and dropped.
+	 */
+	if (gic_rdists->has_vlpis) {
+		void __iomem *vlpi_base = gic_data_rdist_vlpi_base();
+
+		val = (LPI_NRBITS - 1) & GICR_VPROPBASER_IDBITS_MASK;
+		pr_info("GICv4: CPU%d: Init IDbits to 0x%llx for GICR_VPROPBASER\n",
+			smp_processor_id(), val);
+		gits_write_vpropbaser(val, vlpi_base + GICR_VPROPBASER);
+	}
+
 	/* Make sure the GIC has seen the above */
 	dsb(sy);
 out:
