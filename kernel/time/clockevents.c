@@ -719,7 +719,9 @@ static __init int tick_broadcast_init_sysfs(void)
 {
 	int err = device_register(&tick_bc_dev);
 
-	if (!err)
+	if (err)
+		put_device(&tick_bc_dev);
+	else
 		err = device_create_file(&tick_bc_dev, &dev_attr_current_device);
 	return err;
 }
@@ -746,8 +748,10 @@ static int __init tick_init_sysfs(void)
 			err = device_create_file(dev, &dev_attr_current_device);
 		if (!err)
 			err = device_create_file(dev, &dev_attr_unbind_device);
-		if (err)
+		if (err) {
+			put_device(dev);
 			return err;
+		}
 	}
 	return tick_broadcast_init_sysfs();
 }
