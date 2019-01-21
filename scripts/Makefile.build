@@ -103,8 +103,12 @@ modkern_cflags =                                          \
 		$(KBUILD_CFLAGS_KERNEL) $(CFLAGS_KERNEL))
 quiet_modtag = $(if $(part-of-module),[M],   )
 
+disable_extra_cc_dbg := $(call cc-option,-gno-as-locview-support)
+disable_extra_cc_dbg += $(call cc-option,-fno-dwarf2-cfi-asm)
+disable_extra_cc_dbg += $(call cc-option,-feliminate-unused-debug-symbols)
+disable_extra_cc_dbg += $(call cc-option,-gno-statement-frontiers)
 quiet_cmd_cc_s_c = CC $(quiet_modtag)  $@
-cmd_cc_s_c       = $(CC) $(c_flags) $(DISABLE_LTO) -fverbose-asm -S -o $@ $<
+cmd_cc_s_c       = $(CC) $(c_flags) $(DISABLE_LTO) $(disable_extra_cc_dbg) -fverbose-asm -S -o $@ $<
 
 $(obj)/%.s: $(src)/%.c FORCE
 	$(call if_changed_dep,cc_s_c)
