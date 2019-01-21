@@ -935,6 +935,14 @@ out:
 	return err;
 }
 
+int
+bpf_object__get_prog_fd_by_num(struct bpf_object *obj, int idx)
+{
+	if (idx >= 0 && idx < obj->nr_programs)
+		return bpf_program__fd(&obj->programs[idx]);
+	return -ENOENT;
+}
+
 static struct bpf_program *
 bpf_object__find_prog_by_idx(struct bpf_object *obj, int idx)
 {

@@ -95,6 +95,9 @@ LIBBPF_API int bpf_object__btf_fd(const struct bpf_object *obj);
 LIBBPF_API struct bpf_program *
 bpf_object__find_program_by_title(struct bpf_object *obj, const char *title);
 
+LIBBPF_API int
+bpf_object__get_prog_fd_by_num(struct bpf_object *obj, int idx);
+
 LIBBPF_API struct bpf_object *bpf_object__next(struct bpf_object *prev);
 #define bpf_object__for_each_safe(pos, tmp)			\
 	for ((pos) = bpf_object__next(NULL),		\

@@ -127,4 +127,5 @@ LIBBPF_0.0.1 {
 LIBBPF_0.0.2 {
 	global:
 		bpf_object__find_map_fd_by_name;
+		bpf_object__get_prog_fd_by_num;
 } LIBBPF_0.0.1;
