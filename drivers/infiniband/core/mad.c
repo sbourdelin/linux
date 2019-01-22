@@ -2250,6 +2250,17 @@ static void ib_mad_recv_done(struct ib_cq *cq, struct ib_wc *wc)
 		return;
 	}
 
+	if (unlikely(!mad_list->mad_queue)) {
+		/*
+		 * When the interface related with IB device is set to down/up,
+		 * a lot of ib_cancel_mad packets are sent to the sender. In
+		 * sender, the mad packets are cancelled.  The receiver will
+		 * find mad_queue NULL. If the receiver does not test mad_queue,
+		 * the receiver will crash with "kernel NULL pointer" error.
+		 */
+		return;
+	}
+
 	qp_info = mad_list->mad_queue->qp_info;
 	dequeue_mad(mad_list);
 
