@@ -28,6 +28,7 @@
 struct drm_i915_mocs_entry {
 	u32 control_value;
 	u16 l3cc_value;
+	u16 used;
 };
 
 struct drm_i915_mocs_table {
@@ -75,6 +76,7 @@ struct drm_i915_mocs_table {
 	[__idx] = { \
 		.control_value = __control_value, \
 		.l3cc_value = __l3cc_value, \
+		.used = 1, \
 	}
 
 /*
@@ -195,24 +197,26 @@ void intel_mocs_init_engine(struct intel_engine_cs *engine)
 	struct drm_i915_private *dev_priv = engine->i915;
 	struct drm_i915_mocs_table table;
 	unsigned int index;
+	u32 unused_value;
 
 	if (!get_mocs_settings(dev_priv, &table))
 		return;
 
 	GEM_BUG_ON(table.size > GEN9_NUM_MOCS_ENTRIES);
 
-	for (index = 0; index < table.size; index++)
-		I915_WRITE(mocs_register(engine->id, index),
-			   table.table[index].control_value);
+	/* Set unused values to PTE */
+	unused_value = table.table[I915_MOCS_PTE].control_value;
 
-	/*
-	 * Now set the unused entries to PTE. These entries are officially
-	 * undefined and no contract for the contents and settings is given
-	 * for these entries.
-	 */
+	for (index = 0; index < table.size; index++) {
+		u32 value = table.table[index].used ?
+			table.table[index].control_value : unused_value;
+
+		I915_WRITE(mocs_register(engine->id, index), value);
+	}
+
+	/* All remaining entries are also unused */
 	for (; index < GEN9_NUM_MOCS_ENTRIES; index++)
-		I915_WRITE(mocs_register(engine->id, index),
-			   table.table[I915_MOCS_PTE].control_value);
+		I915_WRITE(mocs_register(engine->id, index), unused_value);
 }
 
 /**
@@ -230,10 +234,14 @@ static int emit_mocs_control_table(struct i915_request *rq,
 {
 	enum intel_engine_id engine = rq->engine->id;
 	unsigned int index;
+	u32 unused_value;
 	u32 *cs;
 
 	if (WARN_ON(table->size > GEN9_NUM_MOCS_ENTRIES))
 		return -ENODEV;
+
+	/* Set unused values to PTE */
+	unused_value = table->table[I915_MOCS_PTE].control_value;
 
 	cs = intel_ring_begin(rq, 2 + 2 * GEN9_NUM_MOCS_ENTRIES);
 	if (IS_ERR(cs))
@@ -242,18 +250,17 @@ static int emit_mocs_control_table(struct i915_request *rq,
 	*cs++ = MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES);
 
 	for (index = 0; index < table->size; index++) {
+		u32 value = table->table[index].used ?
+			table->table[index].control_value : unused_value;
+
 		*cs++ = i915_mmio_reg_offset(mocs_register(engine, index));
-		*cs++ = table->table[index].control_value;
+		*cs++ = value;
 	}
 
-	/*
-	 * Now set the unused entries to PTE. These entries are officially
-	 * undefined and no contract for the contents and settings is given
-	 * for these entries.
-	 */
+	/* All remaining entries are also unused */
 	for (; index < GEN9_NUM_MOCS_ENTRIES; index++) {
 		*cs++ = i915_mmio_reg_offset(mocs_register(engine, index));
-		*cs++ = table->table[I915_MOCS_PTE].control_value;
+		*cs++ = unused_value;
 	}
 
 	*cs++ = MI_NOOP;
@@ -284,11 +291,14 @@ static inline u32 l3cc_combine(const struct drm_i915_mocs_table *table,
 static int emit_mocs_l3cc_table(struct i915_request *rq,
 				const struct drm_i915_mocs_table *table)
 {
-	unsigned int i;
+	unsigned int i, unused_index;
 	u32 *cs;
 
 	if (WARN_ON(table->size > GEN9_NUM_MOCS_ENTRIES))
 		return -ENODEV;
+
+	/* Set unused values to PTE */
+	unused_index = I915_MOCS_PTE;
 
 	cs = intel_ring_begin(rq, 2 + GEN9_NUM_MOCS_ENTRIES);
 	if (IS_ERR(cs))
@@ -297,25 +307,29 @@ static int emit_mocs_l3cc_table(struct i915_request *rq,
 	*cs++ = MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES / 2);
 
 	for (i = 0; i < table->size / 2; i++) {
+		u16 low = table->table[2 * i].used ?
+			2 * i : unused_index;
+		u16 high = table->table[2 * i + 1].used ?
+			2 * i + 1 : unused_index;
+
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
-		*cs++ = l3cc_combine(table, 2 * i, 2 * i + 1);
+		*cs++ = l3cc_combine(table, low, high);
 	}
 
 	if (table->size & 0x01) {
+		u16 low = table->table[2 * i].used ?
+			2 * i : unused_index;
+
 		/* Odd table size - 1 left over */
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
-		*cs++ = l3cc_combine(table, 2 * i, I915_MOCS_PTE);
+		*cs++ = l3cc_combine(table, low, unused_index);
 		i++;
 	}
 
-	/*
-	 * Now set the unused entries to PTE. These entries are officially
-	 * undefined and no contract for the contents and settings is given
-	 * for these entries.
-	 */
+	/* All remaining entries are also unused */
 	for (; i < GEN9_NUM_MOCS_ENTRIES / 2; i++) {
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
-		*cs++ = l3cc_combine(table, I915_MOCS_PTE, I915_MOCS_PTE);
+		*cs++ = l3cc_combine(table, unused_index, unused_index);
 	}
 
 	*cs++ = MI_NOOP;
@@ -341,26 +355,38 @@ static int emit_mocs_l3cc_table(struct i915_request *rq,
 void intel_mocs_init_l3cc_table(struct drm_i915_private *dev_priv)
 {
 	struct drm_i915_mocs_table table;
-	unsigned int i;
+	unsigned int i, unused_index;
 
 	if (!get_mocs_settings(dev_priv, &table))
 		return;
 
-	for (i = 0; i < table.size / 2; i++)
+	/* Set unused values to PTE */
+	unused_index = I915_MOCS_PTE;
+
+	for (i = 0; i < table.size / 2; i++) {
+		u16 low = table.table[2 * i].used ?
+			2 * i : unused_index;
+		u16 high = table.table[2 * i + 1].used ?
+			2 * i + 1 : unused_index;
+
 		I915_WRITE(GEN9_LNCFCMOCS(i),
-			   l3cc_combine(&table, 2 * i, 2 * i + 1));
+			   l3cc_combine(&table, low, high));
+	}
 
 	/* Odd table size - 1 left over */
 	if (table.size & 0x01) {
+		u16 low = table.table[2 * i].used ?
+			2 * i : unused_index;
+
 		I915_WRITE(GEN9_LNCFCMOCS(i),
-			   l3cc_combine(&table, 2 * i, I915_MOCS_PTE));
+			   l3cc_combine(&table, low, unused_index));
 		i++;
 	}
 
 	/* Now set the rest of the table to PTE */
 	for (; i < (GEN9_NUM_MOCS_ENTRIES / 2); i++)
 		I915_WRITE(GEN9_LNCFCMOCS(i),
-			   l3cc_combine(&table, I915_MOCS_PTE, I915_MOCS_PTE));
+			   l3cc_combine(&table, unused_index, unused_index));
 }
 
 /**
