@@ -32,7 +32,8 @@ struct drm_i915_mocs_entry {
 };
 
 struct drm_i915_mocs_table {
-	u32 size;
+	unsigned int size;
+	unsigned int n_entries;
 	const struct drm_i915_mocs_entry *table;
 };
 
@@ -140,10 +141,12 @@ static bool get_mocs_settings(struct drm_i915_private *dev_priv,
 	if (IS_GEN9_BC(dev_priv) || IS_CANNONLAKE(dev_priv) ||
 	    IS_ICELAKE(dev_priv)) {
 		table->size  = ARRAY_SIZE(skylake_mocs_table);
+		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
 		table->table = skylake_mocs_table;
 		result = true;
 	} else if (IS_GEN9_LP(dev_priv)) {
 		table->size  = ARRAY_SIZE(broxton_mocs_table);
+		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
 		table->table = broxton_mocs_table;
 		result = true;
 	} else {
@@ -202,8 +205,6 @@ void intel_mocs_init_engine(struct intel_engine_cs *engine)
 	if (!get_mocs_settings(dev_priv, &table))
 		return;
 
-	GEM_BUG_ON(table.size > GEN9_NUM_MOCS_ENTRIES);
-
 	/* Set unused values to PTE */
 	unused_value = table.table[I915_MOCS_PTE].control_value;
 
@@ -215,7 +216,7 @@ void intel_mocs_init_engine(struct intel_engine_cs *engine)
 	}
 
 	/* All remaining entries are also unused */
-	for (; index < GEN9_NUM_MOCS_ENTRIES; index++)
+	for (; index < table.n_entries; index++)
 		I915_WRITE(mocs_register(engine->id, index), unused_value);
 }
 
@@ -237,17 +238,17 @@ static int emit_mocs_control_table(struct i915_request *rq,
 	u32 unused_value;
 	u32 *cs;
 
-	if (WARN_ON(table->size > GEN9_NUM_MOCS_ENTRIES))
+	if (GEM_WARN_ON(table->size > table->n_entries))
 		return -ENODEV;
 
 	/* Set unused values to PTE */
 	unused_value = table->table[I915_MOCS_PTE].control_value;
 
-	cs = intel_ring_begin(rq, 2 + 2 * GEN9_NUM_MOCS_ENTRIES);
+	cs = intel_ring_begin(rq, 2 + 2 * table->n_entries);
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
 
-	*cs++ = MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES);
+	*cs++ = MI_LOAD_REGISTER_IMM(table->n_entries);
 
 	for (index = 0; index < table->size; index++) {
 		u32 value = table->table[index].used ?
@@ -258,7 +259,7 @@ static int emit_mocs_control_table(struct i915_request *rq,
 	}
 
 	/* All remaining entries are also unused */
-	for (; index < GEN9_NUM_MOCS_ENTRIES; index++) {
+	for (; index < table->n_entries; index++) {
 		*cs++ = i915_mmio_reg_offset(mocs_register(engine, index));
 		*cs++ = unused_value;
 	}
@@ -294,17 +295,17 @@ static int emit_mocs_l3cc_table(struct i915_request *rq,
 	unsigned int i, unused_index;
 	u32 *cs;
 
-	if (WARN_ON(table->size > GEN9_NUM_MOCS_ENTRIES))
+	if (GEM_WARN_ON(table->size > table->n_entries))
 		return -ENODEV;
 
 	/* Set unused values to PTE */
 	unused_index = I915_MOCS_PTE;
 
-	cs = intel_ring_begin(rq, 2 + GEN9_NUM_MOCS_ENTRIES);
+	cs = intel_ring_begin(rq, 2 + table->n_entries);
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
 
-	*cs++ = MI_LOAD_REGISTER_IMM(GEN9_NUM_MOCS_ENTRIES / 2);
+	*cs++ = MI_LOAD_REGISTER_IMM(table->n_entries / 2);
 
 	for (i = 0; i < table->size / 2; i++) {
 		u16 low = table->table[2 * i].used ?
@@ -327,7 +328,7 @@ static int emit_mocs_l3cc_table(struct i915_request *rq,
 	}
 
 	/* All remaining entries are also unused */
-	for (; i < GEN9_NUM_MOCS_ENTRIES / 2; i++) {
+	for (; i < table->n_entries / 2; i++) {
 		*cs++ = i915_mmio_reg_offset(GEN9_LNCFCMOCS(i));
 		*cs++ = l3cc_combine(table, unused_index, unused_index);
 	}
@@ -384,7 +385,7 @@ void intel_mocs_init_l3cc_table(struct drm_i915_private *dev_priv)
 	}
 
 	/* Now set the rest of the table to PTE */
-	for (; i < (GEN9_NUM_MOCS_ENTRIES / 2); i++)
+	for (; i < table.n_entries / 2; i++)
 		I915_WRITE(GEN9_LNCFCMOCS(i),
 			   l3cc_combine(&table, unused_index, unused_index));
 }
