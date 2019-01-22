@@ -627,6 +627,8 @@ void l2tp_recv_common(struct l2tp_session *session, struct sk_buff *skb,
 
 	/* Parse and check optional cookie */
 	if (session->peer_cookie_len > 0) {
+		if (!pskb_may_pull(skb, ptr - optr + session->peer_cookie_len))
+			goto discard;
 		if (memcmp(ptr, &session->peer_cookie[0], session->peer_cookie_len)) {
 			l2tp_info(tunnel, L2TP_MSG_DATA,
 				  "%s: cookie mismatch (%u/%u). Discarding.\n",
@@ -649,6 +651,8 @@ void l2tp_recv_common(struct l2tp_session *session, struct sk_buff *skb,
 	L2TP_SKB_CB(skb)->has_seq = 0;
 	if (tunnel->version == L2TP_HDR_VER_2) {
 		if (hdrflags & L2TP_HDRFLAG_S) {
+			if (!pskb_may_pull(skb, ptr - optr + 4))
+				goto discard;
 			ns = ntohs(*(__be16 *) ptr);
 			ptr += 2;
 			nr = ntohs(*(__be16 *) ptr);
@@ -663,6 +667,9 @@ void l2tp_recv_common(struct l2tp_session *session, struct sk_buff *skb,
 				 session->name, ns, nr, session->nr);
 		}
 	} else if (session->l2specific_type == L2TP_L2SPECTYPE_DEFAULT) {
+		if (!pskb_may_pull(skb, ptr - optr + 4))
+			goto discard;
+
 		u32 l2h = ntohl(*(__be32 *) ptr);
 
 		if (l2h & 0x40000000) {
@@ -729,6 +736,9 @@ void l2tp_recv_common(struct l2tp_session *session, struct sk_buff *skb,
 	if (tunnel->version == L2TP_HDR_VER_2) {
 		/* If offset bit set, skip it. */
 		if (hdrflags & L2TP_HDRFLAG_O) {
+			if (!pskb_may_pull(skb, ptr - optr + 2))
+				goto discard;
+
 			offset = ntohs(*(__be16 *)ptr);
 			ptr += 2 + offset;
 		}
