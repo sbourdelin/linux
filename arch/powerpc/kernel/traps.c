@@ -376,6 +376,66 @@ void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 	force_sig_fault(signr, code, (void __user *)addr, current);
 }
 
+/*
+ * The interrupt architecture has a quirk in that the HV interrupts excluding
+ * the NMIs (0x100 and 0x200) do not clear MSR[RI] at entry. The first thing
+ * that an interrupt handler must do is save off a GPR into a scratch register,
+ * and all interrupts on POWERNV (HV=1) use the same HSPRG register as scratch.
+ * Therefore an NMI can clobber an HV interrupt's live HSPRG without noticing
+ * that it is non-reentrant, which leads to random data corruption.
+ *
+ * The solution is for NMI interrupts in HV mode to check if they originated
+ * from these critical HV interrupt regions. If so, then mark them not
+ * recoverable.
+ *
+ * An alternative would be for HV NMIs to use SPRG for scratch to avoid the
+ * HSPRG clobber, however this would cause guest SPRG to be clobbered. Linux
+ * guests should always have MSR[RI]=0 when its scratch SPRG is in use, so
+ * that would work. However any other guest OS that may have the SPRG live
+ * and MSR[RI]=1 could encounter silent corruption.
+ *
+ * Builds that do not support KVM could take this second option to increase
+ * the recoverability of NMIs.
+ */
+void hv_nmi_check_nonrecoverable(struct pt_regs *regs)
+{
+#ifdef CONFIG_POWERNV
+	unsigned long kbase = (unsigned long)_stext;
+	unsigned long nip = regs->nip;
+
+	if (!(regs->msr & MSR_RI))
+		return;
+	if (!(regs->msr & MSR_HV))
+		return;
+	if (regs->msr & MSR_PR)
+		return;
+again:
+	if (nip >= 0x500 && nip < 0x600)
+		goto nonrecoverable;
+	if (nip >= 0x980 && nip < 0xa00)
+		goto nonrecoverable;
+	if (nip >= 0xe00 && nip < 0xec0)
+		goto nonrecoverable;
+	if (nip >= 0xf80 && nip < 0xfa0)
+		goto nonrecoverable;
+	/* Trampolines are not relocated. */
+	if (nip >= real_trampolines_start - kbase &&
+			nip < real_trampolines_end - kbase)
+		goto nonrecoverable;
+	if (nip >= virt_trampolines_start - kbase &&
+			nip < virt_trampolines_end - kbase)
+		goto nonrecoverable;
+	if (nip >= 0xc000000000000000ULL) {
+		nip -= 0xc000000000000000ULL;
+		goto again;
+	}
+	return;
+
+nonrecoverable:
+	regs->msr &= ~MSR_RI;
+#endif
+}
+
 void system_reset_exception(struct pt_regs *regs)
 {
 	/*
@@ -385,6 +445,8 @@ void system_reset_exception(struct pt_regs *regs)
 	bool nested = in_nmi();
 	if (!nested)
 		nmi_enter();
+
+	hv_nmi_check_nonrecoverable(regs);
 
 	__this_cpu_inc(irq_stat.sreset_irqs);
 
