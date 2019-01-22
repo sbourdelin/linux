@@ -426,6 +426,10 @@ struct flex_groups {
 /* Flags that are appropriate for non-directories/regular files. */
 #define EXT4_OTHER_FLMASK (EXT4_NODUMP_FL | EXT4_NOATIME_FL)
 
+/* Flags that should be swap */
+#define EXT4_FL_SHOULD_SWAP (EXT4_COMPR_FL | EXT4_COMPRBLK_FL | EXT4_NOCOMPR_FL |\
+			EXT4_HUGE_FILE_FL | EXT4_EXTENTS_FL)
+
 /* Mask out flags that are inappropriate for the given type of inode. */
 static inline __u32 ext4_mask_flags(umode_t mode, __u32 flags)
 {
