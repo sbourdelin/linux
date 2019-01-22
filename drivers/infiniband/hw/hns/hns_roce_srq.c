@@ -210,6 +210,7 @@ struct ib_srq *hns_roce_create_srq(struct ib_pd *pd,
 				   struct ib_udata *udata)
 {
 	struct hns_roce_dev *hr_dev = to_hr_dev(pd->device);
+	struct hns_roce_ib_create_srq_resp resp = {};
 	struct hns_roce_srq *srq;
 	int srq_desc_size;
 	int srq_buf_size;
@@ -377,9 +378,10 @@ struct ib_srq *hns_roce_create_srq(struct ib_pd *pd,
 
 	srq->event = hns_roce_ib_srq_event;
 	srq->ibsrq.ext.xrc.srq_num = srq->srqn;
+	resp.srqn = srq->srqn;
 
 	if (udata) {
-		if (ib_copy_to_udata(udata, &srq->srqn, sizeof(__u32))) {
+		if (ib_copy_to_udata(udata, &resp, sizeof(resp))) {
 			ret = -EFAULT;
 			goto err_wrid;
 		}
