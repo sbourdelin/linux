@@ -74,7 +74,7 @@ struct ib_umem_odp {
 	struct umem_odp_node	interval_tree;
 
 	struct completion	notifier_completion;
-	int			dying;
+	atomic_t		dying;
 	struct work_struct	work;
 };
 
