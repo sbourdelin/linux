@@ -164,7 +164,6 @@ struct mtk_pcie_soc {
  * @slot: port slot
  * @irq: GIC irq
  * @irq_domain: legacy INTx IRQ domain
- * @inner_domain: inner IRQ domain
  * @msi_domain: MSI IRQ domain
  * @lock: protect the msi_irq_in_use bitmap
  * @msi_irq_in_use: bit map for assigned MSI IRQ
@@ -184,7 +183,6 @@ struct mtk_pcie_port {
 	u32 slot;
 	int irq;
 	struct irq_domain *irq_domain;
-	struct irq_domain *inner_domain;
 	struct irq_domain *msi_domain;
 	struct mutex lock;
 	DECLARE_BITMAP(msi_irq_in_use, MTK_MSI_IRQS_NUM);
@@ -412,22 +410,15 @@ static void mtk_msi_ack_irq(struct irq_data *data)
 	u32 hwirq = data->hwirq;
 
 	writel(1 << hwirq, port->base + PCIE_IMSI_STATUS);
+	writel(MSI_STATUS, port->base + PCIE_INT_STATUS);
 }
 
-static struct irq_chip mtk_msi_bottom_irq_chip = {
-	.name			= "MTK MSI",
-	.irq_compose_msi_msg	= mtk_compose_msi_msg,
-	.irq_set_affinity	= mtk_msi_set_affinity,
-	.irq_ack		= mtk_msi_ack_irq,
-};
-
-static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-				     unsigned int nr_irqs, void *args)
+static irq_hw_number_t mtk_pcie_msi_get_hwirq(struct msi_domain_info *info,
+					      msi_alloc_info_t *arg)
 {
-	struct mtk_pcie_port *port = domain->host_data;
-	unsigned long bit;
+	struct mtk_pcie_port *port = info->chip_data;
+	irq_hw_number_t bit;
 
-	WARN_ON(nr_irqs != 1);
 	mutex_lock(&port->lock);
 
 	bit = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
@@ -440,18 +431,14 @@ static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int vir
 
 	mutex_unlock(&port->lock);
 
-	irq_domain_set_info(domain, virq, bit, &mtk_msi_bottom_irq_chip,
-			    domain->host_data, handle_edge_irq,
-			    NULL, NULL);
-
-	return 0;
+	return bit;
 }
 
-static void mtk_pcie_irq_domain_free(struct irq_domain *domain,
-				     unsigned int virq, unsigned int nr_irqs)
+static void mtk_pcie_msi_free(struct irq_domain *domain,
+			      struct msi_domain_info *info, unsigned int virq)
 {
 	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
-	struct mtk_pcie_port *port = irq_data_get_irq_chip_data(d);
+	struct mtk_pcie_port *port = info->chip_data;
 
 	mutex_lock(&port->lock);
 
@@ -462,46 +449,50 @@ static void mtk_pcie_irq_domain_free(struct irq_domain *domain,
 		__clear_bit(d->hwirq, port->msi_irq_in_use);
 
 	mutex_unlock(&port->lock);
-
-	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
 }
 
-static const struct irq_domain_ops msi_domain_ops = {
-	.alloc	= mtk_pcie_irq_domain_alloc,
-	.free	= mtk_pcie_irq_domain_free,
+static struct msi_domain_ops mtk_msi_domain_ops = {
+	.get_hwirq	= mtk_pcie_msi_get_hwirq,
+	.msi_free	= mtk_pcie_msi_free,
 };
 
 static struct irq_chip mtk_msi_irq_chip = {
-	.name		= "MTK PCIe MSI",
-	.irq_ack	= irq_chip_ack_parent,
-	.irq_mask	= pci_msi_mask_irq,
-	.irq_unmask	= pci_msi_unmask_irq,
+	.name			= "MTK PCIe",
+	.irq_compose_msi_msg	= mtk_compose_msi_msg,
+	.irq_write_msi_msg	= pci_msi_domain_write_msg,
+	.irq_set_affinity	= mtk_msi_set_affinity,
+	.irq_ack		= mtk_msi_ack_irq,
+	.irq_mask		= pci_msi_mask_irq,
+	.irq_unmask		= pci_msi_unmask_irq,
 };
 
 static struct msi_domain_info mtk_msi_domain_info = {
-	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-		   MSI_FLAG_PCI_MSIX),
-	.chip	= &mtk_msi_irq_chip,
+	.flags		= (MSI_FLAG_USE_DEF_DOM_OPS |
+			   MSI_FLAG_USE_DEF_CHIP_OPS | MSI_FLAG_PCI_MSIX),
+	.ops		= &mtk_msi_domain_ops,
+	.chip		= &mtk_msi_irq_chip,
+	.handler	= handle_edge_irq,
+	.handler_name	= "MSI",
 };
 
 static int mtk_pcie_allocate_msi_domains(struct mtk_pcie_port *port)
 {
-	struct fwnode_handle *fwnode = of_node_to_fwnode(port->pcie->dev->of_node);
+	struct device *dev = port->pcie->dev;
+	struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
+	struct msi_domain_info *info;
 
 	mutex_init(&port->lock);
 
-	port->inner_domain = irq_domain_create_linear(fwnode, MTK_MSI_IRQS_NUM,
-						      &msi_domain_ops, port);
-	if (!port->inner_domain) {
-		dev_err(port->pcie->dev, "failed to create IRQ domain\n");
+	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
+	if (!info)
 		return -ENOMEM;
-	}
 
-	port->msi_domain = pci_msi_create_irq_domain(fwnode, &mtk_msi_domain_info,
-						     port->inner_domain);
+	memcpy(info, &mtk_msi_domain_info, sizeof(*info));
+	info->chip_data = port;
+
+	port->msi_domain = pci_msi_create_irq_domain(fwnode, info, NULL);
 	if (!port->msi_domain) {
-		dev_err(port->pcie->dev, "failed to create MSI domain\n");
-		irq_domain_remove(port->inner_domain);
+		dev_err(dev, "failed to create MSI domain\n");
 		return -ENOMEM;
 	}
 
@@ -535,8 +526,6 @@ static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
 		if (IS_ENABLED(CONFIG_PCI_MSI)) {
 			if (port->msi_domain)
 				irq_domain_remove(port->msi_domain);
-			if (port->inner_domain)
-				irq_domain_remove(port->inner_domain);
 		}
 
 		irq_dispose_mapping(port->irq);
@@ -613,12 +602,11 @@ static void mtk_pcie_intr_handler(struct irq_desc *desc)
 
 			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
 				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
-					virq = irq_find_mapping(port->inner_domain, bit);
+					virq = irq_find_mapping(
+							port->msi_domain, bit);
 					generic_handle_irq(virq);
 				}
 			}
-			/* Clear MSI interrupt status */
-			writel(MSI_STATUS, port->base + PCIE_INT_STATUS);
 		}
 	}
 
