@@ -5,6 +5,8 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 
+#define BITSHIFT(val,i)  (u8)((*(u32 *)(val)) >> i & 0xff)
+
 /**
  * compute_crc - Compute CRC value on output frame
  *
@@ -71,6 +73,9 @@ static void blend(void *vaddr_dst, void *vaddr_src,
 	int y_limit = y_src + h_dst;
 	int x_limit = x_src + w_dst;
 
+	u8 alpha, r_src, r_dst, g_src, g_dst, b_src, b_dst;
+	u8 r_alpha, g_alpha, b_alpha;
+
 	for (i = y_src, i_dst = y_dst; i < y_limit; ++i) {
 		for (j = x_src, j_dst = x_dst; j < x_limit; ++j) {
 			offset_dst = crc_dst->offset
@@ -79,9 +84,25 @@ static void blend(void *vaddr_dst, void *vaddr_src,
 			offset_src = crc_src->offset
 				     + (i * crc_src->pitch)
 				     + (j * crc_src->cpp);
+			
+			/*Currently handles alpha values for fully opaque or fully transparent*/
+			alpha = (u8)((*(u32 *)vaddr_src + offset_src) >> 24);
+			alpha = alpha / 255;
+			r_src = BITSHIFT(vaddr_src + offset_src, 16);
+			g_src = BITSHIFT(vaddr_src + offset_src, 8);
+			b_src = BITSHIFT(vaddr_src + offset_src, 0);
+			r_dst = BITSHIFT(vaddr_dst + offset_dst, 16);
+			g_dst = BITSHIFT(vaddr_dst + offset_dst, 8);
+			b_dst = BITSHIFT(vaddr_dst + offset_dst, 0);
 
-			memcpy(vaddr_dst + offset_dst,
-			       vaddr_src + offset_src, sizeof(u32));
+			/*Pre-multiplied alpha for blending */
+			r_alpha = (r_src) + (r_dst * (1 - alpha));
+			g_alpha = (g_src) + (g_dst * (1 - alpha));
+			b_alpha = (b_src) + (b_dst * (1 - alpha));
+			memset(vaddr_dst + offset_dst, b_alpha, sizeof(u8));
+			memset(vaddr_dst + offset_dst + 1, g_alpha, sizeof(u8));
+			memset(vaddr_dst + offset_dst + 2, r_alpha, sizeof(u8));
+
 		}
 		i_dst++;
 	}
