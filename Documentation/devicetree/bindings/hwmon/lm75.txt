@@ -1,0 +1,15 @@
+*LM75 hwmon sensor.
+
+Required properties:
+- compatible: one of
+	"national,lm75"
+	"st,stlm75"
+
+- reg: I2C address
+
+Example:
+
+sensor@48 {
+	compatible = "st,stlm75";
+	reg = <0x48>;
+};
