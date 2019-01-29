@@ -5,7 +5,7 @@
 
 menuconfig MELLANOX_PLATFORM
 	bool "Platform support for Mellanox hardware"
-	depends on X86 || ARM || COMPILE_TEST
+	depends on X86 || ARM || ARM64 || COMPILE_TEST
 	---help---
 	  Say Y here to get to see options for platform support for
 	  Mellanox systems. This option alone does not add any kernel code.
@@ -33,5 +33,18 @@ config MLXREG_IO
 	  are defined per system type bases and include the registers related
 	  to system resets operation, system reset causes monitoring and some
 	  kinds of mux selection.
+
+config MLXBF_BOOTCTL
+	tristate "Mellanox BlueField Firmware Boot Control driver"
+	depends on ARM64
+	default m
+	help
+          The Mellanox BlueField firmware implements functionality to
+          request swapping the primary and alternate eMMC boot
+          partition, and to set up a watchdog that can undo that swap
+          if the system does not boot up correctly.  This driver
+          provides sysfs access to the firmware, to be used in
+          conjunction with the eMMC device driver to do any necessary
+          initial swap of the boot partition.
 
 endif # MELLANOX_PLATFORM
