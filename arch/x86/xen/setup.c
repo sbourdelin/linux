@@ -12,6 +12,7 @@
 #include <linux/memblock.h>
 #include <linux/cpuidle.h>
 #include <linux/cpufreq.h>
+#include <linux/memory_hotplug.h>
 
 #include <asm/elf.h>
 #include <asm/vdso.h>
@@ -825,6 +826,15 @@ char * __init xen_memory_setup(void)
 				xen_max_p2m_pfn = pfn_s + n_pfns;
 			} else
 				discard = true;
+#ifdef CONFIG_MEMORY_HOTPLUG
+			/*
+			 * Don't allow adding memory not in E820 map while
+			 * booting the system. Once the balloon driver is up
+			 * it will remove that restriction again.
+			 */
+			max_mem_size = xen_e820_table.entries[i].addr +
+				       xen_e820_table.entries[i].size;
+#endif
 		}
 
 		if (!discard)

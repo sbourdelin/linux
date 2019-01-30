@@ -37,6 +37,7 @@
 #include <linux/mm_types.h>
 #include <linux/init.h>
 #include <linux/capability.h>
+#include <linux/memory_hotplug.h>
 
 #include <xen/xen.h>
 #include <xen/interface/xen.h>
@@ -62,6 +63,11 @@ static void watch_target(struct xenbus_watch *watch,
 	int err;
 	static bool watch_fired;
 	static long target_diff;
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+	/* The balloon driver will take care of adding memory now. */
+	max_mem_size = U64_MAX;
+#endif
 
 	err = xenbus_scanf(XBT_NIL, "memory", "target", "%llu", &new_target);
 	if (err != 1) {
