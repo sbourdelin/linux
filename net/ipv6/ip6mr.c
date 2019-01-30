@@ -1492,25 +1492,11 @@ static int ip6mr_mfc_add(struct net *net, struct mr_table *mrt,
 	return 0;
 }
 
-/*
- *	Close the multicast socket, and clear the vif tables etc
- */
-
-static void mroute_clean_tables(struct mr_table *mrt, bool all)
+/* Clear the vif tables */
+static void mroute_clean_cache(struct mr_table *mrt, bool all)
 {
 	struct mr_mfc *c, *tmp;
-	LIST_HEAD(list);
-	int i;
 
-	/* Shut down all active vif entries */
-	for (i = 0; i < mrt->maxvif; i++) {
-		if (!all && (mrt->vif_table[i].flags & VIFF_STATIC))
-			continue;
-		mif6_delete(mrt, i, 0, &list);
-	}
-	unregister_netdevice_many(&list);
-
-	/* Wipe the cache */
 	list_for_each_entry_safe(c, tmp, &mrt->mfc_cache_list, list) {
 		if (!all && (c->mfc_flags & MFC_STATIC))
 			continue;
@@ -1533,6 +1519,27 @@ static void mroute_clean_tables(struct mr_table *mrt, bool all)
 		}
 		spin_unlock_bh(&mfc_unres_lock);
 	}
+}
+
+/*
+ *	Close the multicast socket, and clear the vif tables etc
+ */
+
+static void mroute_clean_tables(struct mr_table *mrt, bool all)
+{
+	LIST_HEAD(list);
+	int i;
+
+	/* Shut down all active vif entries */
+	for (i = 0; i < mrt->maxvif; i++) {
+		if (!all && (mrt->vif_table[i].flags & VIFF_STATIC))
+			continue;
+		mif6_delete(mrt, i, 0, &list);
+	}
+	unregister_netdevice_many(&list);
+
+	/* Wipe the cache */
+	mroute_clean_cache(mrt, all);
 }
 
 static int ip6mr_sk_init(struct mr_table *mrt, struct sock *sk)
@@ -1702,6 +1709,13 @@ int ip6_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, uns
 					    parent);
 		rtnl_unlock();
 		return ret;
+	case MRT6_DEL_MFC_ALL:
+		rtnl_lock();
+		ip6mr_for_each_table(mrt, net) {
+			mroute_clean_cache(mrt, true);
+		}
+		rtnl_unlock();
+		return 0;
 
 	/*
 	 *	Control PIM assert (to activate pim will activate assert)
