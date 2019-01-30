@@ -3456,9 +3456,8 @@ out:
  *    of the logical span [map->m_lblk, map->m_lblk + map->m_len).
  *
  * Post-conditions on success:
- *  - the returned value is the number of blocks beyond map->l_lblk
- *    that are allocated and initialized.
- *    It is guaranteed to be >= map->m_len.
+ *  - The returned value is the minimum number of requested blocks or
+ *    initialized blocks. It is guaranteed to be <= map->m_len.
  */
 static int ext4_ext_convert_to_initialized(handle_t *handle,
 					   struct inode *inode,
@@ -3680,7 +3679,6 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 
 			split_map.m_len += split_map.m_lblk - ee_block;
 			split_map.m_lblk = ee_block;
-			allocated = map->m_len;
 		}
 	}
 
@@ -3689,6 +3687,9 @@ static int ext4_ext_convert_to_initialized(handle_t *handle,
 	if (err > 0)
 		err = 0;
 out:
+	if (allocated > map->m_len)
+		allocated = map->m_len;
+
 	/* If we have gotten a failure, don't zero out status tree */
 	if (!err) {
 		err = ext4_zeroout_es(inode, &zero_ex1);
@@ -4045,11 +4046,10 @@ out:
 	if (ret <= 0) {
 		err = ret;
 		goto out2;
-	} else
-		allocated = ret;
+	}
+
+	allocated = ret;
 	map->m_flags |= EXT4_MAP_NEW;
-	if (allocated > map->m_len)
-		allocated = map->m_len;
 	map->m_len = allocated;
 
 map_out:
