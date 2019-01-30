@@ -90,6 +90,7 @@ int kernfs_iop_getattr(const struct path *path, struct kstat *stat,
 		       u32 request_mask, unsigned int query_flags);
 ssize_t kernfs_iop_listxattr(struct dentry *dentry, char *buf, size_t size);
 int __kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr);
+struct kernfs_iattrs *kernfs_iattrs(struct kernfs_node *kn);
 
 /*
  * dir.c
