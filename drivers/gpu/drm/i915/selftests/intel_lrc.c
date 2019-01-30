@@ -503,8 +503,8 @@ static int live_suppress_wait_preempt(void *arg)
 				}
 
 				/* Disable NEWCLIENT promotion */
-				i915_gem_active_set(&rq[i]->timeline->last_request,
-						    dummy);
+				__i915_active_request_set(&rq[i]->timeline->last_request,
+							  dummy);
 				i915_request_add(rq[i]);
 			}
 

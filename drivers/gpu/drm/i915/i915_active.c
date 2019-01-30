@@ -12,7 +12,7 @@
 #define BKL(ref) (&i915_from_gt((ref)->gt)->drm.struct_mutex)
 
 struct active_node {
-	struct i915_gem_active base;
+	struct i915_active_request base;
 	struct i915_active *ref;
 	struct rb_node node;
 	u64 timeline;
@@ -27,18 +27,18 @@ __active_retire(struct i915_active *ref)
 }
 
 static void
-node_retire(struct i915_gem_active *base, struct i915_request *rq)
+node_retire(struct i915_active_request *base, struct i915_request *rq)
 {
 	__active_retire(container_of(base, struct active_node, base)->ref);
 }
 
 static void
-last_retire(struct i915_gem_active *base, struct i915_request *rq)
+last_retire(struct i915_active_request *base, struct i915_request *rq)
 {
 	__active_retire(container_of(base, struct i915_active, last));
 }
 
-static struct i915_gem_active *
+static struct i915_active_request *
 active_instance(struct i915_active *ref, u64 idx)
 {
 	struct active_node *node;
@@ -59,7 +59,7 @@ active_instance(struct i915_active *ref, u64 idx)
 	 * twice for the same timeline (as the older rbtree element will be
 	 * retired before the new request added to last).
 	 */
-	old = i915_gem_active_raw(&ref->last, BKL(ref));
+	old = i915_active_request_raw(&ref->last, BKL(ref));
 	if (!old || old->fence.context == idx)
 		goto out;
 
@@ -84,7 +84,7 @@ active_instance(struct i915_active *ref, u64 idx)
 	node = kmem_cache_alloc(ref->gt->slab_cache, GFP_KERNEL);
 
 	/* kmalloc may retire the ref->last (thanks shrinker)! */
-	if (unlikely(!i915_gem_active_raw(&ref->last, BKL(ref)))) {
+	if (unlikely(!i915_active_request_raw(&ref->last, BKL(ref)))) {
 		kmem_cache_free(ref->gt->slab_cache, node);
 		goto out;
 	}
@@ -92,7 +92,7 @@ active_instance(struct i915_active *ref, u64 idx)
 	if (unlikely(!node))
 		return ERR_PTR(-ENOMEM);
 
-	init_request_active(&node->base, node_retire);
+	i915_active_request_init(&node->base, NULL, node_retire);
 	node->ref = ref;
 	node->timeline = idx;
 
@@ -110,7 +110,7 @@ replace:
 	 * callback not two, and so much undo the active counting for the
 	 * overwritten slot.
 	 */
-	if (i915_gem_active_isset(&node->base)) {
+	if (i915_active_request_isset(&node->base)) {
 		/* Retire ourselves from the old rq->active_list */
 		__list_del_entry(&node->base.link);
 		ref->count--;
@@ -131,7 +131,7 @@ void i915_active_init(struct i915_gt_active *gt,
 	ref->gt = gt;
 	ref->retire = retire;
 	ref->tree = RB_ROOT;
-	init_request_active(&ref->last, last_retire);
+	i915_active_request_init(&ref->last, NULL, last_retire);
 	ref->count = 0;
 }
 
@@ -139,15 +139,15 @@ int i915_active_ref(struct i915_active *ref,
 		    u64 timeline,
 		    struct i915_request *rq)
 {
-	struct i915_gem_active *active;
+	struct i915_active_request *active;
 
 	active = active_instance(ref, timeline);
 	if (IS_ERR(active))
 		return PTR_ERR(active);
 
-	if (!i915_gem_active_isset(active))
+	if (!i915_active_request_isset(active))
 		ref->count++;
-	i915_gem_active_set(active, rq);
+	__i915_active_request_set(active, rq);
 
 	return 0;
 }
@@ -170,7 +170,7 @@ int i915_active_wait(struct i915_active *ref)
 	struct active_node *it, *n;
 	int ret;
 
-	ret = i915_gem_active_retire(&ref->last, BKL(ref));
+	ret = i915_active_request_retire(&ref->last, BKL(ref));
 	if (ret)
 		return ret;
 
@@ -178,11 +178,11 @@ int i915_active_wait(struct i915_active *ref)
 		return 0;
 
 	rbtree_postorder_for_each_entry_safe(it, n, &ref->tree, node) {
-		ret = i915_gem_active_retire(&it->base, BKL(ref));
+		ret = i915_active_request_retire(&it->base, BKL(ref));
 		if (ret)
 			return ret;
 
-		GEM_BUG_ON(i915_gem_active_isset(&it->base));
+		GEM_BUG_ON(i915_active_request_isset(&it->base));
 		kmem_cache_free(slab, it);
 	}
 	ref->tree = RB_ROOT;
@@ -191,11 +191,11 @@ int i915_active_wait(struct i915_active *ref)
 	return 0;
 }
 
-static int __i915_request_await_active(struct i915_request *rq,
-				       struct i915_gem_active *active)
+int i915_request_await_active_request(struct i915_request *rq,
+				      struct i915_active_request *active)
 {
 	struct i915_request *barrier =
-		i915_gem_active_raw(active, &rq->i915->drm.struct_mutex);
+		i915_active_request_raw(active, &rq->i915->drm.struct_mutex);
 
 	return barrier ? i915_request_await_dma_fence(rq, &barrier->fence) : 0;
 }
@@ -205,12 +205,12 @@ int i915_request_await_active(struct i915_request *rq, struct i915_active *ref)
 	struct active_node *it, *n;
 	int ret;
 
-	ret = __i915_request_await_active(rq, &ref->last);
+	ret = i915_request_await_active_request(rq, &ref->last);
 	if (ret)
 		return ret;
 
 	rbtree_postorder_for_each_entry_safe(it, n, &ref->tree, node) {
-		ret = __i915_request_await_active(rq, &it->base);
+		ret = i915_request_await_active_request(rq, &it->base);
 		if (ret)
 			return ret;
 	}
@@ -224,13 +224,13 @@ void i915_active_fini(struct i915_active *ref)
 	struct active_node *it, *n;
 
 	lockdep_assert_held(BKL(ref));
-	GEM_BUG_ON(i915_gem_active_isset(&ref->last));
+	GEM_BUG_ON(i915_active_request_isset(&ref->last));
 
 	if (RB_EMPTY_ROOT(&ref->tree))
 		return;
 
 	rbtree_postorder_for_each_entry_safe(it, n, &ref->tree, node) {
-		GEM_BUG_ON(i915_gem_active_isset(&it->base));
+		GEM_BUG_ON(i915_active_request_isset(&it->base));
 		kmem_cache_free(slab, it);
 	}
 	ref->tree = RB_ROOT;
@@ -260,6 +260,26 @@ void i915_gt_active_fini(struct i915_gt_active *gt)
 {
 	GEM_BUG_ON(!list_empty(&gt->active_refs));
 	kmem_cache_destroy(gt->slab_cache);
+}
+
+int i915_active_request_set(struct i915_active_request *active,
+			    struct i915_request *rq)
+{
+	int err;
+
+	/* Must maintain ordering wrt previous active requests */
+	err = i915_request_await_active_request(rq, active);
+	if (err)
+		return err;
+
+	__i915_active_request_set(active, rq);
+	return 0;
+}
+
+void i915_active_retire_noop(struct i915_active_request *active,
+			     struct i915_request *request)
+{
+	/* Space left intentionally blank */
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)

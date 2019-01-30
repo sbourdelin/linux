@@ -653,8 +653,8 @@ last_request_on_engine(struct i915_timeline *timeline,
 
 	GEM_BUG_ON(timeline == &engine->timeline);
 
-	rq = i915_gem_active_raw(&timeline->last_request,
-				 &engine->i915->drm.struct_mutex);
+	rq = i915_active_request_raw(&timeline->last_request,
+				     &engine->i915->drm.struct_mutex);
 	if (rq && rq->engine == engine) {
 		GEM_TRACE("last request for %s on engine %s: %llx:%llu\n",
 			  timeline->name, engine->name,
