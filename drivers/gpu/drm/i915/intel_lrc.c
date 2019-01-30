@@ -164,6 +164,8 @@
 #define WA_TAIL_DWORDS 2
 #define WA_TAIL_BYTES (sizeof(u32) * WA_TAIL_DWORDS)
 
+#define ACTIVE_PRIORITY (I915_PRIORITY_NEWCLIENT)
+
 static int execlists_context_deferred_alloc(struct i915_gem_context *ctx,
 					    struct intel_engine_cs *engine,
 					    struct intel_context *ce);
@@ -188,6 +190,34 @@ static inline int rq_prio(const struct i915_request *rq)
 	return rq->sched.attr.priority;
 }
 
+static inline int active_prio(const struct i915_request *rq)
+{
+	int prio = rq_prio(rq);
+
+	/*
+	 * On unwinding the active request, we give it a priority bump
+	 * equivalent to a freshly submitted request. This protects it from
+	 * being gazumped again, but it would be preferable if we didn't
+	 * let it be gazumped in the first place!
+	 *
+	 * See __unwind_incomplete_requests()
+	 */
+	if ((prio & ACTIVE_PRIORITY) != ACTIVE_PRIORITY &&
+	    i915_request_started(rq)) {
+		/*
+		 * After preemption, we insert the active request at the
+		 * end of the new priority level. This means that we will be
+		 * _lower_ priority than the preemptee all things equal (and
+		 * so the preemption is valid), so adjust our comparison
+		 * accordingly.
+		 */
+		prio |= ACTIVE_PRIORITY;
+		prio--;
+	}
+
+	return prio;
+}
+
 static int queue_prio(const struct intel_engine_execlists *execlists)
 {
 	struct i915_priolist *p;
@@ -208,7 +238,7 @@ static int queue_prio(const struct intel_engine_execlists *execlists)
 static inline bool need_preempt(const struct intel_engine_cs *engine,
 				const struct i915_request *rq)
 {
-	const int last_prio = rq_prio(rq);
+	int last_prio;
 
 	if (!intel_engine_has_preemption(engine))
 		return false;
@@ -228,6 +258,7 @@ static inline bool need_preempt(const struct intel_engine_cs *engine,
 	 * preempt. If that hint is stale or we may be trying to preempt
 	 * ourselves, ignore the request.
 	 */
+	last_prio = active_prio(rq);
 	if (!__execlists_need_preempt(engine->execlists.queue_priority_hint,
 				      last_prio))
 		return false;
@@ -353,7 +384,7 @@ __unwind_incomplete_requests(struct intel_engine_cs *engine)
 {
 	struct i915_request *rq, *rn, *active = NULL;
 	struct list_head *uninitialized_var(pl);
-	int prio = I915_PRIORITY_INVALID | I915_PRIORITY_NEWCLIENT;
+	int prio = I915_PRIORITY_INVALID | ACTIVE_PRIORITY;
 
 	lockdep_assert_held(&engine->timeline.lock);
 
@@ -384,9 +415,15 @@ __unwind_incomplete_requests(struct intel_engine_cs *engine)
 	 * The active request is now effectively the start of a new client
 	 * stream, so give it the equivalent small priority bump to prevent
 	 * it being gazumped a second time by another peer.
+	 *
+	 * One consequence of this preemption boost is that we may jump
+	 * over lesser priorities (such as I915_PRIORITY_WAIT), effectively
+	 * making those priorities non-preemptible. They will be moved forward
+	 * in the priority queue, but they will not gain immediate access to
+	 * the GPU.
 	 */
-	if (!(prio & I915_PRIORITY_NEWCLIENT)) {
-		prio |= I915_PRIORITY_NEWCLIENT;
+	if ((prio & ACTIVE_PRIORITY) != ACTIVE_PRIORITY) {
+		prio |= ACTIVE_PRIORITY;
 		active->sched.attr.priority = prio;
 		list_move_tail(&active->sched.link,
 			       i915_sched_lookup_priolist(engine, prio));
