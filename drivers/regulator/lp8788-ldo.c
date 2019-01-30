@@ -113,8 +113,6 @@ enum lp8788_ldo_id {
 
 struct lp8788_ldo {
 	struct lp8788 *lp;
-	struct regulator_desc *desc;
-	struct regulator_dev *regulator;
 	struct gpio_desc *ena_gpiod;
 };
 
@@ -558,7 +556,6 @@ static int lp8788_dldo_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ldo->regulator = rdev;
 	platform_set_drvdata(pdev, ldo);
 
 	return 0;
@@ -605,7 +602,6 @@ static int lp8788_aldo_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ldo->regulator = rdev;
 	platform_set_drvdata(pdev, ldo);
 
 	return 0;
