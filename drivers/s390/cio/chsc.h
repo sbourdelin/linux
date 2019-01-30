@@ -9,6 +9,7 @@
 #include <asm/chsc.h>
 #include <asm/schid.h>
 #include <asm/qdio.h>
+#include <asm/ap.h>
 
 #define CHSC_SDA_OC_MSS   0x2
 

@@ -35,6 +35,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/debugfs.h>
 #include <linux/ctype.h>
+#include <asm/crw.h>
 
 #include "ap_bus.h"
 #include "ap_debug.h"
@@ -858,6 +859,17 @@ void ap_bus_force_rescan(void)
 	flush_work(&ap_scan_work);
 }
 EXPORT_SYMBOL(ap_bus_force_rescan);
+
+/*
+* A config change has happened, Force an ap bus rescan.
+*/
+void ap_bus_cfg_chg(void)
+{
+	AP_DBF(DBF_INFO, "%s config change, forcing bus rescan\n", __func__);
+
+	ap_bus_force_rescan();
+}
+EXPORT_SYMBOL(ap_bus_cfg_chg);
 
 /*
  * hex2bitmap() - parse hex mask string and set bitmap.
