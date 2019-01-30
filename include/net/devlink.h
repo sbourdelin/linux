@@ -428,6 +428,11 @@ enum devlink_param_wol_types {
 	.validate = _validate,						\
 }
 
+/* Part number, identifier of board design */
+#define DEVLINK_VERSION_GENERIC_BOARD_ID	"board.id"
+/* Revision of board design */
+#define DEVLINK_VERSION_GENERIC_BOARD_REV	"board.rev"
+
 enum devlink_version_type {
 	DEVLINK_VERSION_FIXED,
 	DEVLINK_VERSION_STORED,
