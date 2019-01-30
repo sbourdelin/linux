@@ -467,6 +467,7 @@ int esp_output_tail(struct xfrm_state *x, struct sk_buff *skb, struct esp_info *
 
 error_free:
 	kfree(tmp);
+	tmp = NULL;
 error:
 	return err;
 }
@@ -959,7 +960,7 @@ static int esp_init_authenc(struct xfrm_state *x)
 
 free_key:
 	kfree(key);
-
+	key = NULL;
 error:
 	return err;
 }
