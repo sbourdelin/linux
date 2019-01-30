@@ -38,6 +38,16 @@ struct drm_i915_gem_object;
 struct i915_request;
 struct i915_timeline;
 
+/*
+ * Powergating configuration for a particular (context,engine).
+ */
+struct intel_sseu {
+	u8 slice_mask;
+	u8 subslice_mask;
+	u8 min_eus_per_subslice;
+	u8 max_eus_per_subslice;
+};
+
 struct i915_capture_list {
 	struct i915_capture_list *next;
 	struct i915_vma *vma;
