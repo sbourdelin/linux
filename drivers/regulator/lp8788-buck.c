@@ -91,7 +91,6 @@ enum lp8788_buck_id {
 
 struct lp8788_buck {
 	struct lp8788 *lp;
-	struct regulator_dev *regulator;
 	void *dvs;
 };
 
@@ -523,7 +522,6 @@ static int lp8788_buck_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	buck->regulator = rdev;
 	platform_set_drvdata(pdev, buck);
 
 	return 0;
