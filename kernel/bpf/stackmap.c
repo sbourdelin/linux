@@ -44,7 +44,7 @@ static void do_up_read(struct irq_work *entry)
 	struct stack_map_irq_work *work;
 
 	work = container_of(entry, struct stack_map_irq_work, irq_work);
-	up_read(work->sem);
+	up_read_non_owner(work->sem);
 	work->sem = NULL;
 }
 
