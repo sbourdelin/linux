@@ -373,7 +373,8 @@ static int prism2_scan(struct wiphy *wiphy,
 			msg2.beaconperiod.data,
 			ie_buf,
 			ie_len,
-			(msg2.signal.data - 65536) * 100, /* Conversion to signed type */
+			/*Conversion to signed type*/
+			(msg2.signal.data - 65536) * 100,
 			GFP_KERNEL
 		);
 
@@ -410,7 +411,7 @@ static int prism2_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 			data = wiphy->rts_threshold;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDMIB_DOT11MAC_OPERATIONTABLE_RTSTHRESHOLD,
+				DIDMIB_DOT11MAC_OPERATIONTABLE_RTSTHRESHOLD,
 						data);
 		if (result) {
 			err = -EFAULT;
@@ -425,7 +426,7 @@ static int prism2_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 			data = wiphy->frag_threshold;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDMIB_DOT11MAC_OPERATIONTABLE_FRAGMENTATIONTHRESHOLD,
+			DIDMIB_DOT11MAC_OPERATIONTABLE_FRAGMENTATIONTHRESHOLD,
 						data);
 		if (result) {
 			err = -EFAULT;
@@ -455,7 +456,7 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 	if (channel) {
 		chan = ieee80211_frequency_to_channel(channel->center_freq);
 		result = prism2_domibset_uint32(wlandev,
-						DIDMIB_DOT11PHY_DSSSTABLE_CURRENTCHANNEL,
+				DIDMIB_DOT11PHY_DSSSTABLE_CURRENTCHANNEL,
 						chan);
 		if (result)
 			goto exit;
@@ -502,13 +503,13 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 		 * seems reasonable anyways
 		 */
 		result = prism2_domibset_uint32(wlandev,
-						DIDMIB_DOT11SMT_PRIVACYTABLE_PRIVACYINVOKED,
+				DIDMIB_DOT11SMT_PRIVACYTABLE_PRIVACYINVOKED,
 						P80211ENUM_truth_true);
 		if (result)
 			goto exit;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDMIB_DOT11SMT_PRIVACYTABLE_EXCLUDEUNENCRYPTED,
+				DIDMIB_DOT11SMT_PRIVACYTABLE_EXCLUDEUNENCRYPTED,
 						P80211ENUM_truth_true);
 		if (result)
 			goto exit;
@@ -518,13 +519,13 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 		 * and exclude unencrypted
 		 */
 		result = prism2_domibset_uint32(wlandev,
-						DIDMIB_DOT11SMT_PRIVACYTABLE_PRIVACYINVOKED,
+				DIDMIB_DOT11SMT_PRIVACYTABLE_PRIVACYINVOKED,
 						P80211ENUM_truth_false);
 		if (result)
 			goto exit;
 
 		result = prism2_domibset_uint32(wlandev,
-						DIDMIB_DOT11SMT_PRIVACYTABLE_EXCLUDEUNENCRYPTED,
+				DIDMIB_DOT11SMT_PRIVACYTABLE_EXCLUDEUNENCRYPTED,
 						P80211ENUM_truth_false);
 		if (result)
 			goto exit;
