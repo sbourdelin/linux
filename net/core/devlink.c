@@ -3715,12 +3715,18 @@ out:
 }
 
 struct devlink_info_req {
+	bool compat;
 	struct sk_buff *msg;
+	/* For compat call */
+	char *buf;
+	size_t len;
 };
 
 int devlink_info_report_driver_name(struct devlink_info_req *req,
 				    const char *name)
 {
+	if (req->compat)
+		return 0;
 	return nla_put_string(req->msg, DEVLINK_ATTR_INFO_DRV_NAME, name);
 }
 EXPORT_SYMBOL_GPL(devlink_info_report_driver_name);
@@ -3728,6 +3734,8 @@ EXPORT_SYMBOL_GPL(devlink_info_report_driver_name);
 int devlink_info_report_serial_number(struct devlink_info_req *req,
 				      const char *sn)
 {
+	if (req->compat)
+		return 0;
 	return nla_put_string(req->msg, DEVLINK_ATTR_INFO_SERIAL_NUMBER, sn);
 }
 EXPORT_SYMBOL_GPL(devlink_info_report_serial_number);
@@ -3743,7 +3751,15 @@ int devlink_info_report_version(struct devlink_info_req *req,
 		[DEVLINK_VERSION_RUNNING] = DEVLINK_ATTR_INFO_VERSION_RUNNING,
 	};
 	struct nlattr *nest;
-	int err;
+	int len, err;
+
+	if (req->compat) {
+		if (type == DEVLINK_VERSION_RUNNING) {
+			len = strlcpy(req->buf, version_value, req->len);
+			req->len = max_t(size_t, 0, req->len - len);
+		}
+		return 0;
+	}
 
 	if (type >= ARRAY_SIZE(type2attr) || !type2attr[type])
 		return -EINVAL;
@@ -3789,6 +3805,7 @@ devlink_nl_info_fill(struct sk_buff *msg, struct devlink *devlink,
 	if (devlink_nl_put_handle(msg, devlink))
 		goto err_cancel_msg;
 
+	memset(&req, 0, sizeof(req));
 	req.msg = msg;
 	err = devlink->ops->info_get(devlink, &req, extack);
 	if (err)
@@ -5262,6 +5279,39 @@ unlock:
 	return err;
 }
 EXPORT_SYMBOL_GPL(devlink_region_snapshot_create);
+
+void devlink_compat_running_versions(struct net_device *dev,
+				     char *buf, size_t len)
+{
+	struct devlink_port *devlink_port;
+	struct devlink_info_req req;
+	struct devlink *devlink;
+	bool found = false;
+
+	mutex_lock(&devlink_mutex);
+	list_for_each_entry(devlink, &devlink_list, list) {
+		mutex_lock(&devlink->lock);
+		list_for_each_entry(devlink_port, &devlink->port_list, list) {
+			if (devlink_port->type == DEVLINK_PORT_TYPE_ETH ||
+			    devlink_port->type_dev == dev) {
+				mutex_unlock(&devlink->lock);
+				found = true;
+				goto out;
+			}
+		}
+		mutex_unlock(&devlink->lock);
+	}
+out:
+	if (found && devlink->ops->info_get) {
+		memset(&req, 0, sizeof(req));
+		req.compat = true;
+		req.buf = buf;
+		req.len = len;
+
+		devlink->ops->info_get(devlink, &req, NULL);
+	}
+	mutex_unlock(&devlink_mutex);
+}
 
 static int __init devlink_module_init(void)
 {

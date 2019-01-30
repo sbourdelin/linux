@@ -640,6 +640,8 @@ int devlink_info_report_version(struct devlink_info_req *req,
 				enum devlink_version_type type,
 				const char *version_name,
 				const char *version_value);
+void devlink_compat_running_versions(struct net_device *dev,
+				     char *buf, size_t len);
 
 #else
 
@@ -956,6 +958,11 @@ devlink_info_report_version(struct devlink_info_req *req,
 			    const char *version_name, const char *version_value)
 {
 	return 0;
+}
+
+static inline void
+devlink_compat_running_versions(struct net_device *dev, char *buf, size_t len)
+{
 }
 #endif
 
