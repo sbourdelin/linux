@@ -164,7 +164,7 @@
 #define WA_TAIL_DWORDS 2
 #define WA_TAIL_BYTES (sizeof(u32) * WA_TAIL_DWORDS)
 
-#define ACTIVE_PRIORITY (I915_PRIORITY_NEWCLIENT)
+#define ACTIVE_PRIORITY (I915_PRIORITY_NEWCLIENT | I915_PRIORITY_NOSEMAPHORE)
 
 static int execlists_context_deferred_alloc(struct i915_gem_context *ctx,
 					    struct intel_engine_cs *engine,
@@ -614,7 +614,8 @@ static bool can_merge_rq(const struct i915_request *prev,
 	 * rules should mean that if this semaphore is preempted, its
 	 * dependency chain is preserved and suitably promoted via PI.
 	 */
-	if (prev->sched.semaphore && !i915_request_started(prev))
+	if (prev->sched.semaphore & I915_SCHED_HAS_SEMAPHORE &&
+	    !i915_request_started(prev))
 		return false;
 
 	if (!can_merge_ctx(prev->hw_context, next->hw_context))

@@ -844,7 +844,7 @@ emit_semaphore_wait(struct i915_request *to,
 		intel_ring_advance(to, cs);
 	}
 
-	to->sched.semaphore = true;
+	to->sched.semaphore |= I915_SCHED_HAS_SEMAPHORE;
 	return 0;
 }
 
@@ -866,6 +866,9 @@ i915_request_await_request(struct i915_request *to, struct i915_request *from)
 		if (ret < 0)
 			return ret;
 	}
+
+	if (from->sched.semaphore && !i915_request_started(from))
+		to->sched.semaphore |= I915_SCHED_CHAIN_SEMAPHORE;
 
 	if (to->engine == from->engine) {
 		ret = i915_sw_fence_await_sw_fence_gfp(&to->submit,
@@ -1116,6 +1119,9 @@ void i915_request_add(struct i915_request *request)
 	rcu_read_lock(); /* RCU serialisation for set-wedged protection */
 	if (engine->schedule) {
 		struct i915_sched_attr attr = request->gem_context->sched;
+
+		if (!request->sched.semaphore)
+			attr.priority |= I915_PRIORITY_NOSEMAPHORE;
 
 		/*
 		 * Boost priorities to new clients (new request flows).
