@@ -2130,7 +2130,8 @@ label_lps_done:
 			if (rtlpriv->link_info.roam_times >= 5) {
 				pr_err("AP off, try to reconnect now\n");
 				rtlpriv->link_info.roam_times = 0;
-				ieee80211_connection_loss(rtlpriv->mac80211.vif);
+				ieee80211_connection_loss
+					(rtlpriv->mac80211.vif);
 			}
 		} else {
 			rtlpriv->link_info.roam_times = 0;
