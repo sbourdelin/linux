@@ -127,6 +127,7 @@ struct i915_request {
 	 */
 	struct i915_sw_fence submit;
 	wait_queue_entry_t submitq;
+	struct list_head execute_cb;
 
 	/*
 	 * A list of everyone we wait upon, and everyone who waits upon us.

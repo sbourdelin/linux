@@ -421,7 +421,8 @@ __unwind_incomplete_requests(struct intel_engine_cs *engine)
 	 * in the priority queue, but they will not gain immediate access to
 	 * the GPU.
 	 */
-	if ((prio & ACTIVE_PRIORITY) != ACTIVE_PRIORITY) {
+	if ((prio & ACTIVE_PRIORITY) != ACTIVE_PRIORITY &&
+	    i915_request_started(active)) {
 		prio |= ACTIVE_PRIORITY;
 		active->sched.attr.priority = prio;
 		list_move_tail(&active->sched.link,
@@ -604,6 +605,17 @@ static bool can_merge_rq(const struct i915_request *prev,
 			 const struct i915_request *next)
 {
 	GEM_BUG_ON(!assert_priority_queue(prev, next));
+
+	/*
+	 * To avoid AB-BA deadlocks, we simply restrict ourselves to only
+	 * submitting one semaphore (think HW spinlock) to HW at a time. This
+	 * prevents the execution callback on a later sempahore from being
+	 * queued on another engine, so no cycle can be formed. Preemption
+	 * rules should mean that if this semaphore is preempted, its
+	 * dependency chain is preserved and suitably promoted via PI.
+	 */
+	if (prev->sched.semaphore && !i915_request_started(prev))
+		return false;
 
 	if (!can_merge_ctx(prev->hw_context, next->hw_context))
 		return false;

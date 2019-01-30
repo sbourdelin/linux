@@ -72,6 +72,7 @@ struct i915_sched_node {
 	struct list_head waiters_list; /* those after us, they depend upon us */
 	struct list_head link;
 	struct i915_sched_attr attr;
+	bool semaphore;
 };
 
 struct i915_dependency {

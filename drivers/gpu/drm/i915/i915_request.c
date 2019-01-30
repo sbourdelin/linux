@@ -22,8 +22,9 @@
  *
  */
 
-#include <linux/prefetch.h>
 #include <linux/dma-fence-array.h>
+#include <linux/irq_work.h>
+#include <linux/prefetch.h>
 #include <linux/sched.h>
 #include <linux/sched/clock.h>
 #include <linux/sched/signal.h>
@@ -326,6 +327,76 @@ void i915_request_retire_upto(struct i915_request *rq)
 	} while (tmp != rq);
 }
 
+struct execute_cb {
+	struct list_head link;
+	struct irq_work work;
+	struct i915_sw_fence *fence;
+};
+
+static void irq_execute_cb(struct irq_work *wrk)
+{
+	struct execute_cb *cb = container_of(wrk, typeof(*cb), work);
+
+	i915_sw_fence_complete(cb->fence);
+	kfree(cb);
+}
+
+static void __notify_execute_cb(struct i915_request *rq)
+{
+	struct execute_cb *cb;
+
+	lockdep_assert_held(&rq->lock);
+
+	if (list_empty(&rq->execute_cb))
+		return;
+
+	list_for_each_entry(cb, &rq->execute_cb, link)
+		irq_work_queue(&cb->work);
+
+	/*
+	 * XXX Rollback on __i915_request_unsubmit()
+	 *
+	 * In the future, perhaps when we have an active time-slicing scheduler,
+	 * it will be interesting to unsubmit parallel execution and remove
+	 * busywaits from the GPU until their master is restarted. This is
+	 * quite hairy, we have to carefully rollback the fence and do a
+	 * preempt-to-idle cycle on the target engine, all the while the
+	 * master execute_cb may refire.
+	 */
+	INIT_LIST_HEAD(&rq->execute_cb);
+}
+
+static int
+i915_request_await_execution(struct i915_request *rq,
+			     struct i915_request *signal,
+			     gfp_t gfp)
+{
+	struct execute_cb *cb;
+	unsigned long flags;
+
+	if (test_bit(I915_FENCE_FLAG_ACTIVE, &signal->fence.flags))
+		return 0;
+
+	cb = kmalloc(sizeof(*cb), gfp);
+	if (!cb)
+		return -ENOMEM;
+
+	cb->fence = &rq->submit;
+	i915_sw_fence_await(cb->fence);
+	init_irq_work(&cb->work, irq_execute_cb);
+
+	spin_lock_irqsave(&signal->lock, flags);
+	if (test_bit(I915_FENCE_FLAG_ACTIVE, &signal->fence.flags)) {
+		i915_sw_fence_complete(cb->fence);
+		kfree(cb);
+	} else {
+		list_add_tail(&cb->link, &signal->execute_cb);
+	}
+	spin_unlock_irqrestore(&signal->lock, flags);
+
+	return 0;
+}
+
 static void move_to_timeline(struct i915_request *request,
 			     struct i915_timeline *timeline)
 {
@@ -373,6 +444,7 @@ void __i915_request_submit(struct i915_request *request)
 	if (test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &request->fence.flags) &&
 	    !i915_request_enable_breadcrumb(request))
 		intel_engine_queue_breadcrumbs(engine);
+	__notify_execute_cb(request);
 	spin_unlock(&request->lock);
 
 	engine->emit_fini_breadcrumb(request,
@@ -613,6 +685,7 @@ i915_request_alloc(struct intel_engine_cs *engine, struct i915_gem_context *ctx)
 	}
 
 	INIT_LIST_HEAD(&rq->active_list);
+	INIT_LIST_HEAD(&rq->execute_cb);
 
 	tl = ce->ring->timeline;
 	ret = i915_timeline_get_seqno(tl, rq, &seqno);
@@ -701,6 +774,81 @@ err_unreserve:
 }
 
 static int
+emit_semaphore_wait(struct i915_request *to,
+		    struct i915_request *from,
+		    gfp_t gfp)
+{
+	u32 *cs;
+	int err;
+
+	GEM_BUG_ON(!from->timeline->has_initial_breadcrumb);
+
+	err = i915_timeline_read_lock(from->timeline, to);
+	if (err)
+		return err;
+
+	/*
+	 * If we know our signaling request has started, we know that it
+	 * must, at least, have passed its initial breadcrumb and that its
+	 * seqno can only increase, therefore any change in its breadcrumb
+	 * must indicate completion. By using a "not equal to start" compare
+	 * we avoid the murky issue of how to handle seqno wraparound in an
+	 * async environment (short answer, we must stop the world whenever
+	 * any context wraps!) as the likelihood of missing one request then
+	 * seeing the same start value for a new request is 1 in 2^31, and
+	 * even then we know that the new request has started and is in
+	 * progress, so we are sure it will complete soon enough (not to
+	 * worry about).
+	 */
+	if (i915_request_started(from)) {
+		cs = intel_ring_begin(to, 4);
+		if (IS_ERR(cs))
+			return PTR_ERR(cs);
+
+		*cs++ = MI_SEMAPHORE_WAIT |
+			MI_SEMAPHORE_GLOBAL_GTT |
+			MI_SEMAPHORE_POLL |
+			MI_SEMAPHORE_SAD_NEQ_SDD;
+		*cs++ = from->fence.seqno - 1;
+		*cs++ = from->timeline->hwsp_offset;
+		*cs++ = 0;
+
+		intel_ring_advance(to, cs);
+	} else {
+		int err;
+
+		err = i915_request_await_execution(to, from, gfp);
+		if (err)
+			return err;
+
+		cs = intel_ring_begin(to, 4);
+		if (IS_ERR(cs))
+			return PTR_ERR(cs);
+
+		/*
+		 * Using greater-than-or-equal here means we have to worry
+		 * about seqno wraparound. To side step that issue, we swap
+		 * the timeline HWSP upon wrapping, so that everyone listening
+		 * for the old (pre-wrap) values do not see the much smaller
+		 * (post-wrap) values than they were expecting (and so wait
+		 * forever).
+		 */
+		*cs++ = MI_SEMAPHORE_WAIT |
+			MI_SEMAPHORE_GLOBAL_GTT |
+			MI_SEMAPHORE_POLL |
+			MI_SEMAPHORE_SAD_GTE_SDD;
+		*cs++ = from->fence.seqno;
+		*cs++ = from->timeline->hwsp_offset;
+		*cs++ = 0;
+
+		intel_ring_advance(to, cs);
+	}
+
+	to->sched.semaphore = true;
+	return 0;
+}
+
+static int
 i915_request_await_request(struct i915_request *to, struct i915_request *from)
 {
 	int ret;
@@ -723,6 +871,9 @@ i915_request_await_request(struct i915_request *to, struct i915_request *from)
 		ret = i915_sw_fence_await_sw_fence_gfp(&to->submit,
 						       &from->submit,
 						       I915_FENCE_GFP);
+	} else if (HAS_EXECLISTS(to->i915) &&
+		   to->gem_context->sched.priority >= I915_PRIORITY_NORMAL) {
+		ret = emit_semaphore_wait(to, from, I915_FENCE_GFP);
 	} else {
 		ret = i915_sw_fence_await_dma_fence(&to->submit,
 						    &from->fence, 0,
