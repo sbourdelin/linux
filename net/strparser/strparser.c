@@ -384,6 +384,14 @@ void strp_data_ready(struct strparser *strp)
 	if (unlikely(strp->stopped) || strp->paused)
 		return;
 
+	/* If the socket does not contain the number bytes required by
+	 * stream parser context to proceed, return silently.
+	 */
+	if (strp->need_bytes) {
+		if (strp_peek_len(strp) < strp->need_bytes)
+			return;
+	}
+
 	/* This check is needed to synchronize with do_strp_work.
 	 * do_strp_work acquires a process lock (lock_sock) whereas
 	 * the lock held here is bh_lock_sock. The two locks can be
@@ -394,11 +402,6 @@ void strp_data_ready(struct strparser *strp)
 	if (sock_owned_by_user_nocheck(strp->sk)) {
 		queue_work(strp_wq, &strp->work);
 		return;
-	}
-
-	if (strp->need_bytes) {
-		if (strp_peek_len(strp) < strp->need_bytes)
-			return;
 	}
 
 	if (strp_read_sock(strp) == -ENOMEM)
