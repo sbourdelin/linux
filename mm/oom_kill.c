@@ -478,7 +478,7 @@ static bool oom_killer_disabled __read_mostly;
  * task's threads: if one of those is using this mm then this task was also
  * using it.
  */
-bool process_shares_mm(struct task_struct *p, struct mm_struct *mm)
+static bool process_shares_mm(struct task_struct *p, struct mm_struct *mm)
 {
 	struct task_struct *t;
 
@@ -896,12 +896,14 @@ static void __oom_kill_process(struct task_struct *victim)
 			continue;
 		if (same_thread_group(p, victim))
 			continue;
-		if (is_global_init(p)) {
+		if (is_global_init(p) ||
+		    p->signal->oom_score_adj == OOM_SCORE_ADJ_MIN) {
 			can_oom_reap = false;
-			set_bit(MMF_OOM_SKIP, &mm->flags);
-			pr_info("oom killer %d (%s) has mm pinned by %d (%s)\n",
+			if (!test_bit(MMF_OOM_SKIP, &mm->flags))
+				pr_info("oom killer %d (%s) has mm pinned by %d (%s)\n",
 					task_pid_nr(victim), victim->comm,
 					task_pid_nr(p), p->comm);
+			set_bit(MMF_OOM_SKIP, &mm->flags);
 			continue;
 		}
 		/*
