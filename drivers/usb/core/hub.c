@@ -108,6 +108,16 @@ EXPORT_SYMBOL_GPL(ehci_cf_port_reset_rwsem);
 static void hub_release(struct kref *kref);
 static int usb_reset_and_verify_device(struct usb_device *udev);
 static int hub_port_disable(struct usb_hub *hub, int port1, int set_state);
+static bool hub_port_warm_reset_required(struct usb_hub *hub, int port1,
+		u16 portstatus);
+static int hub_port_reset(struct usb_hub *hub, int port1,
+			struct usb_device *udev, unsigned int delay, bool warm);
+
+#define HUB_ROOT_RESET_TIME	60	/* times are in msec */
+#define HUB_SHORT_RESET_TIME	10
+#define HUB_BH_RESET_TIME	50
+#define HUB_LONG_RESET_TIME	200
+#define HUB_RESET_TIMEOUT	800
 
 static inline char *portspeed(struct usb_hub *hub, int portstatus)
 {
@@ -1146,6 +1156,11 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		    ((portstatus & USB_PORT_STAT_LINK_STATE) ==
 						USB_SS_PORT_LS_POLLING))
 			need_debounce_delay = true;
+
+		if (type == HUB_RESUME &&
+		    hub_port_warm_reset_required(hub, port1, portstatus))
+			hub_port_reset(hub, port1, udev,
+					HUB_BH_RESET_TIME, true);
 
 		/* Clear status-change flags; we'll debounce later */
 		if (portchange & USB_PORT_STAT_C_CONNECTION) {
@@ -2683,12 +2698,6 @@ static unsigned hub_is_wusb(struct usb_hub *hub)
 #define GET_DESCRIPTOR_TRIES	2
 #define SET_CONFIG_TRIES	(2 * (use_both_schemes + 1))
 #define USE_NEW_SCHEME(i, scheme)	((i) / 2 == (int)scheme)
-
-#define HUB_ROOT_RESET_TIME	60	/* times are in msec */
-#define HUB_SHORT_RESET_TIME	10
-#define HUB_BH_RESET_TIME	50
-#define HUB_LONG_RESET_TIME	200
-#define HUB_RESET_TIMEOUT	800
 
 /*
  * "New scheme" enumeration causes an extra state transition to be
