@@ -428,6 +428,12 @@ enum devlink_param_wol_types {
 	.validate = _validate,						\
 }
 
+enum devlink_version_type {
+	DEVLINK_VERSION_FIXED,
+	DEVLINK_VERSION_STORED,
+	DEVLINK_VERSION_RUNNING,
+};
+
 struct devlink_region;
 struct devlink_info_req;
 
@@ -614,6 +620,10 @@ int devlink_info_report_serial_number(struct devlink_info_req *req,
 				      const char *sn);
 int devlink_info_report_driver_name(struct devlink_info_req *req,
 				    const char *name);
+int devlink_info_report_version(struct devlink_info_req *req,
+				enum devlink_version_type type,
+				const char *version_name,
+				const char *version_value);
 
 #else
 
@@ -920,6 +930,14 @@ devlink_info_report_driver_name(struct devlink_info_req *req, const char *name)
 
 static inline int
 devlink_info_report_serial_number(struct devlink_info_req *req, const char *sn)
+{
+	return 0;
+}
+
+static inline int
+devlink_info_report_version(struct devlink_info_req *req,
+			    enum devlink_version_type type,
+			    const char *version_name, const char *version_value)
 {
 	return 0;
 }

@@ -3732,6 +3732,46 @@ int devlink_info_report_serial_number(struct devlink_info_req *req,
 }
 EXPORT_SYMBOL_GPL(devlink_info_report_serial_number);
 
+int devlink_info_report_version(struct devlink_info_req *req,
+				enum devlink_version_type type,
+				const char *version_name,
+				const char *version_value)
+{
+	static const enum devlink_attr type2attr[] = {
+		[DEVLINK_VERSION_FIXED] = DEVLINK_ATTR_INFO_VERSION_FIXED,
+		[DEVLINK_VERSION_STORED] = DEVLINK_ATTR_INFO_VERSION_STORED,
+		[DEVLINK_VERSION_RUNNING] = DEVLINK_ATTR_INFO_VERSION_RUNNING,
+	};
+	struct nlattr *nest;
+	int err;
+
+	if (type >= ARRAY_SIZE(type2attr) || !type2attr[type])
+		return -EINVAL;
+
+	nest = nla_nest_start(req->msg, type2attr[type]);
+	if (!nest)
+		return -EMSGSIZE;
+
+	err = nla_put_string(req->msg, DEVLINK_ATTR_INFO_VERSION_NAME,
+			     version_name);
+	if (err)
+		goto nla_put_failure;
+
+	err = nla_put_string(req->msg, DEVLINK_ATTR_INFO_VERSION_VALUE,
+			     version_value);
+	if (err)
+		goto nla_put_failure;
+
+	nla_nest_end(req->msg, nest);
+
+	return 0;
+
+nla_put_failure:
+	nla_nest_cancel(req->msg, nest);
+	return err;
+}
+EXPORT_SYMBOL_GPL(devlink_info_report_version);
+
 static int
 devlink_nl_info_fill(struct sk_buff *msg, struct devlink *devlink,
 		     enum devlink_command cmd, u32 portid,
