@@ -128,6 +128,7 @@ static u32 __i915_gem_park(struct drm_i915_private *i915)
 
 	intel_engines_park(i915);
 	i915_timelines_park(i915);
+	i915_gt_active_park(i915_gt_active(i915));
 
 	i915_pmu_gt_parked(i915);
 	i915_vma_parked(i915);
@@ -4996,15 +4997,19 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 		dev_priv->gt.cleanup_engine = intel_engine_cleanup;
 	}
 
+	ret = i915_gt_active_init(i915_gt_active(dev_priv));
+	if (ret)
+		return ret;
+
 	i915_timelines_init(dev_priv);
 
 	ret = i915_gem_init_userptr(dev_priv);
 	if (ret)
-		return ret;
+		goto err_timelines;
 
 	ret = intel_uc_init_misc(dev_priv);
 	if (ret)
-		return ret;
+		goto err_userptr;
 
 	ret = intel_wopcm_init(&dev_priv->wopcm);
 	if (ret)
@@ -5120,9 +5125,13 @@ err_unlock:
 err_uc_misc:
 	intel_uc_fini_misc(dev_priv);
 
-	if (ret != -EIO) {
+err_userptr:
+	if (ret != -EIO)
 		i915_gem_cleanup_userptr(dev_priv);
+err_timelines:
+	if (ret != -EIO) {
 		i915_timelines_fini(dev_priv);
+		i915_gt_active_fini(i915_gt_active(dev_priv));
 	}
 
 	if (ret == -EIO) {
@@ -5175,6 +5184,7 @@ void i915_gem_fini(struct drm_i915_private *dev_priv)
 	intel_uc_fini_misc(dev_priv);
 	i915_gem_cleanup_userptr(dev_priv);
 	i915_timelines_fini(dev_priv);
+	i915_gt_active_fini(i915_gt_active(dev_priv));
 
 	i915_gem_drain_freed_objects(dev_priv);
 

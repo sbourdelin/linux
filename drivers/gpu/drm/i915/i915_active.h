@@ -9,10 +9,6 @@
 
 #include "i915_active_types.h"
 
-#include <linux/rbtree.h>
-
-#include "i915_request.h"
-
 /*
  * GPU activity tracking
  *
@@ -39,7 +35,7 @@
  * synchronisation.
  */
 
-void i915_active_init(struct drm_i915_private *i915,
+void i915_active_init(struct i915_gt_active *gt,
 		      struct i915_active *ref,
 		      void (*retire)(struct i915_active *ref));
 
@@ -62,5 +58,20 @@ i915_active_is_idle(const struct i915_active *ref)
 }
 
 void i915_active_fini(struct i915_active *ref);
+
+/*
+ * Active refs memory management
+ *
+ * To be more economical with memory, we reap all the i915_active trees on
+ * parking the GPU (when we know the GPU is inactive) and allocate the nodes
+ * from a local slab cache to hopefully reduce the fragmentation as we will
+ * then be able to free all pages en masse upon idling.
+ */
+
+int i915_gt_active_init(struct i915_gt_active *gt);
+void i915_gt_active_park(struct i915_gt_active *gt);
+void i915_gt_active_fini(struct i915_gt_active *gt);
+
+#define i915_gt_active(i915) (&(i915)->gt.active_refs)
 
 #endif /* _I915_ACTIVE_H_ */

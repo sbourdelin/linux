@@ -69,6 +69,7 @@ static void mock_device_release(struct drm_device *dev)
 	mutex_unlock(&i915->drm.struct_mutex);
 
 	i915_timelines_fini(i915);
+	i915_gt_active_fini(i915_gt_active(i915));
 
 	drain_workqueue(i915->wq);
 	i915_gem_drain_freed_objects(i915);
@@ -228,6 +229,9 @@ struct drm_i915_private *mock_gem_device(void)
 	if (!i915->priorities)
 		goto err_dependencies;
 
+	if (i915_gt_active_init(i915_gt_active(i915)))
+		goto err_priorities;
+
 	i915_timelines_init(i915);
 
 	INIT_LIST_HEAD(&i915->gt.active_rings);
@@ -257,6 +261,8 @@ err_context:
 err_unlock:
 	mutex_unlock(&i915->drm.struct_mutex);
 	i915_timelines_fini(i915);
+	i915_gt_active_fini(i915_gt_active(i915));
+err_priorities:
 	kmem_cache_destroy(i915->priorities);
 err_dependencies:
 	kmem_cache_destroy(i915->dependencies);

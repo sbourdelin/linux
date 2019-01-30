@@ -1917,7 +1917,7 @@ static struct i915_vma *pd_vma_create(struct gen6_hw_ppgtt *ppgtt, int size)
 	if (!vma)
 		return ERR_PTR(-ENOMEM);
 
-	i915_active_init(i915, &vma->active, NULL);
+	i915_active_init(i915_gt_active(i915), &vma->active, NULL);
 	init_request_active(&vma->last_fence, NULL);
 
 	vma->vm = &ggtt->vm;

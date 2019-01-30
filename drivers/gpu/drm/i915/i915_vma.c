@@ -119,7 +119,8 @@ vma_create(struct drm_i915_gem_object *obj,
 	if (vma == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	i915_active_init(vm->i915, &vma->active, __i915_vma_retire);
+	i915_active_init(i915_gt_active(vm->i915),
+			 &vma->active, __i915_vma_retire);
 	init_request_active(&vma->last_fence, NULL);
 
 	vma->vm = vm;

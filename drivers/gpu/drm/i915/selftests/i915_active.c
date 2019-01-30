@@ -30,7 +30,8 @@ static int __live_active_setup(struct drm_i915_private *i915,
 	unsigned int count = 0;
 	int err = 0;
 
-	i915_active_init(i915, &active->base, __live_active_retire);
+	i915_active_init(i915_gt_active(i915),
+			 &active->base, __live_active_retire);
 	active->retired = false;
 
 	if (!i915_active_acquire(&active->base)) {

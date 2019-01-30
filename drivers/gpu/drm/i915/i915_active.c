@@ -7,7 +7,9 @@
 #include "i915_drv.h"
 #include "i915_active.h"
 
-#define BKL(ref) (&(ref)->i915->drm.struct_mutex)
+#define i915_from_gt(x) \
+	container_of(x, struct drm_i915_private, gt.active_refs)
+#define BKL(ref) (&i915_from_gt((ref)->gt)->drm.struct_mutex)
 
 struct active_node {
 	struct i915_gem_active base;
@@ -79,11 +81,11 @@ active_instance(struct i915_active *ref, u64 idx)
 			p = &parent->rb_left;
 	}
 
-	node = kmalloc(sizeof(*node), GFP_KERNEL);
+	node = kmem_cache_alloc(ref->gt->slab_cache, GFP_KERNEL);
 
 	/* kmalloc may retire the ref->last (thanks shrinker)! */
 	if (unlikely(!i915_gem_active_raw(&ref->last, BKL(ref)))) {
-		kfree(node);
+		kmem_cache_free(ref->gt->slab_cache, node);
 		goto out;
 	}
 
@@ -93,6 +95,9 @@ active_instance(struct i915_active *ref, u64 idx)
 	init_request_active(&node->base, node_retire);
 	node->ref = ref;
 	node->timeline = idx;
+
+	if (RB_EMPTY_ROOT(&ref->tree))
+		list_add(&ref->active_link, &ref->gt->active_refs);
 
 	rb_link_node(&node->node, parent, p);
 	rb_insert_color(&node->node, &ref->tree);
@@ -119,11 +124,11 @@ out:
 	return &ref->last;
 }
 
-void i915_active_init(struct drm_i915_private *i915,
+void i915_active_init(struct i915_gt_active *gt,
 		      struct i915_active *ref,
 		      void (*retire)(struct i915_active *ref))
 {
-	ref->i915 = i915;
+	ref->gt = gt;
 	ref->retire = retire;
 	ref->tree = RB_ROOT;
 	init_request_active(&ref->last, last_retire);
@@ -161,6 +166,7 @@ void i915_active_release(struct i915_active *ref)
 
 int i915_active_wait(struct i915_active *ref)
 {
+	struct kmem_cache *slab = ref->gt->slab_cache;
 	struct active_node *it, *n;
 	int ret;
 
@@ -168,15 +174,19 @@ int i915_active_wait(struct i915_active *ref)
 	if (ret)
 		return ret;
 
+	if (RB_EMPTY_ROOT(&ref->tree))
+		return 0;
+
 	rbtree_postorder_for_each_entry_safe(it, n, &ref->tree, node) {
 		ret = i915_gem_active_retire(&it->base, BKL(ref));
 		if (ret)
 			return ret;
 
 		GEM_BUG_ON(i915_gem_active_isset(&it->base));
-		kfree(it);
+		kmem_cache_free(slab, it);
 	}
 	ref->tree = RB_ROOT;
+	list_del(&ref->active_link);
 
 	return 0;
 }
@@ -210,15 +220,46 @@ int i915_request_await_active(struct i915_request *rq, struct i915_active *ref)
 
 void i915_active_fini(struct i915_active *ref)
 {
+	struct kmem_cache *slab = ref->gt->slab_cache;
 	struct active_node *it, *n;
 
+	lockdep_assert_held(BKL(ref));
 	GEM_BUG_ON(i915_gem_active_isset(&ref->last));
+
+	if (RB_EMPTY_ROOT(&ref->tree))
+		return;
 
 	rbtree_postorder_for_each_entry_safe(it, n, &ref->tree, node) {
 		GEM_BUG_ON(i915_gem_active_isset(&it->base));
-		kfree(it);
+		kmem_cache_free(slab, it);
 	}
 	ref->tree = RB_ROOT;
+	list_del(&ref->active_link);
+}
+
+int i915_gt_active_init(struct i915_gt_active *gt)
+{
+	gt->slab_cache = KMEM_CACHE(active_node, SLAB_HWCACHE_ALIGN);
+	if (!gt->slab_cache)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&gt->active_refs);
+
+	return 0;
+}
+
+void i915_gt_active_park(struct i915_gt_active *gt)
+{
+	struct i915_active *it, *n;
+
+	list_for_each_entry_safe(it, n, &gt->active_refs, active_link)
+		i915_active_fini(it);
+}
+
+void i915_gt_active_fini(struct i915_gt_active *gt)
+{
+	GEM_BUG_ON(!list_empty(&gt->active_refs));
+	kmem_cache_destroy(gt->slab_cache);
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)

@@ -1984,6 +1984,8 @@ struct drm_i915_private {
 			struct list_head hwsp_free_list;
 		} timelines;
 
+		struct i915_gt_active active_refs;
+
 		struct list_head active_rings;
 		struct list_head closed_vma;
 		u32 active_requests;
