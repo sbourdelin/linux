@@ -26,10 +26,8 @@ static inline void set_cede_latency_hint(u8 latency_hint)
 	get_lppaca()->cede_latency_hint = latency_hint;
 }
 
-static inline long cede_processor(void)
-{
-	return plpar_hcall_norets(H_CEDE);
-}
+int cpu_is_ceded(int cpu);
+long cede_processor(void);
 
 static inline long extended_cede_processor(unsigned long latency_hint)
 {

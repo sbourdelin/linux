@@ -331,6 +331,24 @@ static int alloc_dispatch_log_kmem_cache(void)
 }
 machine_early_initcall(pseries, alloc_dispatch_log_kmem_cache);
 
+static DEFINE_PER_CPU(int, cpu_ceded);
+
+int cpu_is_ceded(int cpu)
+{
+	return per_cpu(cpu_ceded, cpu);
+}
+
+long cede_processor(void)
+{
+	long rc;
+
+	per_cpu(cpu_ceded, raw_smp_processor_id()) = 1;
+	rc = plpar_hcall_norets(H_CEDE);
+	per_cpu(cpu_ceded, raw_smp_processor_id()) = 0;
+
+	return rc;
+}
+
 static void pseries_lpar_idle(void)
 {
 	/*

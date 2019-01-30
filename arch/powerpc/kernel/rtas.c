@@ -44,6 +44,7 @@
 #include <asm/time.h>
 #include <asm/mmu.h>
 #include <asm/topology.h>
+#include <asm/plpar_wrappers.h>
 
 /* This is here deliberately so it's only used in this file */
 void enter_rtas(unsigned long);
@@ -942,7 +943,7 @@ int rtas_ibm_suspend_me(u64 handle)
 	struct rtas_suspend_me_data data;
 	DECLARE_COMPLETION_ONSTACK(done);
 	cpumask_var_t offline_mask;
-	int cpuret;
+	int cpuret, cpu;
 
 	if (!rtas_service_present("ibm,suspend-me"))
 		return -ENOSYS;
@@ -989,6 +990,11 @@ int rtas_ibm_suspend_me(u64 handle)
 		       __func__);
 		atomic_set(&data.error, -EBUSY);
 		goto out_hotplug_enable;
+	}
+
+	for_each_present_cpu(cpu) {
+		if (cpu_is_ceded(cpu))
+			plpar_hcall_norets(H_PROD, get_hard_smp_processor_id(cpu));
 	}
 
 	/* Call function on all CPUs.  One of us will make the
