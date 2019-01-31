@@ -4839,8 +4839,7 @@ static void skl_compute_transition_wm(const struct intel_crtc_state *cstate,
 {
 	struct drm_device *dev = cstate->base.crtc->dev;
 	const struct drm_i915_private *dev_priv = to_i915(dev);
-	u16 trans_min, trans_y_tile_min;
-	const u16 trans_amount = 10; /* This is configurable amount */
+	u16 trans_min, trans_y_tile_min, trans_amount;
 	u16 wm0_sel_res_b, trans_offset_b, res_blocks;
 
 	/*
@@ -4854,9 +4853,16 @@ static void skl_compute_transition_wm(const struct intel_crtc_state *cstate,
 	if (!dev_priv->ipc_enabled)
 		return;
 
-	trans_min = 14;
 	if (INTEL_GEN(dev_priv) >= 11)
 		trans_min = 4;
+	else
+		trans_min = 14;
+
+	/* Display WA #1140: glk,cnl */
+	if (IS_CANNONLAKE(dev_priv) || IS_GEMINILAKE(dev_priv))
+		trans_amount = 0;
+	else
+		trans_amount = 10; /* This is configurable amount */
 
 	trans_offset_b = trans_min + trans_amount;
 
