@@ -203,12 +203,15 @@ int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
 	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE
 	 * between io_tlb_start and io_tlb_end.
 	 */
-	io_tlb_list = memblock_alloc(
+	io_tlb_list = memblock_alloc_nopanic(
 				PAGE_ALIGN(io_tlb_nslabs * sizeof(int)),
 				PAGE_SIZE);
-	io_tlb_orig_addr = memblock_alloc(
+	io_tlb_orig_addr = memblock_alloc_nopanic(
 				PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)),
 				PAGE_SIZE);
+	if (io_tlb_list == NULL || io_tlb_orig_addr == NULL)
+		goto out_fail;
+
 	for (i = 0; i < io_tlb_nslabs; i++) {
 		io_tlb_list[i] = IO_TLB_SEGSIZE - OFFSET(i, IO_TLB_SEGSIZE);
 		io_tlb_orig_addr[i] = INVALID_PHYS_ADDR;
@@ -219,7 +222,26 @@ int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
 		swiotlb_print_info();
 
 	swiotlb_set_max_segment(io_tlb_nslabs << IO_TLB_SHIFT);
+
 	return 0;
+
+out_fail:
+	if (io_tlb_list)
+		memblock_free(io_tlb_list,
+			      PAGE_ALIGN(io_tlb_nslabs * sizeof(int)));
+
+	if (io_tlb_orig_addr)
+		memblock_free(io_tlb_orig_addr,
+			      PAGE_ALIGN(io_tlb_nslabs * sizeof(phys_addr_t)));
+
+	io_tlb_list      = NULL;
+	io_tlb_orig_addr = NULL;
+	io_tlb_end       = 0;
+	io_tlb_start     = 0;
+	io_tlb_nslabs    = 0;
+	max_segment      = 0;
+
+	return -ENOMEM;
 }
 
 /*
