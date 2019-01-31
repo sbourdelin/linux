@@ -112,6 +112,10 @@ static const struct nf_ipv6_ops ipv6ops = {
 	.fragment		= ip6_fragment,
 	.route			= nf_ip6_route,
 	.reroute		= nf_ip6_reroute,
+#ifdef CONFIG_IPV6_MODULE
+	.route_me_harder	= ip6_route_me_harder,
+	.dev_get_saddr		= ipv6_dev_get_saddr,
+#endif
 };
 
 int __init ipv6_netfilter_init(void)
