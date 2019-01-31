@@ -20,7 +20,7 @@
 
 #include "kernfs-internal.h"
 
-struct kmem_cache *kernfs_node_cache;
+struct kmem_cache *kernfs_node_cache, *kernfs_iattrs_cache;
 
 static int kernfs_sop_remount_fs(struct super_block *sb, int *flags, char *data)
 {
@@ -414,6 +414,11 @@ void __init kernfs_init(void)
 	 */
 	kernfs_node_cache = kmem_cache_create("kernfs_node_cache",
 					      sizeof(struct kernfs_node),
+					      0,
+					      SLAB_PANIC | SLAB_TYPESAFE_BY_RCU,
+					      NULL);
+	kernfs_iattrs_cache  = kmem_cache_create("kernfs_iattrs_cache",
+					      sizeof(struct kernfs_iattrs),
 					      0,
 					      SLAB_PANIC | SLAB_TYPESAFE_BY_RCU,
 					      NULL);
