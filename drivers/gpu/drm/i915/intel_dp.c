@@ -2098,6 +2098,31 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 	return 0;
 }
 
+static bool
+intel_dp_ycbcr420_config(struct drm_connector *connector,
+			 struct intel_crtc_state *config)
+{
+	struct intel_crtc *intel_crtc = to_intel_crtc(config->base.crtc);
+
+	if (!connector->ycbcr_420_allowed) {
+		DRM_ERROR("Platform doesn't support YCBCR420 output\n");
+		return false;
+	}
+
+	config->output_format = INTEL_OUTPUT_FORMAT_YCBCR420;
+
+	/* YCBCR 420 output conversion needs a scaler */
+	if (skl_update_scaler_crtc(config)) {
+		DRM_DEBUG_KMS("Scaler allocation for output failed\n");
+		return false;
+	}
+
+	intel_pch_panel_fitting(intel_crtc, config,
+				DRM_MODE_SCALE_FULLSCREEN);
+
+	return true;
+}
+
 int
 intel_dp_compute_config(struct intel_encoder *encoder,
 			struct intel_crtc_state *pipe_config,
@@ -2115,6 +2140,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	bool constant_n = drm_dp_has_quirk(&intel_dp->desc,
 					   DP_DPCD_QUIRK_CONSTANT_N);
 	int ret;
+	struct drm_connector *connector = conn_state->connector;
 
 	if (HAS_PCH_SPLIT(dev_priv) && !HAS_DDI(dev_priv) && port != PORT_A)
 		pipe_config->has_pch_encoder = true;
@@ -2122,6 +2148,13 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
 	if (lspcon->active)
 		lspcon_ycbcr420_config(&intel_connector->base, pipe_config);
+
+	if (drm_mode_is_420_only(&connector->display_info, adjusted_mode)) {
+		if (!intel_dp_ycbcr420_config(connector, pipe_config)) {
+			DRM_ERROR("Can't support YCBCR420 output\n");
+			return false;
+		}
+	}
 
 	pipe_config->has_drrs = false;
 	if (IS_G4X(dev_priv) || port == PORT_A)
