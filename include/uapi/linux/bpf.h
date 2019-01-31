@@ -292,6 +292,9 @@ enum bpf_attach_type {
 /* Zero-initialize hash function seed. This should only be used for testing. */
 #define BPF_F_ZERO_SEED		(1U << 6)
 
+/* Enable memory accounting for map (only for BPF_MAP_CREATE) */
+#define BPF_F_ACCOUNT_MEM	(1U << 7)
+
 /* flags for BPF_PROG_QUERY */
 #define BPF_F_QUERY_EFFECTIVE	(1U << 0)
 
