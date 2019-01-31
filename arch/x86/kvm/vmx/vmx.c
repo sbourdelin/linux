@@ -1221,6 +1221,11 @@ static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 		new.sn = 0;
 	} while (cmpxchg64(&pi_desc->control, old.control,
 			   new.control) != old.control);
+
+	smp_mb__after_atomic();
+
+	if (!bitmap_empty((unsigned long *)pi_desc->pir, NR_VECTORS))
+		pi_test_and_set_on(pi_desc);
 }
 
 /*
