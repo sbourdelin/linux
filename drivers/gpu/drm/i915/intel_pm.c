@@ -4696,9 +4696,7 @@ static void skl_compute_plane_wm(const struct intel_crtc_state *cstate,
 	 * WaIncreaseLatencyIPCEnabled: kbl,cfl
 	 * Display WA #1141: kbl,cfl
 	 */
-	if ((IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv) ||
-	    IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_B0)) &&
-	    dev_priv->ipc_enabled)
+	if (IS_GEN9_BC(dev_priv) && dev_priv->ipc_enabled)
 		latency += 4;
 
 	if (skl_needs_memory_bw_wa(dev_priv) && wp->x_tiled)
