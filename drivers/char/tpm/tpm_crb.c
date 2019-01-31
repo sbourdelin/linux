@@ -299,7 +299,7 @@ static int crb_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 	if (expected > count || expected < 6)
 		return -EIO;
 
-	memcpy_fromio(&buf[6], &priv->rsp[6], expected - 6);
+	memcpy(&buf[6], &priv->rsp[6], expected - 6);
 
 	return expected;
 }
