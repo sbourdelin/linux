@@ -20,6 +20,7 @@
 #include <linux/uaccess.h>
 #include <linux/delay.h>
 #include <linux/iversion.h>
+#include <linux/namei.h>
 #include "ext4_jbd2.h"
 #include "ext4.h"
 #include <linux/fsmap.h>
@@ -333,9 +334,8 @@ flags_out:
 }
 
 #ifdef CONFIG_QUOTA
-static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
+static int ext4_ioctl_setproject(struct inode *inode, __u32 projid)
 {
-	struct inode *inode = file_inode(filp);
 	struct super_block *sb = inode->i_sb;
 	struct ext4_inode_info *ei = EXT4_I(inode);
 	int err, rc;
@@ -419,7 +419,7 @@ out_stop:
 	return err;
 }
 #else
-static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
+static int ext4_ioctl_setproject(struct inode *inode, __u32 projid)
 {
 	if (projid != EXT4_DEF_PROJID)
 		return -EOPNOTSUPP;
@@ -661,6 +661,59 @@ static int ext4_ioctl_check_project(struct inode *inode, struct fsxattr *fa)
 	}
 
 	return 0;
+}
+
+static void ext4_ioctl_fsgetxattr(struct inode *inode, struct fsxattr *fa,
+				  unsigned long arg)
+{
+	struct ext4_inode_info *ei = EXT4_I(inode);
+
+	memset(fa, 0, sizeof(struct fsxattr));
+	fa->fsx_xflags = ext4_iflags_to_xflags(ei->i_flags &
+					       EXT4_FL_USER_VISIBLE);
+
+	if (ext4_has_feature_project(inode->i_sb))
+		fa->fsx_projid = (__u32)from_kprojid(&init_user_ns,
+						     ei->i_projid);
+}
+
+static int ext4_ioctl_fssetxattr(struct file *filp, struct inode *cinode,
+				 struct fsxattr *fa)
+{
+	int err;
+	unsigned int flags;
+	struct ext4_inode_info *ei = EXT4_I(cinode);
+
+	/* Make sure caller has proper permission */
+	if (!inode_owner_or_capable(cinode))
+		return -EACCES;
+
+	if (fa->fsx_xflags & ~EXT4_SUPPORTED_FS_XFLAGS)
+		return -EOPNOTSUPP;
+
+	flags = ext4_xflags_to_iflags(fa->fsx_xflags);
+	if (ext4_mask_flags(cinode->i_mode, flags) != flags)
+		return -EOPNOTSUPP;
+
+	err = mnt_want_write_file(filp);
+	if (err)
+		return err;
+
+	inode_lock(cinode);
+	err = ext4_ioctl_check_project(cinode, fa);
+	if (err)
+		goto out;
+	flags = (ei->i_flags & ~EXT4_FL_XFLAG_VISIBLE) |
+		 (flags & EXT4_FL_XFLAG_VISIBLE);
+	err = ext4_ioctl_setflags(cinode, flags);
+	if (err)
+		goto out;
+	err = ext4_ioctl_setproject(cinode, fa->fsx_projid);
+out:
+	inode_unlock(cinode);
+	mnt_drop_write_file(filp);
+
+	return err;
 }
 
 long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
@@ -1024,56 +1077,75 @@ resizefs_out:
 	{
 		struct fsxattr fa;
 
-		memset(&fa, 0, sizeof(struct fsxattr));
-		fa.fsx_xflags = ext4_iflags_to_xflags(ei->i_flags & EXT4_FL_USER_VISIBLE);
+		ext4_ioctl_fsgetxattr(inode, &fa, arg);
 
-		if (ext4_has_feature_project(inode->i_sb)) {
-			fa.fsx_projid = (__u32)from_kprojid(&init_user_ns,
-				EXT4_I(inode)->i_projid);
-		}
-
-		if (copy_to_user((struct fsxattr __user *)arg,
-				 &fa, sizeof(fa)))
+		if (copy_to_user((struct fsxattr __user *)arg, &fa,
+				 sizeof(fa)))
 			return -EFAULT;
-		return 0;
+	}
+	case EXT4_IOC_FSGETXATTR_CHILD:
+	{
+		struct fsxattr_child fa;
+		struct dentry *dentry;
+
+		if (copy_from_user(&fa, (struct fsxattr_child __user *)arg,
+				   sizeof(fa)))
+			return -EFAULT;
+
+		fa.fsxc_name[NAME_MAX] = '\0';
+		inode_lock(file_inode(filp));
+		dentry = lookup_one_len(fa.fsxc_name, file_dentry(filp),
+					strlen(fa.fsxc_name));
+		inode_unlock(file_inode(filp));
+		if (IS_ERR(dentry))
+			return PTR_ERR(dentry);
+
+		ext4_ioctl_fsgetxattr(d_inode(dentry), &fa.fsxc_fsx, arg);
+		dput(dentry);
+
+		if (copy_to_user((struct fsxattr_child __user *)arg, &fa,
+				 sizeof(fa)))
+			return -EFAULT;
 	}
 	case EXT4_IOC_FSSETXATTR:
 	{
 		struct fsxattr fa;
-		int err;
 
 		if (copy_from_user(&fa, (struct fsxattr __user *)arg,
 				   sizeof(fa)))
 			return -EFAULT;
 
-		/* Make sure caller has proper permission */
-		if (!inode_owner_or_capable(inode))
-			return -EACCES;
+		return ext4_ioctl_fssetxattr(filp, inode, &fa);
+	}
+	case EXT4_IOC_FSSETXATTR_CHILD:
+	{
+		struct fsxattr_child fa;
+		struct dentry *dentry;
+		int err;
 
-		if (fa.fsx_xflags & ~EXT4_SUPPORTED_FS_XFLAGS)
-			return -EOPNOTSUPP;
+		if (copy_from_user(&fa, (struct fsxattr_child __user *)arg,
+				   sizeof(fa)))
+			return -EFAULT;
 
-		flags = ext4_xflags_to_iflags(fa.fsx_xflags);
-		if (ext4_mask_flags(inode->i_mode, flags) != flags)
-			return -EOPNOTSUPP;
+		fa.fsxc_name[NAME_MAX] = '\0';
+		inode_lock(file_inode(filp));
+		dentry = lookup_one_len(fa.fsxc_name, file_dentry(filp),
+					strlen(fa.fsxc_name));
+		inode_unlock(file_inode(filp));
+		if (IS_ERR(dentry))
+			return PTR_ERR(dentry);
+		/* this didn't work since child will share
+		 * parent @filp to use mnt_want_write_file()
+		 */
+		if (file_inode(filp)->i_sb != d_inode(dentry)->i_sb) {
+			err = -EXDEV;
+			goto errout;
+		}
 
-		err = mnt_want_write_file(filp);
-		if (err)
-			return err;
-
-		inode_lock(inode);
-		err = ext4_ioctl_check_project(inode, &fa);
-		if (err)
-			goto out;
-		flags = (ei->i_flags & ~EXT4_FL_XFLAG_VISIBLE) |
-			 (flags & EXT4_FL_XFLAG_VISIBLE);
-		err = ext4_ioctl_setflags(inode, flags);
-		if (err)
-			goto out;
-		err = ext4_ioctl_setproject(filp, fa.fsx_projid);
-out:
-		inode_unlock(inode);
-		mnt_drop_write_file(filp);
+		err = ext4_ioctl_fssetxattr(filp, d_inode(dentry),
+					    &fa.fsxc_fsx);
+errout:
+		dput(dentry);
 		return err;
 	}
 	case EXT4_IOC_SHUTDOWN:

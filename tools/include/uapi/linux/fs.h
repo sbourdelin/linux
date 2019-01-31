@@ -165,6 +165,14 @@ struct fsxattr {
 };
 
 /*
+ * Structure for FS_IOC_FSGETXATTR_CHILD and FS_IOC_FSSETXATTR_CHILD.
+ */
+struct fsxattr_child {
+	struct fsxattr	fsxc_fsx;
+	unsigned char	fsxc_name[NAME_MAX + 1]; /* child filename */
+};
+
+/*
  * Flags for the fsx_xflags field
  */
 #define FS_XFLAG_REALTIME	0x00000001	/* data in realtime volume */
@@ -255,6 +263,8 @@ struct fsxattr {
 #define FS_IOC32_SETVERSION		_IOW('v', 2, int)
 #define FS_IOC_FSGETXATTR		_IOR('X', 31, struct fsxattr)
 #define FS_IOC_FSSETXATTR		_IOW('X', 32, struct fsxattr)
+#define FS_IOC_FSGETXATTR_CHILD		_IOR('X', 33, struct fsxattr_child)
+#define FS_IOC_FSSETXATTR_CHILD		_IOW('X', 34, struct fsxattr_child)
 #define FS_IOC_GETFSLABEL		_IOR(0x94, 49, char[FSLABEL_MAX])
 #define FS_IOC_SETFSLABEL		_IOW(0x94, 50, char[FSLABEL_MAX])
 
