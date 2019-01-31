@@ -1696,6 +1696,7 @@ void intel_ddi_set_pipe_settings(const struct intel_crtc_state *crtc_state)
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	u32 temp;
+	int bpp;
 
 	if (!intel_crtc_has_dp_encoder(crtc_state))
 		return;
@@ -1707,7 +1708,11 @@ void intel_ddi_set_pipe_settings(const struct intel_crtc_state *crtc_state)
 	if (crtc_state->limited_color_range)
 		temp |= TRANS_MSA_CEA_RANGE;
 
-	switch (crtc_state->pipe_bpp) {
+	bpp = crtc_state->pipe_bpp;
+	if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420)
+		bpp *= 2;
+
+	switch (bpp) {
 	case 18:
 		temp |= TRANS_MSA_6_BPC;
 		break;

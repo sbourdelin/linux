@@ -1761,12 +1761,13 @@ static int intel_dp_compute_bpp(struct intel_dp *intel_dp,
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
 	int bpp, bpc;
+	int bpp_divider = pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ? 2 : 1;
 
 	bpp = pipe_config->pipe_bpp;
 	bpc = drm_dp_downstream_max_bpc(intel_dp->dpcd, intel_dp->downstream_ports);
 
 	if (bpc > 0)
-		bpp = min(bpp, 3*bpc);
+		bpp = min(bpp, 3*bpc/bpp_divider);
 
 	if (intel_dp_is_edp(intel_dp)) {
 		/* Get bpp from vbt only for panels that dont have bpp in edid */
@@ -1787,12 +1788,14 @@ intel_dp_adjust_compliance_config(struct intel_dp *intel_dp,
 				  struct intel_crtc_state *pipe_config,
 				  struct link_config_limits *limits)
 {
+	int bpp_divider = pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ? 2 : 1;
+
 	/* For DP Compliance we override the computed bpp for the pipe */
 	if (intel_dp->compliance.test_data.bpc != 0) {
-		int bpp = 3 * intel_dp->compliance.test_data.bpc;
+		int bpp = 3 * intel_dp->compliance.test_data.bpc / bpp_divider;
 
 		limits->min_bpp = limits->max_bpp = bpp;
-		pipe_config->dither_force_disable = bpp == 6 * 3;
+		pipe_config->dither_force_disable = bpp == 6 * 3 / bpp_divider;
 
 		DRM_DEBUG_KMS("Setting pipe_bpp to %d\n", bpp);
 	}
@@ -1826,8 +1829,9 @@ intel_dp_compute_link_config_wide(struct intel_dp *intel_dp,
 	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
 	int bpp, clock, lane_count;
 	int mode_rate, link_clock, link_avail;
+	int bpp_divider = pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ? 2 : 1;
 
-	for (bpp = limits->max_bpp; bpp >= limits->min_bpp; bpp -= 2 * 3) {
+	for (bpp = limits->max_bpp; bpp >= limits->min_bpp; bpp -= 2 * 3 / bpp_divider) {
 		mode_rate = intel_dp_link_required(adjusted_mode->crtc_clock,
 						   bpp);
 
@@ -1862,8 +1866,9 @@ intel_dp_compute_link_config_fast(struct intel_dp *intel_dp,
 	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
 	int bpp, clock, lane_count;
 	int mode_rate, link_clock, link_avail;
+	int bpp_divider = pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ? 2 : 1;
 
-	for (bpp = limits->max_bpp; bpp >= limits->min_bpp; bpp -= 2 * 3) {
+	for (bpp = limits->max_bpp; bpp >= limits->min_bpp; bpp -= 2 * 3 / bpp_divider) {
 		mode_rate = intel_dp_link_required(adjusted_mode->crtc_clock,
 						   bpp);
 
@@ -2009,6 +2014,7 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 	struct link_config_limits limits;
 	int common_len;
 	int ret;
+	int bpp_divider = pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ? 2 : 1;
 
 	common_len = intel_dp_common_len_rate_limit(intel_dp,
 						    intel_dp->max_link_rate);
@@ -2022,7 +2028,7 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 	limits.min_lane_count = 1;
 	limits.max_lane_count = intel_dp_max_lane_count(intel_dp);
 
-	limits.min_bpp = 6 * 3;
+	limits.min_bpp = 6 * 3 / bpp_divider;
 	limits.max_bpp = intel_dp_compute_bpp(intel_dp, pipe_config);
 
 	if (intel_dp_is_edp(intel_dp) && intel_dp->edp_dpcd[0] < DP_EDP_14) {
@@ -2110,6 +2116,11 @@ intel_dp_ycbcr420_config(struct drm_connector *connector,
 	}
 
 	config->output_format = INTEL_OUTPUT_FORMAT_YCBCR420;
+	/* pipe_bpp value was assumed RGB therefore it was multiplied
+	 * with 3. But YCbCr 4:2:0 requires multiplier value to 1.5
+	 * therefore it divides pipe_bpp to 2.
+	 */
+	config->pipe_bpp /= 2;
 
 	/* YCBCR 420 output conversion needs a scaler */
 	if (skl_update_scaler_crtc(config)) {
@@ -4446,7 +4457,23 @@ intel_pixel_encoding_setup_vsc(struct intel_dp *intel_dp,
 	 * 011b = 12bpc.
 	 * 100b = 16bpc.
 	 */
-	vsc_sdp.DB17 = 0x1;
+	switch (crtc_state->pipe_bpp) {
+	case 12: /* 8bpc */
+		vsc_sdp.DB17 = 0x1;
+		break;
+	case 15: /* 10bpc */
+		vsc_sdp.DB17 = 0x2;
+		break;
+	case 18: /* 12bpc */
+		vsc_sdp.DB17 = 0x3;
+		break;
+	case 24: /* 16bpc */
+		vsc_sdp.DB17 = 0x4;
+		break;
+	default:
+		DRM_DEBUG_KMS("Invalid bpp value '%d'\n", crtc_state->pipe_bpp);
+		break;
+	}
 
 	/*
 	 * Content Type (Bits 2:0)
