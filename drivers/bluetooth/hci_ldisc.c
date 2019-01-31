@@ -314,6 +314,11 @@ void hci_uart_set_flow_control(struct hci_uart *hu, bool enable)
 		return;
 	}
 
+	/* don't set HCI line discipline on PTYs */
+	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
+	    tty->driver->subtype == PTY_TYPE_MASTER)
+		return;
+
 	if (enable) {
 		/* Disable hardware flow control */
 		ktermios = tty->termios;
@@ -384,10 +389,16 @@ void hci_uart_set_baudrate(struct hci_uart *hu, unsigned int speed)
 static int hci_uart_setup(struct hci_dev *hdev)
 {
 	struct hci_uart *hu = hci_get_drvdata(hdev);
+	struct tty_struct *tty = hu->tty;
 	struct hci_rp_read_local_version *ver;
 	struct sk_buff *skb;
 	unsigned int speed;
 	int err;
+
+	/* don't set HCI line discipline on PTYs */
+	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
+	    tty->driver->subtype == PTY_TYPE_MASTER)
+		return -EINVAL;
 
 	/* Init speed if any */
 	if (hu->init_speed)
