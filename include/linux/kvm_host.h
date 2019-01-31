@@ -739,15 +739,15 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *vcpu, bool usermode_vcpu_not_eligible);
 void kvm_flush_remote_tlbs(struct kvm *kvm);
 void kvm_reload_remote_mmus(struct kvm *kvm);
 
-#ifdef KVM_ARCH_WANT_MMU_MEMORY_CACHE
-int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+#ifdef KVM_ARCH_WANT_MMU_MEMCACHE
+int kvm_mmu_topup_memcache(struct kvm_mmu_memcache *cache,
 			   struct kmem_cache *base_cache, int min);
-int mmu_memory_cache_free_objects(struct kvm_mmu_memory_cache *cache);
-void mmu_free_memory_cache(struct kvm_mmu_memory_cache *mc,
+int kvm_mmu_memcache_free_objects(struct kvm_mmu_memcache *cache);
+void kvm_mmu_free_memcache(struct kvm_mmu_memcache *mc,
 			   struct kmem_cache *cache);
-int mmu_topup_memory_cache_page(struct kvm_mmu_memory_cache *cache, int min);
-void mmu_free_memory_cache_page(struct kvm_mmu_memory_cache *mc);
-void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc);
+int kvm_mmu_topup_memcache_page(struct kvm_mmu_memcache *cache, int min);
+void kvm_mmu_free_memcache_page(struct kvm_mmu_memcache *mc);
+void *kvm_mmu_memcache_alloc(struct kvm_mmu_memcache *mc);
 #endif
 
 bool kvm_make_vcpus_request_mask(struct kvm *kvm, unsigned int req,

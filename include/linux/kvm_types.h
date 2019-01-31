@@ -64,14 +64,14 @@ struct gfn_to_hva_cache {
 	struct kvm_memory_slot *memslot;
 };
 
-#ifdef KVM_ARCH_WANT_MMU_MEMORY_CACHE
+#ifdef KVM_ARCH_WANT_MMU_MEMCACHE
 /*
  * We don't want allocation failures within the mmu code, so we preallocate
  * enough memory for a single page fault in a cache.
  */
-struct kvm_mmu_memory_cache {
+struct kvm_mmu_memcache {
 	int nobjs;
-	void *objects[KVM_NR_MEM_OBJS];
+	void *objects[KVM_MMU_NR_MEMCACHE_OBJS];
 };
 #endif
 
