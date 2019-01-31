@@ -112,6 +112,8 @@ LIBBPF_0.0.1 {
 		btf__find_by_name;
 		btf__free;
 		btf__get_from_id;
+		btf__get_nr_types;
+		btf__get_strings;
 		btf__name_by_offset;
 		btf__new;
 		btf__resolve_size;
