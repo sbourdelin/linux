@@ -3042,10 +3042,9 @@ sub process {
 					 WARN("SPDX_LICENSE_TAG",
 					      "Missing or malformed SPDX-License-Identifier tag in line $checklicenseline\n" . $herecurr);
 				} elsif ($rawline =~ /(SPDX-License-Identifier: .*)/) {
-					 my $spdx_license = $1;
-					 if (!is_SPDX_License_valid($spdx_license)) {
+					 if (!is_SPDX_License_valid($rawline)) {
 						  WARN("SPDX_LICENSE_TAG",
-						       "'$spdx_license' is not supported in LICENSES/...\n" . $herecurr);
+						       "'$rawline' is not supported in LICENSES/...\n" . $herecurr);
 					 }
 				}
 			}
