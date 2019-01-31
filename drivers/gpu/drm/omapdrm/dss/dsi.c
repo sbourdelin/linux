@@ -339,6 +339,7 @@ struct dsi_data {
 	int irq;
 
 	bool is_enabled;
+	unsigned int disconnect_lanes:1;
 
 	struct clk *dss_clk;
 	struct regmap *syscon;
@@ -1382,10 +1383,12 @@ err0:
 	return r;
 }
 
-static void dsi_pll_uninit(struct dsi_data *dsi, bool disconnect_lanes)
+static void dsi_pll_disable(struct dss_pll *pll)
 {
+	struct dsi_data *dsi = container_of(pll, struct dsi_data, pll);
+
 	dsi_pll_power(dsi, DSI_PLL_POWER_OFF);
-	if (disconnect_lanes) {
+	if (dsi->disconnect_lanes) {
 		WARN_ON(!dsi->vdds_dsi_enabled);
 		regulator_disable(dsi->vdds_dsi_reg);
 		dsi->vdds_dsi_enabled = false;
@@ -1395,13 +1398,6 @@ static void dsi_pll_uninit(struct dsi_data *dsi, bool disconnect_lanes)
 	dsi_runtime_put(dsi);
 
 	DSSDBG("PLL uninit done\n");
-}
-
-static void dsi_pll_disable(struct dss_pll *pll)
-{
-	struct dsi_data *dsi = container_of(pll, struct dsi_data, pll);
-
-	dsi_pll_uninit(dsi, true);
 }
 
 static int dsi_dump_dsi_clocks(struct seq_file *s, void *p)
@@ -4158,7 +4154,9 @@ static void dsi_display_uninit_dsi(struct dsi_data *dsi, bool disconnect_lanes,
 
 	dss_select_dsi_clk_source(dsi->dss, dsi->module_id, DSS_CLK_SRC_FCK);
 	dsi_cio_uninit(dsi);
-	dsi_pll_uninit(dsi, disconnect_lanes);
+
+	dsi->disconnect_lanes = disconnect_lanes;
+	dss_pll_disable(&dsi->pll);
 }
 
 static int dsi_display_enable(struct omap_dss_device *dssdev)
