@@ -83,6 +83,14 @@ int btf_ext__reloc_line_info(const struct btf *btf,
 __u32 btf_ext__func_info_rec_size(const struct btf_ext *btf_ext);
 __u32 btf_ext__line_info_rec_size(const struct btf_ext *btf_ext);
 
+struct btf_dedup_opts {
+	bool dont_resolve_fwds;
+};
+
+LIBBPF_API int btf__dedup(struct btf *btf, struct btf_ext *btf_ext,
+			  const struct btf_dedup_opts *opts,
+			  btf_print_fn_t err_log);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
