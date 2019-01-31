@@ -1371,6 +1371,8 @@ static void rtl_link_chg_patch(struct rtl8169_private *tp)
 
 #define WAKE_ANY (WAKE_PHY | WAKE_MAGIC | WAKE_UCAST | WAKE_BCAST | WAKE_MCAST)
 
+/* Don't delete it completely, in case we need to re-enable it */
+#if 0
 static u32 __rtl8169_get_wol(struct rtl8169_private *tp)
 {
 	u8 options;
@@ -1405,6 +1407,7 @@ static u32 __rtl8169_get_wol(struct rtl8169_private *tp)
 
 	return wolopts;
 }
+#endif
 
 static void rtl8169_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
@@ -4284,7 +4287,7 @@ static void rtl_wol_suspend_quirk(struct rtl8169_private *tp)
 
 static bool rtl_wol_pll_power_down(struct rtl8169_private *tp)
 {
-	if (!__rtl8169_get_wol(tp))
+	if (!device_may_wakeup(tp_to_dev(tp)))
 		return false;
 
 	phy_speed_down(tp->phydev, false);
@@ -7440,8 +7443,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dev_err(&pdev->dev, "Can't allocate interrupt\n");
 		return rc;
 	}
-
-	tp->saved_wolopts = __rtl8169_get_wol(tp);
 
 	mutex_init(&tp->wk.mutex);
 	INIT_WORK(&tp->wk.work, rtl_task);
