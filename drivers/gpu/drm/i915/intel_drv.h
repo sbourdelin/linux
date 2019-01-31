@@ -1867,6 +1867,8 @@ u16 intel_dp_dsc_get_output_bpp(int link_clock, u8 lane_count,
 				int mode_clock, int mode_hdisplay);
 u8 intel_dp_dsc_get_slice_count(struct intel_dp *intel_dp, int mode_clock,
 				int mode_hdisplay);
+void intel_dp_ycbcr_420_enable(struct intel_dp *intel_dp,
+			       const struct intel_crtc_state *crtc_state);
 
 /* intel_vdsc.c */
 int intel_dp_compute_dsc_params(struct intel_dp *intel_dp,

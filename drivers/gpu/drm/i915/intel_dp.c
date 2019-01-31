@@ -4402,6 +4402,78 @@ u8 intel_dp_dsc_get_slice_count(struct intel_dp *intel_dp,
 	return 0;
 }
 
+static void
+intel_pixel_encoding_setup_vsc(struct intel_dp *intel_dp,
+			       const struct intel_crtc_state *crtc_state)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct dp_vsc_sdp vsc_sdp;
+
+	if (!intel_dp->attached_connector->base.ycbcr_420_allowed)  return;
+
+	/* Prepare VSC Header for SU as per DP 1.4a spec, Table 2-119 */
+	memset(&vsc_sdp, 0, sizeof(vsc_sdp));
+	vsc_sdp.sdp_header.HB0 = 0;
+	vsc_sdp.sdp_header.HB1 = 0x7;
+
+	/* VSC SDP supporting 3D stereo, PSR2, and Pixel Encoding/
+	 * Colorimetry Format indication. A DP Source device is allowed
+	 * to indicate the pixel encoding/colorimetry format to the DP Sink
+	 * device with VSC SDP only when the DP Sink device supports it
+	 * (i.e., VSC_SDP_EXTENSION_FOR_COLORIMETRY_SUPPORTED bit in the register
+	 * DPRX_FEATURE_ENUMERATION_LIST (DPCD Address 02210h, bit 3) is set to 1)
+	 */
+	vsc_sdp.sdp_header.HB2 = 0x5;
+
+	/* VSC SDP supporting 3D stereo, + PSR2, + Pixel Encoding/
+	 * Colorimetry Format indication (HB2 = 05h).
+	 */
+	vsc_sdp.sdp_header.HB3 = 0x13;
+	/* YCbCr 420 = 3h DB16[7:4] ITU-R BT.601 = 0h, ITU-R BT.709 = 1h
+	 * DB16[3:0] DP 1.4a spec, Table 2-120
+	 */
+
+	/* https://patchwork.freedesktop.org/patch/166830/ i915 implementations
+	 * uses BT.709 color space
+	 */
+	vsc_sdp.DB16 = 0x3 << 4; /* 0x3 << 4 , YCbCr 420*/
+	vsc_sdp.DB16 |= 0x1; /* 0x1, ITU-R BT.709 */
+
+	/* For pixel encoding formats YCbCr444, YCbCr422, YCbCr420, and Y Only,
+	 * the following Component Bit Depth values are defined:
+	 * 001b = 8bpc.
+	 * 010b = 10bpc.
+	 * 011b = 12bpc.
+	 * 100b = 16bpc.
+	 */
+	vsc_sdp.DB17 = 0x1;
+
+	/*
+	 * Content Type (Bits 2:0)
+	 * 000b = Not defined.
+	 * 001b = Graphics.
+	 * 010b = Photo.
+	 * 011b = Video.
+	 * 100b = Game
+	 * All other values are RESERVED.
+	 * Note: See CTA-861-G for the definition and expected
+	 * processing by a stream sink for the above contect types.
+	 */
+	vsc_sdp.DB18 = 0;
+
+	intel_dig_port->write_infoframe(&intel_dig_port->base,
+			crtc_state, DP_SDP_VSC, &vsc_sdp, sizeof(vsc_sdp));
+}
+
+void intel_dp_ycbcr_420_enable(struct intel_dp *intel_dp,
+			       const struct intel_crtc_state *crtc_state)
+{
+	if (crtc_state->output_format != INTEL_OUTPUT_FORMAT_YCBCR420)
+		return;
+
+	intel_pixel_encoding_setup_vsc(intel_dp, crtc_state);
+}
+
 static u8 intel_dp_autotest_link_training(struct intel_dp *intel_dp)
 {
 	int status = 0;
