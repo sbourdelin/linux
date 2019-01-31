@@ -180,6 +180,37 @@ static int btf_parse_str_sec(struct btf *btf, btf_print_fn_t err_log)
 	return 0;
 }
 
+static int btf_type_size(struct btf_type *t, btf_print_fn_t err_log)
+{
+	int base_size = sizeof(struct btf_type);
+	__u16 vlen = BTF_INFO_VLEN(t->info);
+
+	switch (BTF_INFO_KIND(t->info)) {
+	case BTF_KIND_FWD:
+	case BTF_KIND_CONST:
+	case BTF_KIND_VOLATILE:
+	case BTF_KIND_RESTRICT:
+	case BTF_KIND_PTR:
+	case BTF_KIND_TYPEDEF:
+	case BTF_KIND_FUNC:
+		return base_size;
+	case BTF_KIND_INT:
+		return base_size + sizeof(__u32);
+	case BTF_KIND_ENUM:
+		return base_size + vlen * sizeof(struct btf_enum);
+	case BTF_KIND_ARRAY:
+		return base_size + sizeof(struct btf_array);
+	case BTF_KIND_STRUCT:
+	case BTF_KIND_UNION:
+		return base_size + vlen * sizeof(struct btf_member);
+	case BTF_KIND_FUNC_PROTO:
+		return base_size + vlen * sizeof(struct btf_param);
+	default:
+		elog("Unsupported BTF_KIND:%u\n", BTF_INFO_KIND(t->info));
+		return -EINVAL;
+	}
+}
+
 static int btf_parse_type_sec(struct btf *btf, btf_print_fn_t err_log)
 {
 	struct btf_header *hdr = btf->hdr;
@@ -189,41 +220,13 @@ static int btf_parse_type_sec(struct btf *btf, btf_print_fn_t err_log)
 
 	while (next_type < end_type) {
 		struct btf_type *t = next_type;
-		__u16 vlen = BTF_INFO_VLEN(t->info);
+		int type_size;
 		int err;
 
-		next_type += sizeof(*t);
-		switch (BTF_INFO_KIND(t->info)) {
-		case BTF_KIND_INT:
-			next_type += sizeof(int);
-			break;
-		case BTF_KIND_ARRAY:
-			next_type += sizeof(struct btf_array);
-			break;
-		case BTF_KIND_STRUCT:
-		case BTF_KIND_UNION:
-			next_type += vlen * sizeof(struct btf_member);
-			break;
-		case BTF_KIND_ENUM:
-			next_type += vlen * sizeof(struct btf_enum);
-			break;
-		case BTF_KIND_FUNC_PROTO:
-			next_type += vlen * sizeof(struct btf_param);
-			break;
-		case BTF_KIND_FUNC:
-		case BTF_KIND_TYPEDEF:
-		case BTF_KIND_PTR:
-		case BTF_KIND_FWD:
-		case BTF_KIND_VOLATILE:
-		case BTF_KIND_CONST:
-		case BTF_KIND_RESTRICT:
-			break;
-		default:
-			elog("Unsupported BTF_KIND:%u\n",
-			     BTF_INFO_KIND(t->info));
-			return -EINVAL;
-		}
-
+		type_size = btf_type_size(t, err_log);
+		if (type_size < 0)
+			return type_size;
+		next_type += type_size;
 		err = btf_add_type(btf, t);
 		if (err)
 			return err;
@@ -250,21 +253,6 @@ static bool btf_type_is_void_or_null(const struct btf_type *t)
 	return !t || btf_type_is_void(t);
 }
 
-static __s64 btf_type_size(const struct btf_type *t)
-{
-	switch (BTF_INFO_KIND(t->info)) {
-	case BTF_KIND_INT:
-	case BTF_KIND_STRUCT:
-	case BTF_KIND_UNION:
-	case BTF_KIND_ENUM:
-		return t->size;
-	case BTF_KIND_PTR:
-		return sizeof(void *);
-	default:
-		return -EINVAL;
-	}
-}
-
 #define MAX_RESOLVE_DEPTH 32
 
 __s64 btf__resolve_size(const struct btf *btf, __u32 type_id)
@@ -278,11 +266,16 @@ __s64 btf__resolve_size(const struct btf *btf, __u32 type_id)
 	t = btf__type_by_id(btf, type_id);
 	for (i = 0; i < MAX_RESOLVE_DEPTH && !btf_type_is_void_or_null(t);
 	     i++) {
-		size = btf_type_size(t);
-		if (size >= 0)
-			break;
-
 		switch (BTF_INFO_KIND(t->info)) {
+		case BTF_KIND_INT:
+		case BTF_KIND_STRUCT:
+		case BTF_KIND_UNION:
+		case BTF_KIND_ENUM:
+			size = t->size;
+			goto done;
+		case BTF_KIND_PTR:
+			size = sizeof(void *);
+			goto done;
 		case BTF_KIND_TYPEDEF:
 		case BTF_KIND_VOLATILE:
 		case BTF_KIND_CONST:
@@ -306,6 +299,7 @@ __s64 btf__resolve_size(const struct btf *btf, __u32 type_id)
 	if (size < 0)
 		return -EINVAL;
 
+done:
 	if (nelems && size > UINT32_MAX / nelems)
 		return -E2BIG;
 
