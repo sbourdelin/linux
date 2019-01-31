@@ -8783,6 +8783,11 @@ static void netdev_wait_allrefs(struct net_device *dev)
 	refcnt = netdev_refcnt_read(dev);
 
 	while (refcnt != 0) {
+		if (refcnt < 0) {
+			pr_warn("Device %s refcnt negative: device considered free, but it should not happen\n",
+				dev->name);
+			break;
+		}
 		if (time_after(jiffies, rebroadcast_time + 1 * HZ)) {
 			rtnl_lock();
 
