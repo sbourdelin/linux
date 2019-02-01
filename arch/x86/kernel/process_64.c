@@ -477,10 +477,16 @@ int copy_thread_tls(unsigned long clone_flags, unsigned long sp,
 	p->thread.sp = (unsigned long) fork_frame;
 	p->thread.io_bitmap_ptr = NULL;
 
-	savesegment(gs, p->thread.gsindex);
-	p->thread.gsbase = p->thread.gsindex ? 0 : me->thread.gsbase;
 	savesegment(fs, p->thread.fsindex);
-	p->thread.fsbase = p->thread.fsindex ? 0 : me->thread.fsbase;
+	savesegment(gs, p->thread.gsindex);
+	if (static_cpu_has(X86_FEATURE_FSGSBASE)) {
+		p->thread.fsbase = rdfsbase();
+		p->thread.gsbase = __rdgsbase_inactive();
+	} else {
+		/* save_base_legacy() does not set base when index is zero. */
+		p->thread.fsbase = p->thread.fsindex ? 0 : me->thread.fsbase;
+		p->thread.gsbase = p->thread.gsindex ? 0 : me->thread.gsbase;
+	}
 	savesegment(es, p->thread.es);
 	savesegment(ds, p->thread.ds);
 	memset(p->thread.ptrace_bps, 0, sizeof(p->thread.ptrace_bps));
