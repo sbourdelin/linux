@@ -27,6 +27,7 @@
 /* name for boot aggregate entry */
 static const char boot_aggregate_name[] = "boot_aggregate";
 struct tpm_chip *ima_tpm_chip;
+struct tpm_digest *digests;
 
 /* Add the boot aggregate to the IMA measurement list and extend
  * the PCR register.
@@ -104,6 +105,24 @@ void __init ima_load_x509(void)
 }
 #endif
 
+int __init ima_init_digests(void)
+{
+	int i;
+
+	if (!ima_tpm_chip)
+		return 0;
+
+	digests = kcalloc(ima_tpm_chip->nr_allocated_banks, sizeof(*digests),
+			  GFP_NOFS);
+	if (!digests)
+		return -ENOMEM;
+
+	for (i = 0; i < ima_tpm_chip->nr_allocated_banks; i++)
+		digests[i].alg_id = ima_tpm_chip->allocated_banks[i].alg_id;
+
+	return 0;
+}
+
 int __init ima_init(void)
 {
 	int rc;
@@ -125,6 +144,9 @@ int __init ima_init(void)
 
 	ima_load_kexec_buffer();
 
+	rc = ima_init_digests();
+	if (rc != 0)
+		return rc;
 	rc = ima_add_boot_aggregate();	/* boot aggregate must be first entry */
 	if (rc != 0)
 		return rc;

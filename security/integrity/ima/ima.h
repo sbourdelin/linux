@@ -56,6 +56,7 @@ extern int ima_policy_flag;
 extern int ima_hash_algo;
 extern int ima_appraise;
 extern struct tpm_chip *ima_tpm_chip;
+extern struct tpm_digest *digests;
 
 /* IMA event related data */
 struct ima_event_data {
