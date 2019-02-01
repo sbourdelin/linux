@@ -864,7 +864,7 @@ void intel_hdcp_atomic_check(struct drm_connector *connector,
 
 	crtc_state = drm_atomic_get_new_crtc_state(new_state->state,
 						   new_state->crtc);
-	crtc_state->mode_changed = true;
+	crtc_state->connectors_changed = true;
 }
 
 /* Implements Part 3 of the HDCP authorization procedure */
