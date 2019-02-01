@@ -172,6 +172,10 @@ static int (*bpf_skb_vlan_pop)(void *ctx) =
 	(void *) BPF_FUNC_skb_vlan_pop;
 static int (*bpf_rc_pointer_rel)(void *ctx, int rel_x, int rel_y) =
 	(void *) BPF_FUNC_rc_pointer_rel;
+static struct bpf_sock *(*bpf_sk_fullsock)(struct bpf_sock *sk) =
+	(void *) BPF_FUNC_sk_fullsock;
+static struct bpf_tcp_sock *(*bpf_tcp_sock)(struct bpf_sock *sk) =
+	(void *) BPF_FUNC_tcp_sock;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
