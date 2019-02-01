@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0
 /*
  * ADXL372 3-Axis Digital Accelerometer I2C driver
  *
@@ -58,4 +58,4 @@ module_i2c_driver(adxl372_i2c_driver);
 
 MODULE_AUTHOR("Stefan Popa <stefan.popa@analog.com>");
 MODULE_DESCRIPTION("Analog Devices ADXL372 3-axis accelerometer I2C driver");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");

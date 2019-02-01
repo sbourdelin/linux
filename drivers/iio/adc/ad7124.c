@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0
 /*
  * AD7124 SPI ADC driver
  *
@@ -681,4 +681,4 @@ module_spi_driver(ad71124_driver);
 
 MODULE_AUTHOR("Stefan Popa <stefan.popa@analog.com>");
 MODULE_DESCRIPTION("Analog Devices AD7124 SPI driver");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
