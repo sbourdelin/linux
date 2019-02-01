@@ -346,12 +346,14 @@ int __init security_init(void)
 }
 
 /* Save user chosen LSM */
+#ifndef CONFIG_DEBUG_AID_FOR_SYZBOT
 static int __init choose_major_lsm(char *str)
 {
 	chosen_major_lsm = str;
 	return 1;
 }
 __setup("security=", choose_major_lsm);
+#endif
 
 /* Explicitly choose LSM initialization order. */
 static int __init choose_lsm_order(char *str)
