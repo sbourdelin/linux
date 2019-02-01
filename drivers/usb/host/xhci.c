@@ -1238,6 +1238,41 @@ EXPORT_SYMBOL_GPL(xhci_resume);
 
 /*-------------------------------------------------------------------------*/
 
+static void xhci_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
+{
+	if (urb->transfer_flags & URB_NO_DMA_MAP)
+		urb->transfer_flags &= ~URB_NO_DMA_MAP;
+	else
+		usb_hcd_unmap_urb_for_dma(hcd, urb);
+}
+
+static int xhci_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
+				gfp_t mem_flags)
+{
+	int maxp = usb_endpoint_maxp(&urb->ep->desc);
+	int len = urb->transfer_buffer_length;
+	int ret = 0;
+
+	/*
+	 * Checks if URB is suitable for Immediate Transfer (IDT): instead of
+	 * mapping the buffer for DMA and passing the address to the host
+	 * controller, we copy the actual data into the TRB address register.
+	 * This is limited to transfers up to 8 bytes.
+	 *
+	 * IDT is only supported for Bulk and Interrupt endpoints. Apart from
+	 * the size constraints special care is taken to avoid cases where
+	 * wMaxPacketSize is smaller than 8 bytes as it's not supported.
+	 */
+	if ((usb_endpoint_is_int_out(&urb->ep->desc) ||
+	    usb_endpoint_is_bulk_out(&urb->ep->desc)) &&
+	    maxp >= TRB_IDT_MAX_SIZE && len <= TRB_IDT_MAX_SIZE)
+		urb->transfer_flags |= URB_NO_DMA_MAP;
+	else
+		ret = usb_hcd_map_urb_for_dma(hcd, urb, mem_flags);
+
+	return ret;
+}
+
 /**
  * xhci_get_endpoint_index - Used for passing endpoint bitmasks between the core and
  * HCDs.  Find the index for an endpoint given its descriptor.  Use the return
@@ -5154,6 +5189,8 @@ static const struct hc_driver xhci_hc_driver = {
 	/*
 	 * managing i/o requests and associated device resources
 	 */
+	.map_urb_for_dma =      xhci_map_urb_for_dma,
+	.unmap_urb_for_dma =    xhci_unmap_urb_for_dma,
 	.urb_enqueue =		xhci_urb_enqueue,
 	.urb_dequeue =		xhci_urb_dequeue,
 	.alloc_dev =		xhci_alloc_dev,
