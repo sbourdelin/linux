@@ -741,12 +741,11 @@ static int do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 func,
 
 struct kvm_cpuid_param {
 	u32 func;
-	u32 idx;
 	bool has_leaf_count;
-	bool (*qualifier)(const struct kvm_cpuid_param *param);
+	bool (*qualifier)(void);
 };
 
-static bool is_centaur_cpu(const struct kvm_cpuid_param *param)
+static bool is_centaur_cpu(void)
 {
 	return boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR;
 }
@@ -811,10 +810,10 @@ int kvm_dev_ioctl_get_cpuid(struct kvm_cpuid2 *cpuid,
 	for (i = 0; i < ARRAY_SIZE(param); i++) {
 		const struct kvm_cpuid_param *ent = &param[i];
 
-		if (ent->qualifier && !ent->qualifier(ent))
+		if (ent->qualifier && !ent->qualifier())
 			continue;
 
-		r = do_cpuid_ent(&cpuid_entries[nent], ent->func, ent->idx,
+		r = do_cpuid_ent(&cpuid_entries[nent], ent->func, 0,
 				&nent, cpuid->nent, type);
 
 		if (r)
@@ -825,7 +824,7 @@ int kvm_dev_ioctl_get_cpuid(struct kvm_cpuid2 *cpuid,
 
 		limit = cpuid_entries[nent - 1].eax;
 		for (func = ent->func + 1; func <= limit && nent < cpuid->nent && r == 0; ++func)
-			r = do_cpuid_ent(&cpuid_entries[nent], func, ent->idx,
+			r = do_cpuid_ent(&cpuid_entries[nent], func, 0,
 				     &nent, cpuid->nent, type);
 
 		if (r)
