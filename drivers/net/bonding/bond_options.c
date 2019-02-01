@@ -1375,6 +1375,7 @@ static int bond_option_slaves_set(struct bonding *bond,
 	sscanf(newval->string, "%16s", command); /* IFNAMSIZ*/
 	ifname = command + 1;
 	if ((strlen(command) <= 1) ||
+	    (command[0] != '+' && command[0] != '-') ||
 	    !dev_valid_name(ifname))
 		goto err_no_cmd;
 
@@ -1396,9 +1397,6 @@ static int bond_option_slaves_set(struct bonding *bond,
 		netdev_dbg(bond->dev, "Removing slave %s\n", dev->name);
 		ret = bond_release(bond->dev, dev);
 		break;
-
-	default:
-		goto err_no_cmd;
 	}
 
 out:
