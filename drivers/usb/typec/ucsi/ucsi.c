@@ -12,7 +12,7 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/usb/typec_altmode.h>
+#include <linux/usb/typec_dp.h>
 
 #include "ucsi.h"
 #include "trace.h"
@@ -288,8 +288,11 @@ static int ucsi_register_altmode(struct ucsi_connector *con,
 				 u8 recipient)
 {
 	struct typec_altmode *alt;
+	bool override;
 	int ret;
 	int i;
+
+	override = !!(con->ucsi->cap.features & UCSI_CAP_ALT_MODE_OVERRIDE);
 
 	switch (recipient) {
 	case UCSI_RECIPIENT_CON:
@@ -302,7 +305,15 @@ static int ucsi_register_altmode(struct ucsi_connector *con,
 		desc->mode = ucsi_altmode_next_mode(con->port_altmode,
 						    desc->svid);
 
-		alt = typec_port_register_altmode(con->port, desc);
+		switch (desc->svid) {
+		case USB_TYPEC_DP_SID:
+			alt = ucsi_register_displayport(con, override, i, desc);
+			break;
+		default:
+			alt = typec_port_register_altmode(con->port, desc);
+			break;
+		}
+
 		if (IS_ERR(alt)) {
 			ret = PTR_ERR(alt);
 			goto err;
@@ -398,6 +409,7 @@ static int ucsi_register_altmodes(struct ucsi_connector *con, u8 recipient)
 static void ucsi_unregister_altmodes(struct ucsi_connector *con, u8 recipient)
 {
 	struct typec_altmode **adev;
+	struct typec_altmode *alt;
 	int i = 0;
 
 	switch (recipient) {
@@ -412,6 +424,12 @@ static void ucsi_unregister_altmodes(struct ucsi_connector *con, u8 recipient)
 	}
 
 	while (adev[i]) {
+		if (recipient == UCSI_RECIPIENT_SOP &&
+		    adev[i]->svid == USB_TYPEC_DP_SID) {
+			alt = typec_match_altmode(con->port_altmode, -1,
+						  USB_TYPEC_DP_SID, 1);
+			ucsi_displayport_remove_partner(alt);
+		}
 		typec_unregister_altmode(adev[i]);
 		adev[i++] = NULL;
 	}
