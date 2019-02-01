@@ -54,8 +54,8 @@
 
 #define __printf(a, b)	__attribute__((format(printf, a, b)))
 
-__printf(1, 2)
-static int __base_pr(const char *format, ...)
+__printf(2, 3)
+static int __base_pr(enum libbpf_print_level level, const char *format, ...)
 {
 	va_list args;
 	int err;
@@ -66,17 +66,11 @@ static int __base_pr(const char *format, ...)
 	return err;
 }
 
-static __printf(1, 2) libbpf_print_fn_t __pr_warning = __base_pr;
-static __printf(1, 2) libbpf_print_fn_t __pr_info = __base_pr;
-static __printf(1, 2) libbpf_print_fn_t __pr_debug;
+static __printf(2, 3) libbpf_print_fn_t __libbpf_pr = __base_pr;
 
-void libbpf_set_print(libbpf_print_fn_t warn,
-		      libbpf_print_fn_t info,
-		      libbpf_print_fn_t debug)
+void libbpf_set_print(libbpf_print_fn_t fn)
 {
-	__pr_warning = warn;
-	__pr_info = info;
-	__pr_debug = debug;
+	__libbpf_pr = fn;
 }
 
 __printf(2, 3)
@@ -85,16 +79,8 @@ void libbpf_debug_print(enum libbpf_print_level level, const char *format, ...)
 	va_list args;
 
 	va_start(args, format);
-	if (level == LIBBPF_WARN) {
-		if (__pr_warning)
-			__pr_warning(format, args);
-	} else if (level == LIBBPF_INFO) {
-		if (__pr_info)
-			__pr_info(format, args);
-	} else {
-		if (__pr_debug)
-			__pr_debug(format, args);
-	}
+	if (__libbpf_pr)
+		__libbpf_pr(level, format, args);
 	va_end(args);
 }
 
