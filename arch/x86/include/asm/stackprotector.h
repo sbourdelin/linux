@@ -62,17 +62,21 @@ static __always_inline void boot_init_stack_canary(void)
 {
 	u64 canary;
 	u64 tsc;
+	int ret;
 
 #ifdef CONFIG_X86_64
 	BUILD_BUG_ON(offsetof(union irq_stack_union, stack_canary) != 40);
 #endif
 	/*
-	 * We both use the random pool and the current TSC as a source
-	 * of randomness. The TSC only matters for very early init,
-	 * there it already has some randomness on most systems. Later
-	 * on during the bootup the random pool has true entropy too.
+	 * During early boot the entropy pool may not be initialized.  As an
+	 * alternative and if one is available, try to use the hardware random
+	 * generator.  On most systems the TSC will have some randomness so it
+	 * can also be used for entropy during early boot.
 	 */
-	get_random_bytes(&canary, sizeof(canary));
+	if (crng_ready())
+		get_random_bytes(&canary, sizeof(canary));
+	else
+		ret = get_random_bytes_arch(&canary, sizeof(canary));
 	tsc = rdtsc();
 	canary += tsc + (tsc << 32UL);
 	canary &= CANARY_MASK;
