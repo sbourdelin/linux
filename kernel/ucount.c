@@ -57,6 +57,11 @@ static struct ctl_table_root set_root = {
 	.permissions = set_permissions,
 };
 
+#ifdef CONFIG_INOTIFY_USER
+int proc_read_inotify_watches(struct ctl_table *table, int write,
+		     void __user *buffer, size_t *lenp, loff_t *ppos);
+#endif
+
 static int zero = 0;
 static int int_max = INT_MAX;
 #define UCOUNT_ENTRY(name)				\
@@ -79,6 +84,12 @@ static struct ctl_table user_table[] = {
 #ifdef CONFIG_INOTIFY_USER
 	UCOUNT_ENTRY("max_inotify_instances"),
 	UCOUNT_ENTRY("max_inotify_watches"),
+	{
+		.procname	= "current_inotify_watches",
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= proc_read_inotify_watches,
+	},
 #endif
 	{ }
 };
@@ -225,6 +236,24 @@ void dec_ucount(struct ucounts *ucounts, enum ucount_type type)
 	}
 	put_ucounts(ucounts);
 }
+
+#ifdef CONFIG_INOTIFY_USER
+int proc_read_inotify_watches(struct ctl_table *table, int write,
+		     void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ucounts *ucounts;
+	struct ctl_table fake_table;
+	int count;
+
+	ucounts = get_ucounts(current_user_ns(), current_euid());
+	count = atomic_read(&ucounts->ucount[UCOUNT_INOTIFY_WATCHES]);
+	put_ucounts(ucounts);
+
+	fake_table.data = &count;
+	fake_table.maxlen = sizeof(count);
+	return proc_dointvec(&fake_table, write, buffer, lenp, ppos);
+}
+#endif
 
 static __init int user_namespace_sysctl_init(void)
 {
