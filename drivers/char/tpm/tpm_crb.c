@@ -288,18 +288,18 @@ static int crb_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 	unsigned int expected;
 
 	/* sanity check */
-	if (count < 6)
+	if (count < 8)
 		return -EIO;
 
 	if (ioread32(&priv->regs_t->ctrl_sts) & CRB_CTRL_STS_ERROR)
 		return -EIO;
 
-	memcpy_fromio(buf, priv->rsp, 6);
+	memcpy_fromio(buf, priv->rsp, 8);
 	expected = be32_to_cpup((__be32 *) &buf[2]);
-	if (expected > count || expected < 6)
+	if (expected > count || expected < 8)
 		return -EIO;
 
-	memcpy_fromio(&buf[6], &priv->rsp[6], expected - 6);
+	memcpy_fromio(&buf[8], &priv->rsp[8], expected - 8);
 
 	return expected;
 }
