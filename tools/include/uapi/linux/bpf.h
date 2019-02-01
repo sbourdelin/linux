@@ -2328,6 +2328,23 @@ union bpf_attr {
  *		"**y**".
  *	Return
  *		0
+ *
+ * struct bpf_sock *bpf_sk_fullsock(struct bpf_sock *sk)
+ *	Description
+ *		This helper tests if a bpf_sock is a fullsock such that
+ *		all the fields in bpf_sock can be accessed.
+ *	Return
+ *		The same pointer if *sk* is a fullsock.  Otherwise,
+ *		NULL is returned.
+ *
+ * struct bpf_tcp_sock *bpf_tcp_sock(struct bpf_sock *sk)
+ *	Description
+ *		Obtain a **struct bpf_tcp_sock** pointer from a
+ *              **struct bpf_sock** pointer.
+ *
+ *	Return
+ *		Pointer to **struct bpf_tcp_sock**, or **NULL** in
+ *		case of failure.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -2422,7 +2439,9 @@ union bpf_attr {
 	FN(map_peek_elem),		\
 	FN(msg_push_data),		\
 	FN(msg_pop_data),		\
-	FN(rc_pointer_rel),
+	FN(rc_pointer_rel),		\
+	FN(sk_fullsock),		\
+	FN(tcp_sock),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call
@@ -2542,6 +2561,7 @@ struct __sk_buff {
 	__u64 tstamp;
 	__u32 wire_len;
 	__u32 gso_segs;
+	__bpf_md_ptr(struct bpf_sock *, sk);
 };
 
 struct bpf_tunnel_key {
@@ -2601,6 +2621,45 @@ struct bpf_sock {
 				 */
 	__u32 src_port;		/* Allows 4-byte read.
 				 * Stored in host byte order
+				 */
+};
+
+struct bpf_tcp_sock {
+	__u32 snd_cwnd;		/* Sending congestion window		*/
+	__u32 srtt_us;		/* smoothed round trip time << 3 in usecs */
+	__u32 rtt_min;
+	__u32 snd_ssthresh;	/* Slow start size threshold		*/
+	__u32 rcv_nxt;		/* What we want to receive next		*/
+	__u32 snd_nxt;		/* Next sequence we send		*/
+	__u32 snd_una;		/* First byte we want an ack for	*/
+	__u32 mss_cache;	/* Cached effective mss, not including SACKS */
+	__u32 ecn_flags;	/* ECN status bits.			*/
+	__u32 rate_delivered;	/* saved rate sample: packets delivered */
+	__u32 rate_interval_us;	/* saved rate sample: time elapsed */
+	__u32 packets_out;	/* Packets which are "in flight"	*/
+	__u32 retrans_out;	/* Retransmitted packets out		*/
+	__u32 total_retrans;	/* Total retransmits for entire connection */
+	__u32 segs_in;		/* RFC4898 tcpEStatsPerfSegsIn
+				 * total number of segments in.
+				 */
+	__u32 data_segs_in;	/* RFC4898 tcpEStatsPerfDataSegsIn
+				 * total number of data segments in.
+				 */
+	__u32 segs_out;		/* RFC4898 tcpEStatsPerfSegsOut
+				 * The total number of segments sent.
+				 */
+	__u32 data_segs_out;	/* RFC4898 tcpEStatsPerfDataSegsOut
+				 * total number of data segments sent.
+				 */
+	__u32 lost_out;		/* Lost packets			*/
+	__u32 sacked_out;	/* SACK'd packets			*/
+	__u64 bytes_received;	/* RFC4898 tcpEStatsAppHCThruOctetsReceived
+				 * sum(delta(rcv_nxt)), or how many bytes
+				 * were acked.
+				 */
+	__u64 bytes_acked;	/* RFC4898 tcpEStatsAppHCThruOctetsAcked
+				 * sum(delta(snd_una)), or how many bytes
+				 * were acked.
 				 */
 };
 
