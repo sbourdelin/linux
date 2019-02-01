@@ -300,6 +300,9 @@ static int shadow_crycb(struct kvm_vcpu *vcpu, struct vsie_page *vsie_page)
 	if (!apie_h && !key_msk)
 		return 0;
 
+	if (!(scb_o->eca & ECA_APIE) && !(scb_o->ecb3 & (ECB3_AES | ECB3_DEA)))
+		return 0;
+
 	if (!crycb_addr)
 		return set_validity_icpt(scb_s, 0x0039U);
 
