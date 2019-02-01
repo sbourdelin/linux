@@ -130,4 +130,5 @@ LIBBPF_0.0.2 {
 		bpf_probe_helper;
 		bpf_probe_map_type;
 		bpf_probe_prog_type;
+		bpf_object__find_map_fd_by_name;
 } LIBBPF_0.0.1;
