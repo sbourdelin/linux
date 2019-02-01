@@ -23,6 +23,7 @@
 #include <linux/sed-opal.h>
 #include <linux/fault-inject.h>
 #include <linux/rcupdate.h>
+#include <linux/jump_label.h>
 
 extern unsigned int nvme_io_timeout;
 #define NVME_IO_TIMEOUT	(nvme_io_timeout * HZ)
@@ -36,6 +37,8 @@ extern unsigned int admin_timeout;
 extern struct workqueue_struct *nvme_wq;
 extern struct workqueue_struct *nvme_reset_wq;
 extern struct workqueue_struct *nvme_delete_wq;
+
+DECLARE_STATIC_KEY_FALSE(nvme_quirk_a64fx_force_relax_key);
 
 enum {
 	NVME_NS_LBA		= 0,
@@ -95,6 +98,10 @@ enum nvme_quirks {
 	 * Ignore device provided subnqn.
 	 */
 	NVME_QUIRK_IGNORE_DEV_SUBNQN		= (1 << 8),
+	/*
+	 * Force relaxed ordering for A64FX controller
+	 */
+	NVME_QUIRK_A64FX_FORCE_RELAX		= (1 << 9),
 };
 
 /*

@@ -835,6 +835,45 @@ static blk_status_t nvme_pci_setup_sgls(struct nvme_dev *dev,
 	return BLK_STS_OK;
 }
 
+static inline void nvme_pci_enable_a64fx_relax_bit(struct nvme_sgl_desc *sge)
+{
+	sge->addr |= (1ULL << 56);
+}
+
+/*
+ * A64FX's controller allow relaxed order by setting 1 on bit 56 of dma address
+ * for performance enhancement.
+ *
+ * This traverses the sgl list and set the bit on ever dma address for
+ * data read.
+ */
+static void nvme_pci_quirk_a64fx_force_relax(struct request *req,
+		struct nvme_rw_command *cmd, int entries)
+{
+	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
+	struct nvme_sgl_desc *sg_list;
+	int i, j;
+
+	/* do nothing if sgl is not used or command is not read */
+	if (!iod->use_sgl || cmd->opcode != nvme_cmd_read)
+		return;
+
+	if (entries == 1) {
+		nvme_pci_enable_a64fx_relax_bit(&cmd->dptr.sgl);
+		return;
+	}
+
+	i = 0; j = 0;
+	sg_list = nvme_pci_iod_list(req)[j];
+	do {
+		if (i == SGES_PER_PAGE) {
+			i = 0;
+			sg_list = nvme_pci_iod_list(req)[++j];
+		}
+		nvme_pci_enable_a64fx_relax_bit(&sg_list[i++]);
+	} while (--entries > 0);
+}
+
 static blk_status_t nvme_map_data(struct nvme_dev *dev, struct request *req,
 		struct nvme_command *cmnd)
 {
@@ -868,6 +907,9 @@ static blk_status_t nvme_map_data(struct nvme_dev *dev, struct request *req,
 
 	if (ret != BLK_STS_OK)
 		goto out_unmap;
+
+	if (static_branch_unlikely(&nvme_quirk_a64fx_force_relax_key))
+		nvme_pci_quirk_a64fx_force_relax(req, &cmnd->rw, nr_mapped);
 
 	ret = BLK_STS_IOERR;
 	if (blk_integrity_rq(req)) {
@@ -2748,6 +2790,27 @@ static unsigned long check_vendor_combination_bug(struct pci_dev *pdev)
 	return 0;
 }
 
+/*
+ * PCI vendor id of Fujitsu and device id for root port in the A64FX processor
+ */
+#define PCI_VENDOR_ID_FUJITSU			0x10cf
+#define PCI_DEVICE_ID_FUJITSU_A64FX_ROOTPORT	0x1952
+
+static unsigned long check_system_vendor_acceleration(void)
+{
+	struct pci_dev *pdev_root;
+	/*
+	 * When Fujitsu A64FX Root Port is found, acceleration feature
+	 * can be enabled.
+	 */
+	pdev_root = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
+	if (pdev_root && (pdev_root->vendor == PCI_VENDOR_ID_FUJITSU) &&
+	    (pdev_root->device == PCI_DEVICE_ID_FUJITSU_A64FX_ROOTPORT))
+		return NVME_QUIRK_A64FX_FORCE_RELAX;
+
+	return 0;
+}
+
 static void nvme_async_probe(void *data, async_cookie_t cookie)
 {
 	struct nvme_dev *dev = data;
@@ -2793,6 +2856,8 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto unmap;
 
 	quirks |= check_vendor_combination_bug(pdev);
+
+	quirks |= check_system_vendor_acceleration();
 
 	/*
 	 * Double check that our mempool alloc size will cover the biggest

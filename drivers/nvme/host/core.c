@@ -37,6 +37,9 @@
 
 #define NVME_MINORS		(1U << MINORBITS)
 
+DEFINE_STATIC_KEY_FALSE(nvme_quirk_a64fx_force_relax_key);
+EXPORT_SYMBOL_GPL(nvme_quirk_a64fx_force_relax_key);
+
 unsigned int admin_timeout = 60;
 module_param(admin_timeout, uint, 0644);
 MODULE_PARM_DESC(admin_timeout, "timeout in seconds for admin commands");
@@ -2492,6 +2495,9 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 		dev_warn(ctrl->device, "forcibly allowing all power states due to nvme_core.force_apst -- use at your own risk\n");
 		ctrl->quirks &= ~NVME_QUIRK_NO_DEEPEST_PS;
 	}
+
+	if (ctrl->quirks & NVME_QUIRK_A64FX_FORCE_RELAX)
+		static_branch_enable(&nvme_quirk_a64fx_force_relax_key);
 
 	ctrl->crdt[0] = le16_to_cpu(id->crdt1);
 	ctrl->crdt[1] = le16_to_cpu(id->crdt2);
