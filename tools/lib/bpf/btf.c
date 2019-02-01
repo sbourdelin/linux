@@ -377,7 +377,7 @@ struct btf *btf__new(__u8 *data, __u32 size)
 
 	btf->fd = -1;
 
-	if (libbpf_dprint_level_available(LIBBPF_DEBUG)) {
+	if (libbpf_dprint_available()) {
 		log_buf = malloc(BPF_LOG_BUF_SIZE);
 		if (!log_buf) {
 			err = -ENOMEM;
