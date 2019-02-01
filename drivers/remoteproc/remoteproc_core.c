@@ -276,8 +276,9 @@ rproc_find_carveout_by_name(struct rproc *rproc, const char *name, ...)
  *
  * Return: 0 if carveout match request else -ENOMEM
  */
-int rproc_check_carveout_da(struct rproc *rproc, struct rproc_mem_entry *mem,
-			    u32 da, u32 len)
+static int rproc_check_carveout_da(struct rproc *rproc,
+				   struct rproc_mem_entry *mem,
+				   u32 da, u32 len)
 {
 	struct device *dev = &rproc->dev;
 	int delta = 0;
