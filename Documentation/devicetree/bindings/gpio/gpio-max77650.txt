@@ -1,0 +1,34 @@
+GPIO driver for MAX77650 PMIC from Maxim Integrated.
+
+This module is part of the MAX77650 MFD device. For more details
+see Documentation/devicetree/bindings/mfd/max77650.txt.
+
+The GPIO controller is represented as a sub-node of the PMIC node on
+the device tree.
+
+This device has a single GPIO pin.
+
+Required properties:
+--------------------
+- compatible:		Must be "maxim,max77650-gpio"
+- gpio-controller : 	Marks the device node as a gpio controller.
+- #gpio-cells : 	Must be <2>. The first cell is the pin number and
+			the second cell is used to specify the gpio active
+			state.
+
+Optional properties:
+--------------------
+gpio-line-names:	Single string containing the name of the GPIO line.
+
+For more details, please refer to the generic GPIO DT binding document
+<devicetree/bindings/gpio/gpio.txt>.
+
+Example:
+--------
+
+	gpio {
+		compatible = "maxim,max77650-gpio";
+		gpio-line-names = "max77650-charger";
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
