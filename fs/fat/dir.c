@@ -314,7 +314,7 @@ parse_long:
 
 		if (ds->id & 0x40)
 			(*unicode)[offset + 13] = 0;
-		if (fat_get_entry(dir, pos, bh, de) < 0)
+		if (fat_get_entry(dir, pos, bh, de) < 0 || !(*de)->name[0])
 			return PARSE_EOF;
 		if (slot == 0)
 			break;
@@ -476,7 +476,8 @@ int fat_search_long(struct inode *inode, const unsigned char *name,
 
 	err = -ENOENT;
 	while (1) {
-		if (fat_get_entry(inode, &cpos, &bh, &de) == -1)
+		if (fat_get_entry(inode, &cpos, &bh, &de) == -1 ||
+		    !de->name[0])
 			goto end_of_dir;
 parse_record:
 		nr_slots = 0;
@@ -588,7 +589,7 @@ static int __fat_readdir(struct inode *inode, struct file *file,
 
 	bh = NULL;
 get_new:
-	if (fat_get_entry(inode, &cpos, &bh, &de) == -1)
+	if (fat_get_entry(inode, &cpos, &bh, &de) == -1 || !de->name[0])
 		goto end_of_dir;
 parse_record:
 	nr_slots = 0;
@@ -898,7 +899,8 @@ int fat_get_dotdot_entry(struct inode *dir, struct buffer_head **bh,
 	loff_t offset = 0;
 
 	*de = NULL;
-	while (fat_get_short_entry(dir, &offset, bh, de) >= 0) {
+	while (fat_get_short_entry(dir, &offset, bh, de) >= 0 &&
+	       (*de)->name[0]) {
 		if (!strncmp((*de)->name, MSDOS_DOTDOT, MSDOS_NAME))
 			return 0;
 	}
@@ -916,7 +918,8 @@ int fat_dir_empty(struct inode *dir)
 
 	bh = NULL;
 	cpos = 0;
-	while (fat_get_short_entry(dir, &cpos, &bh, &de) >= 0) {
+	while (fat_get_short_entry(dir, &cpos, &bh, &de) >= 0 &&
+	       de->name[0]) {
 		if (strncmp(de->name, MSDOS_DOT   , MSDOS_NAME) &&
 		    strncmp(de->name, MSDOS_DOTDOT, MSDOS_NAME)) {
 			result = -ENOTEMPTY;
@@ -941,7 +944,8 @@ int fat_subdirs(struct inode *dir)
 
 	bh = NULL;
 	cpos = 0;
-	while (fat_get_short_entry(dir, &cpos, &bh, &de) >= 0) {
+	while (fat_get_short_entry(dir, &cpos, &bh, &de) >= 0 &&
+	       de->name[0]) {
 		if (de->attr & ATTR_DIR)
 			count++;
 	}
@@ -961,7 +965,7 @@ int fat_scan(struct inode *dir, const unsigned char *name,
 	sinfo->slot_off = 0;
 	sinfo->bh = NULL;
 	while (fat_get_short_entry(dir, &sinfo->slot_off, &sinfo->bh,
-				   &sinfo->de) >= 0) {
+				   &sinfo->de) >= 0 && sinfo->de->name[0]) {
 		if (!strncmp(sinfo->de->name, name, MSDOS_NAME)) {
 			sinfo->slot_off -= sizeof(*sinfo->de);
 			sinfo->nr_slots = 1;
@@ -985,7 +989,7 @@ int fat_scan_logstart(struct inode *dir, int i_logstart,
 	sinfo->slot_off = 0;
 	sinfo->bh = NULL;
 	while (fat_get_short_entry(dir, &sinfo->slot_off, &sinfo->bh,
-				   &sinfo->de) >= 0) {
+				   &sinfo->de) >= 0 && sinfo->de->name[0]) {
 		if (fat_get_start(MSDOS_SB(sb), sinfo->de) == i_logstart) {
 			sinfo->slot_off -= sizeof(*sinfo->de);
 			sinfo->nr_slots = 1;
