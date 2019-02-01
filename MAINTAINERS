@@ -16933,6 +16933,13 @@ L:	linux-mm@kvack.org
 S:	Maintained
 F:	mm/zswap.c
 
+REDPINE WIRELESS DRIVER
+M:	Siva Rebbagondla <siva8118@gmail.com>
+M:	Amitkumar Karwar <amitkarwar@gmail.com>
+L:	linux-wireless@vger.kernel.org
+S:	Maintained
+F:	drivers/net/wireless/rsi/
+
 THE REST
 M:	Linus Torvalds <torvalds@linux-foundation.org>
 L:	linux-kernel@vger.kernel.org
