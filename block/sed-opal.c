@@ -11,8 +11,8 @@
  *
  * This program is distributed in the hope it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * for more details.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ":OPAL: " fmt
@@ -157,7 +157,7 @@ static const u8 opaluid[][OPAL_UID_LENGTH] = {
 
 	/* C_PIN_TABLE object ID's */
 
-        [OPAL_C_PIN_MSID] =
+	[OPAL_C_PIN_MSID] =
 		{ 0x00, 0x00, 0x00, 0x0B, 0x00, 0x00, 0x84, 0x02},
 	[OPAL_C_PIN_SID] =
 		{ 0x00, 0x00, 0x00, 0x0B, 0x00, 0x00, 0x00, 0x01},
@@ -623,7 +623,7 @@ static int build_locking_range(u8 *buffer, size_t length, u8 lr)
 static int build_locking_user(u8 *buffer, size_t length, u8 lr)
 {
 	if (length > OPAL_UID_LENGTH) {
-		pr_debug("Can't build locking range user, Length OOB\n");
+		pr_debug("Can't build locking range user. Length OOB\n");
 		return -ERANGE;
 	}
 
@@ -1324,6 +1324,7 @@ static int start_SIDASP_opal_session(struct opal_dev *dev, void *data)
 
 	if (!key) {
 		const struct opal_key *okey = data;
+
 		ret = start_generic_opal_session(dev, OPAL_SID_UID,
 						 OPAL_ADMINSP_UID,
 						 okey->key,
@@ -1341,6 +1342,7 @@ static int start_SIDASP_opal_session(struct opal_dev *dev, void *data)
 static int start_admin1LSP_opal_session(struct opal_dev *dev, void *data)
 {
 	struct opal_key *key = data;
+
 	return start_generic_opal_session(dev, OPAL_ADMIN1_UID,
 					  OPAL_LOCKINGSP_UID,
 					  key->key, key->key_len);
@@ -1714,7 +1716,7 @@ static int lock_unlock_locking_range(struct opal_dev *dev, void *data)
 		write_locked = 0;
 		break;
 	case OPAL_LK:
-		/* vars are initalized to locked */
+		/* vars are initialized to locked */
 		break;
 	default:
 		pr_debug("Tried to set an invalid locking state... returning to uland\n");
@@ -1775,7 +1777,7 @@ static int lock_unlock_locking_range_sum(struct opal_dev *dev, void *data)
 		write_locked = 0;
 		break;
 	case OPAL_LK:
-		/* vars are initalized to locked */
+		/* vars are initialized to locked */
 		break;
 	default:
 		pr_debug("Tried to set an invalid locking state.\n");
@@ -2222,7 +2224,7 @@ static int __opal_lock_unlock(struct opal_dev *dev,
 static int __opal_set_mbr_done(struct opal_dev *dev, struct opal_key *key)
 {
 	u8 mbr_done_tf = 1;
-	const struct opal_step mbrdone_step [] = {
+	const struct opal_step mbrdone_step[] = {
 		{ opal_discovery0, },
 		{ start_admin1LSP_opal_session, key },
 		{ set_mbr_done, &mbr_done_tf },
@@ -2273,7 +2275,8 @@ static int opal_take_ownership(struct opal_dev *dev, struct opal_key *opal)
 	return ret;
 }
 
-static int opal_activate_lsp(struct opal_dev *dev, struct opal_lr_act *opal_lr_act)
+static int opal_activate_lsp(struct opal_dev *dev,
+			     struct opal_lr_act *opal_lr_act)
 {
 	const struct opal_step active_steps[] = {
 		{ opal_discovery0, },
