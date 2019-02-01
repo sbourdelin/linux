@@ -360,7 +360,7 @@ out:
  * (i.e. it does not include its run size). This range must be avoided
  * because it contains the data used for decompression.
  *
- * [input+input_size, output+init_size) is [_text, _end) for ZO. This
+ * [input+input_size, output+init_size) is [_bss, _end) for ZO. This
  * range includes ZO's heap and stack, and must be avoided since it
  * performs the decompression.
  *
@@ -763,9 +763,6 @@ static unsigned long find_random_phys_addr(unsigned long minimum,
 		return 0;
 	}
 
-	/* Make sure minimum is aligned. */
-	minimum = ALIGN(minimum, CONFIG_PHYSICAL_ALIGN);
-
 	if (process_efi_entries(minimum, image_size))
 		return slots_fetch_random();
 
@@ -831,8 +828,8 @@ void choose_random_location(unsigned long input,
 
 	/*
 	 * Low end of the randomization range should be the
-	 * smaller of 512M or the initial kernel image
-	 * location:
+	 * smaller of 512M or the initial kernel image location.
+	 * Should be aligned to CONFIG_PHYSICAL_ALIGN.
 	 */
 	min_addr = min(*output, 512UL << 20);
 
