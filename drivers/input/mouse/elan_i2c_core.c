@@ -670,6 +670,29 @@ out:
 	return retval ?: count;
 }
 
+static ssize_t i2c_reset_store(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct elan_tp_data *data = i2c_get_clientdata(client);
+	int retval;
+
+	retval = mutex_lock_interruptible(&data->sysfs_mutex);
+	if (retval)
+		return retval;
+
+	disable_irq(client->irq);
+
+	retval = elan_initialize(data);
+	if (retval)
+		dev_err(dev, "failed to re-initialize touchpad: %d\n", retval);
+
+	enable_irq(client->irq);
+	mutex_unlock(&data->sysfs_mutex);
+	return retval ?: count;
+}
+
 static ssize_t elan_sysfs_read_mode(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
@@ -702,6 +725,7 @@ static DEVICE_ATTR(mode, S_IRUGO, elan_sysfs_read_mode, NULL);
 static DEVICE_ATTR(update_fw, S_IWUSR, NULL, elan_sysfs_update_fw);
 
 static DEVICE_ATTR_WO(calibrate);
+static DEVICE_ATTR_WO(i2c_reset);
 
 static struct attribute *elan_sysfs_entries[] = {
 	&dev_attr_product_id.attr,
@@ -710,6 +734,7 @@ static struct attribute *elan_sysfs_entries[] = {
 	&dev_attr_iap_version.attr,
 	&dev_attr_fw_checksum.attr,
 	&dev_attr_calibrate.attr,
+	&dev_attr_i2c_reset.attr,
 	&dev_attr_mode.attr,
 	&dev_attr_update_fw.attr,
 	NULL,
