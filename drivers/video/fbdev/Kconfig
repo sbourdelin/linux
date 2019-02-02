@@ -2302,6 +2302,10 @@ config FB_SM712
 	  called sm712fb. If you want to compile it as a module, say M
 	  here and read <file:Documentation/kbuild/modules.txt>.
 
+	  Warning: this driver has many known problems and limitations,
+	  please make sure you've checked the documentation, at
+	  <file:Documentation/fb/sm712fb.txt>.
+
 source "drivers/video/fbdev/omap/Kconfig"
 source "drivers/video/fbdev/omap2/Kconfig"
 source "drivers/video/fbdev/mmp/Kconfig"
