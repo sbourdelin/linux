@@ -146,6 +146,7 @@
 #include <net/udp_tunnel.h>
 #include <linux/net_namespace.h>
 #include <linux/indirect_call_wrapper.h>
+#include <linux/dynamic_call.h>
 
 #include "net-sysfs.h"
 
@@ -1949,6 +1950,9 @@ int dev_forward_skb(struct net_device *dev, struct sk_buff *skb)
 }
 EXPORT_SYMBOL_GPL(dev_forward_skb);
 
+DYNAMIC_CALL_4(int, deliver_skb, struct sk_buff *, struct net_device *,
+	       struct packet_type *, struct net_device *);
+
 static inline int deliver_skb(struct sk_buff *skb,
 			      struct packet_type *pt_prev,
 			      struct net_device *orig_dev)
@@ -1956,7 +1960,7 @@ static inline int deliver_skb(struct sk_buff *skb,
 	if (unlikely(skb_orphan_frags_rx(skb, GFP_ATOMIC)))
 		return -ENOMEM;
 	refcount_inc(&skb->users);
-	return pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+	return dynamic_deliver_skb(pt_prev->func, skb, skb->dev, pt_prev, orig_dev);
 }
 
 static inline void deliver_ptype_list_skb(struct sk_buff *skb,
@@ -4970,7 +4974,8 @@ static int __netif_receive_skb_one_core(struct sk_buff *skb, bool pfmemalloc)
 
 	ret = __netif_receive_skb_core(skb, pfmemalloc, &pt_prev);
 	if (pt_prev)
-		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+		ret = dynamic_deliver_skb(pt_prev->func, skb, skb->dev, pt_prev,
+					  orig_dev);
 	return ret;
 }
 
@@ -5015,7 +5020,8 @@ static inline void __netif_receive_skb_list_ptype(struct list_head *head,
 		pt_prev->list_func(head, pt_prev, orig_dev);
 	else
 		list_for_each_entry_safe(skb, next, head, list)
-			pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+			dynamic_deliver_skb(pt_prev->func, skb, skb->dev,
+					    pt_prev, orig_dev);
 }
 
 static void __netif_receive_skb_list_core(struct list_head *head, bool pfmemalloc)
