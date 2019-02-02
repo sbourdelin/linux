@@ -44,6 +44,7 @@ struct jz4780_nand_cs {
 struct jz4780_nand_controller {
 	struct device *dev;
 	const struct jz_soc_info *soc_info;
+	const struct mtd_ooblayout_ops *oob_layout;
 	struct jz4780_bch *bch;
 	struct nand_controller controller;
 	unsigned int num_banks;
@@ -213,7 +214,7 @@ static int jz4780_nand_attach_chip(struct nand_chip *chip)
 		return -EINVAL;
 	}
 
-	mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
+	mtd_set_ooblayout(mtd, nfc->oob_layout);
 
 	return 0;
 }
@@ -345,11 +346,47 @@ static int jz4780_nand_init_chips(struct jz4780_nand_controller *nfc,
 	return 0;
 }
 
+static int jz4725b_ooblayout_ecc(struct mtd_info *mtd, int section,
+				 struct mtd_oob_region *oobregion)
+{
+	struct nand_chip *chip = mtd_to_nand(mtd);
+	struct nand_ecc_ctrl *ecc = &chip->ecc;
+
+	if (section || !ecc->total)
+		return -ERANGE;
+
+	oobregion->length = ecc->total;
+	oobregion->offset = 3;
+
+	return 0;
+}
+
+static int jz4725b_ooblayout_free(struct mtd_info *mtd, int section,
+				  struct mtd_oob_region *oobregion)
+{
+	struct nand_chip *chip = mtd_to_nand(mtd);
+	struct nand_ecc_ctrl *ecc = &chip->ecc;
+
+	if (section)
+		return -ERANGE;
+
+	oobregion->length = mtd->oobsize - ecc->total - 3;
+	oobregion->offset = 3 + ecc->total;
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops jz4725b_ooblayout_ops = {
+	.ecc = jz4725b_ooblayout_ecc,
+	.free = jz4725b_ooblayout_free,
+};
+
 static int jz4780_nand_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	unsigned int num_banks;
 	struct jz4780_nand_controller *nfc;
+	const char *layout;
 	int ret;
 
 	num_banks = jz4780_nemc_num_banks(dev);
@@ -365,6 +402,18 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 	nfc->soc_info = device_get_match_data(dev);
 	if (!nfc->soc_info)
 		return -EINVAL;
+
+	nfc->oob_layout = &nand_ooblayout_lp_ops;
+
+	ret = device_property_read_string(dev, "ingenic,oob-layout", &layout);
+	if (!ret) {
+		if (!strcmp(layout, "ingenic,jz4725b")) {
+			nfc->oob_layout  = &jz4725b_ooblayout_ops;
+		} else {
+			dev_err(dev, "Unrecognized OOB layout %s\n", layout);
+			return -EINVAL;
+		}
+	}
 
 	/*
 	 * Check for BCH HW before we call nand_scan_ident, to prevent us from
