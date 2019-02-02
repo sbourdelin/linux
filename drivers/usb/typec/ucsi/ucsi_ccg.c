@@ -177,6 +177,8 @@ struct ucsi_ccg {
 	struct ccg_resp dev_resp;
 	u8 cmd_resp;
 	int port_num;
+	int irq;
+	struct work_struct work;
 	struct mutex lock; /* to sync between user and driver thread */
 };
 
@@ -793,6 +795,275 @@ static int ccg_fw_update_needed(struct ucsi_ccg *uc,
 	return 0;
 }
 
+static int do_flash(struct ucsi_ccg *uc, enum enum_flash_mode mode)
+{
+	struct device *dev = uc->dev;
+	const struct firmware *fw = NULL;
+	const char *p, *s;
+	const char *eof;
+	int err, row, len, line_sz, line_cnt = 0;
+	unsigned long start_time = jiffies;
+	struct fw_config_table  fw_cfg;
+	u8 fw_cfg_sig[FW_CFG_TABLE_SIG_SIZE];
+	u8 *wr_buf;
+
+	err = request_firmware(&fw, ccg_fw_names[mode], dev);
+	if (err) {
+		dev_err(dev, "request %s failed err=%d\n",
+			ccg_fw_names[mode], err);
+		return err;
+	}
+
+	if (((uc->info.mode & CCG_DEVINFO_FWMODE_MASK) >>
+			CCG_DEVINFO_FWMODE_SHIFT) == FW2) {
+		err = ccg_cmd_port_control(uc, false);
+		if (err < 0)
+			goto release_fw;
+		err = ccg_cmd_jump_boot_mode(uc, 0);
+		if (err < 0)
+			goto release_fw;
+	}
+
+	eof = fw->data + fw->size;
+
+	/*
+	 * check if signed fw
+	 * last part of fw image is fw cfg table and signature
+	 */
+	if (fw->size < sizeof(fw_cfg) + sizeof(fw_cfg_sig))
+		goto not_signed_fw;
+
+	memcpy((uint8_t *)&fw_cfg, fw->data + fw->size -
+	       sizeof(fw_cfg) - sizeof(fw_cfg_sig), sizeof(fw_cfg));
+
+	if (fw_cfg.identity != ('F' | ('W' << 8) | ('C' << 16) | ('T' << 24))) {
+		dev_info(dev, "not a signed image\n");
+		goto not_signed_fw;
+	}
+	eof = fw->data + fw->size - sizeof(fw_cfg) - sizeof(fw_cfg_sig);
+
+	memcpy((uint8_t *)&fw_cfg_sig,
+	       fw->data + fw->size - sizeof(fw_cfg_sig), sizeof(fw_cfg_sig));
+
+	/* flash fw config table and signature first */
+	err = ccg_cmd_write_flash_row(uc, 0, (u8 *)&fw_cfg,
+				      FLASH_FWCT1_WR_CMD);
+	if (err)
+		goto release_fw;
+
+	err = ccg_cmd_write_flash_row(uc, 0, (u8 *)&fw_cfg + CCG4_ROW_SIZE,
+				      FLASH_FWCT2_WR_CMD);
+	if (err)
+		goto release_fw;
+
+	err = ccg_cmd_write_flash_row(uc, 0, &fw_cfg_sig,
+				      FLASH_FWCT_SIG_WR_CMD);
+	if (err)
+		goto release_fw;
+
+not_signed_fw:
+	wr_buf = kzalloc(CCG4_ROW_SIZE + 4, GFP_KERNEL);
+	if (!wr_buf)
+		return -ENOMEM;
+
+	err = ccg_cmd_enter_flashing(uc);
+	if (err)
+		goto release_mem;
+
+	/*****************************************************************
+	 * CCG firmware image (.cyacd) file line format
+	 *
+	 * :00rrrrllll[dd....]cc/r/n
+	 *
+	 * :00   header
+	 * rrrr is row number to flash				(4 char)
+	 * llll is data len to flash				(4 char)
+	 * dd   is a data field represents one byte of data	(512 char)
+	 * cc   is checksum					(2 char)
+	 * \r\n newline
+	 *
+	 * Total length: 3 + 4 + 4 + 512 + 2 + 2 = 527
+	 *
+	 *****************************************************************/
+
+	p = strnchr(fw->data, fw->size, ':');
+	while (p < eof) {
+		s = strnchr(p + 1, eof - p - 1, ':');
+
+		if (!s)
+			s = eof;
+
+		line_sz = s - p;
+
+		if (line_sz != CYACD_LINE_SIZE) {
+			dev_err(dev, "Bad FW format line_sz=%d\n", line_sz);
+			err =  -EINVAL;
+			goto release_mem;
+		}
+
+		if (hex2bin(wr_buf, p + 3, CCG4_ROW_SIZE + 4)) {
+			err =  -EINVAL;
+			goto release_mem;
+		}
+
+		row = (wr_buf[0] << 8) + wr_buf[1];
+		len = (wr_buf[2] << 8) + wr_buf[3];
+
+		if (len != CCG4_ROW_SIZE) {
+			err =  -EINVAL;
+			goto release_mem;
+		}
+
+		err = ccg_cmd_write_flash_row(uc, row, wr_buf + 4,
+					      FLASH_WR_CMD);
+		if (err)
+			goto release_mem;
+
+		line_cnt++;
+		p = s;
+	}
+
+	dev_info(dev, "total %d row flashed. time: %dms\n",
+		 line_cnt, jiffies_to_msecs(jiffies - start_time));
+
+	err = ccg_cmd_validate_fw(uc, (mode == PRIMARY) ? FW2 :  FW1);
+	if (err)
+		dev_err(dev, "%s validation failed err=%d\n",
+			(mode == PRIMARY) ? "FW2" :  "FW1", err);
+	else
+		dev_info(dev, "%s validated\n",
+			 (mode == PRIMARY) ? "FW2" :  "FW1");
+
+	err = ccg_cmd_port_control(uc, false);
+	if (err < 0)
+		goto release_mem;
+
+	err = ccg_cmd_reset(uc, mode == SECONDARY);
+	if (err < 0)
+		goto release_mem;
+
+	err = ccg_cmd_port_control(uc, true);
+	if (err < 0)
+		goto release_mem;
+
+release_mem:
+	kfree(wr_buf);
+
+release_fw:
+	release_firmware(fw);
+	return err;
+}
+
+/*******************************************************************************
+ * CCG4 has two copies of the firmware in addition to the bootloader.
+ * If the device is running FW1, FW2 can be updated with the new version.
+ * Dual firmware mode allows the CCG device to stay in a PD contract and support
+ * USB PD and Type-C functionality while a firmware update is in progress.
+ ******************************************************************************/
+static int ccg_fw_update(struct ucsi_ccg *uc, enum enum_flash_mode flash_mode)
+{
+	int err;
+
+	while (flash_mode != FLASH_NOT_NEEDED) {
+		err = do_flash(uc, flash_mode);
+		if (err < 0)
+			return err;
+		err = ccg_fw_update_needed(uc, &flash_mode);
+		if (err < 0)
+			return err;
+	}
+	dev_info(uc->dev, "CCG FW update successful\n");
+
+	return err;
+}
+
+static int ccg_restart(struct ucsi_ccg *uc)
+{
+	struct device *dev = uc->dev;
+	int status;
+
+	status = ucsi_ccg_init(uc);
+	if (status < 0) {
+		dev_err(dev, "ucsi_ccg_start fail, err=%d\n", status);
+		return status;
+	}
+
+	status = request_threaded_irq(uc->irq, NULL, ccg_irq_handler,
+				      IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+				      dev_name(dev), uc);
+	if (status < 0) {
+		dev_err(dev, "request_threaded_irq failed - %d\n", status);
+		return status;
+	}
+
+	uc->ucsi = ucsi_register_ppm(dev, &uc->ppm);
+	if (IS_ERR(uc->ucsi)) {
+		dev_err(uc->dev, "ucsi_register_ppm failed\n");
+		return PTR_ERR(uc->ucsi);
+	}
+
+	return 0;
+}
+
+static void ccg_update_firmware(struct work_struct *work)
+{
+	struct ucsi_ccg *uc = container_of(work, struct ucsi_ccg, work);
+	enum enum_flash_mode flash_mode;
+	int status;
+
+	status = ccg_fw_update_needed(uc, &flash_mode);
+	if (status < 0)
+		return;
+
+	if (flash_mode != FLASH_NOT_NEEDED) {
+		ucsi_unregister_ppm(uc->ucsi);
+		free_irq(uc->irq, uc);
+
+		ccg_fw_update(uc, flash_mode);
+		ccg_restart(uc);
+	}
+}
+
+static ssize_t do_flash_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t n)
+{
+	struct i2c_client *i2c_cl = to_i2c_client(dev);
+	struct ucsi_ccg *uc = i2c_get_clientdata(i2c_cl);
+	unsigned int mode;
+
+	if (kstrtouint(buf, 10, &mode))
+		return -EINVAL;
+
+	if (mode)
+		schedule_work(&uc->work);
+
+	return n;
+}
+
+static ssize_t do_flash_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "[Usage]\n"
+		"1) copy ccg_boot.cyacd /lib/firmware/\n"
+		"2) copy ccg_1.cyacd /lib/firmware/\n"
+		"3) copy ccg_2.cyacd /lib/firmware/\n"
+		"4) echo 1 > do_flash\n");
+}
+
+static DEVICE_ATTR_RW(do_flash);
+
+static struct attribute *
+ucsi_ccg_sysfs_attrs[] = {
+	&dev_attr_do_flash.attr,
+	NULL,
+};
+
+static struct attribute_group
+ucsi_ccg_attr_group = {
+	.attrs = ucsi_ccg_sysfs_attrs,
+};
+
 static int ucsi_ccg_probe(struct i2c_client *client,
 			  const struct i2c_device_id *id)
 {
@@ -813,6 +1084,8 @@ static int ucsi_ccg_probe(struct i2c_client *client,
 	uc->ppm.sync = ucsi_ccg_sync;
 	uc->dev = dev;
 	uc->client = client;
+	mutex_init(&uc->lock);
+	INIT_WORK(&uc->work, ccg_update_firmware);
 
 	/* reset ccg device and initialize ucsi */
 	status = ucsi_ccg_init(uc);
@@ -832,14 +1105,15 @@ static int ucsi_ccg_probe(struct i2c_client *client,
 	if (uc->info.mode & CCG_DEVINFO_PDPORTS_MASK)
 		uc->port_num++;
 
-	status = devm_request_threaded_irq(dev, client->irq, NULL,
-					   ccg_irq_handler,
-					   IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
-					   dev_name(dev), uc);
+	status = request_threaded_irq(client->irq, NULL, ccg_irq_handler,
+				      IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+				      dev_name(dev), uc);
 	if (status < 0) {
 		dev_err(uc->dev, "request_threaded_irq failed - %d\n", status);
 		return status;
 	}
+
+	uc->irq = client->irq;
 
 	uc->ucsi = ucsi_register_ppm(dev, &uc->ppm);
 	if (IS_ERR(uc->ucsi)) {
@@ -857,6 +1131,11 @@ static int ucsi_ccg_probe(struct i2c_client *client,
 	}
 
 	i2c_set_clientdata(client, uc);
+
+	status = sysfs_create_group(&uc->dev->kobj, &ucsi_ccg_attr_group);
+	if (status)
+		dev_err(uc->dev, "cannot create sysfs group: %d\n", status);
+
 	return 0;
 }
 
@@ -864,7 +1143,10 @@ static int ucsi_ccg_remove(struct i2c_client *client)
 {
 	struct ucsi_ccg *uc = i2c_get_clientdata(client);
 
+	cancel_work_sync(&uc->work);
 	ucsi_unregister_ppm(uc->ucsi);
+	free_irq(uc->irq, uc);
+	sysfs_remove_group(&uc->dev->kobj, &ucsi_ccg_attr_group);
 
 	return 0;
 }
