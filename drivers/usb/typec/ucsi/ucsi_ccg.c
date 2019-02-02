@@ -30,13 +30,34 @@ enum enum_fw_mode {
 #define  PORT0_INT				BIT(1)
 #define  PORT1_INT				BIT(2)
 #define  UCSI_READ_INT				BIT(7)
+#define CCGX_RAB_JUMP_TO_BOOT			0x0007
+#define  TO_BOOT				'J'
+#define  TO_ALT_FW				'A'
+#define CCGX_RAB_RESET_REQ			0x0008
+#define  RESET_SIG				'R'
+#define  CMD_RESET_I2C				0x0
+#define  CMD_RESET_DEV				0x1
+#define CCGX_RAB_ENTER_FLASHING			0x000A
+#define  FLASH_ENTER_SIG			'P'
+#define CCGX_RAB_VALIDATE_FW			0x000B
+#define CCGX_RAB_FLASH_ROW_RW			0x000C
+#define  FLASH_SIG				'F'
+#define  FLASH_RD_CMD				0x0
+#define  FLASH_WR_CMD				0x1
+#define  FLASH_FWCT1_WR_CMD			0x2
+#define  FLASH_FWCT2_WR_CMD			0x3
+#define  FLASH_FWCT_SIG_WR_CMD			0x4
 #define CCGX_RAB_READ_ALL_VER			0x0010
 #define CCGX_RAB_READ_FW2_VER			0x0020
 #define CCGX_RAB_UCSI_CONTROL			0x0039
 #define CCGX_RAB_UCSI_CONTROL_START		BIT(0)
 #define CCGX_RAB_UCSI_CONTROL_STOP		BIT(1)
 #define CCGX_RAB_UCSI_DATA_BLOCK(offset)	(0xf000 | ((offset) & 0xff))
+#define REG_FLASH_RW_MEM        0x0200
 #define DEV_REG_IDX				CCGX_RAB_DEVICE_MODE
+#define CCGX_RAB_PDPORT_ENABLE			0x002C
+#define  PDPORT_1		BIT(0)
+#define  PDPORT_2		BIT(1)
 #define CCGX_RAB_RESPONSE			0x007E
 #define  ASYNC_EVENT				BIT(7)
 
@@ -46,6 +67,13 @@ enum enum_fw_mode {
 #define PORT_CONNECT_DET	0x84
 #define PORT_DISCONNECT_DET	0x85
 #define ROLE_SWAP_COMPELETE	0x87
+
+/* ccg firmware */
+#define CYACD_LINE_SIZE         527
+#define CCG4_ROW_SIZE           256
+#define FW1_METADATA_ROW        0x1FF
+#define FW2_METADATA_ROW        0x1FE
+#define FW_CFG_TABLE_SIG_SIZE	256
 
 struct ccg_dev_info {
 #define CCG_DEVINFO_FWMODE_SHIFT (0)
@@ -118,6 +146,7 @@ struct ucsi_ccg {
 	struct ccg_resp dev_resp;
 	u8 cmd_resp;
 	int port_num;
+	struct mutex lock; /* to sync between user and driver thread */
 };
 
 static int ccg_read(struct ucsi_ccg *uc, u16 rab, u8 *data, u32 len)
@@ -429,6 +458,193 @@ static int ccg_send_command(struct ucsi_ccg *uc, struct ccg_cmd *cmd)
 	ccg_process_response(uc);
 
 	return uc->cmd_resp;
+}
+
+static int ccg_cmd_enter_flashing(struct ucsi_ccg *uc)
+{
+	struct ccg_cmd cmd;
+	int ret;
+
+	cmd.reg = CCGX_RAB_ENTER_FLASHING;
+	cmd.data = FLASH_ENTER_SIG;
+	cmd.len = 1;
+	cmd.delay = 50;
+
+	mutex_lock(&uc->lock);
+
+	ret = ccg_send_command(uc, &cmd);
+
+	mutex_unlock(&uc->lock);
+
+	if (ret != CMD_SUCCESS) {
+		dev_err(uc->dev, "enter flashing failed ret=%d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int ccg_cmd_reset(struct ucsi_ccg *uc, bool extra_delay)
+{
+	struct ccg_cmd cmd;
+	u8 *p;
+	int ret;
+
+	p = (u8 *)&cmd.data;
+	cmd.reg = CCGX_RAB_RESET_REQ;
+	p[0] = RESET_SIG;
+	p[1] = CMD_RESET_DEV;
+	cmd.len = 2;
+	cmd.delay = 2000 + (extra_delay ? 3000 : 0);
+
+	mutex_lock(&uc->lock);
+
+	set_bit(RESET_PENDING, &uc->flags);
+
+	ret = ccg_send_command(uc, &cmd);
+	if (ret != RESET_COMPLETE)
+		goto err_clear_flag;
+
+	ret = 0;
+
+err_clear_flag:
+	clear_bit(RESET_PENDING, &uc->flags);
+
+	mutex_unlock(&uc->lock);
+
+	return ret;
+}
+
+static int ccg_cmd_port_control(struct ucsi_ccg *uc, bool enable)
+{
+	struct ccg_cmd cmd;
+	int ret;
+
+	cmd.reg = CCGX_RAB_PDPORT_ENABLE;
+	if (enable)
+		cmd.data = (uc->port_num == 1) ?
+			    PDPORT_1 : (PDPORT_1 | PDPORT_2);
+	else
+		cmd.data = 0x0;
+	cmd.len = 1;
+	cmd.delay = 10;
+
+	mutex_lock(&uc->lock);
+
+	ret = ccg_send_command(uc, &cmd);
+
+	mutex_unlock(&uc->lock);
+
+	if (ret != CMD_SUCCESS) {
+		dev_err(uc->dev, "port control failed ret=%d\n", ret);
+		return ret;
+	}
+	return 0;
+}
+
+static int ccg_cmd_jump_boot_mode(struct ucsi_ccg *uc, int bl_mode)
+{
+	struct ccg_cmd cmd;
+	int ret;
+
+	cmd.reg = CCGX_RAB_JUMP_TO_BOOT;
+
+	if (bl_mode)
+		cmd.data = TO_BOOT;
+	else
+		cmd.data = TO_ALT_FW;
+
+	cmd.len = 1;
+	cmd.delay = 100;
+
+	mutex_lock(&uc->lock);
+
+	set_bit(RESET_PENDING, &uc->flags);
+
+	ret = ccg_send_command(uc, &cmd);
+	if (ret != RESET_COMPLETE)
+		goto err_clear_flag;
+
+	ret = 0;
+
+err_clear_flag:
+	clear_bit(RESET_PENDING, &uc->flags);
+
+	mutex_unlock(&uc->lock);
+
+	return ret;
+}
+
+static int
+ccg_cmd_write_flash_row(struct ucsi_ccg *uc, u16 row,
+			const void *data, u8 fcmd)
+{
+	struct i2c_client *client = uc->client;
+	struct ccg_cmd cmd;
+	u8 buf[CCG4_ROW_SIZE + 2];
+	u8 *p;
+	int ret;
+
+	/* Copy the data into the flash read/write memory. */
+	buf[0] = REG_FLASH_RW_MEM & 0xFF;
+	buf[1] = REG_FLASH_RW_MEM >> 8;
+
+	memcpy(buf + 2, data, CCG4_ROW_SIZE);
+
+	mutex_lock(&uc->lock);
+
+	ret = i2c_master_send(client, buf, CCG4_ROW_SIZE + 2);
+	if (ret != CCG4_ROW_SIZE + 2) {
+		dev_err(uc->dev, "REG_FLASH_RW_MEM write fail %d\n", ret);
+		return ret < 0 ? ret : -EIO;
+	}
+
+	/* Use the FLASH_ROW_READ_WRITE register to trigger */
+	/* writing of data to the desired flash row */
+	p = (u8 *)&cmd.data;
+	cmd.reg = CCGX_RAB_FLASH_ROW_RW;
+	p[0] = FLASH_SIG;
+	p[1] = fcmd;
+	p[2] = row & 0xFF;
+	p[3] = row >> 8;
+	cmd.len = 4;
+	cmd.delay = 50;
+	if (fcmd == FLASH_FWCT_SIG_WR_CMD)
+		cmd.delay += 400;
+	if (row == 510)
+		cmd.delay += 220;
+	ret = ccg_send_command(uc, &cmd);
+
+	mutex_unlock(&uc->lock);
+
+	if (ret != CMD_SUCCESS) {
+		dev_err(uc->dev, "write flash row failed ret=%d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int ccg_cmd_validate_fw(struct ucsi_ccg *uc, unsigned int fwid)
+{
+	struct ccg_cmd cmd;
+	int ret;
+
+	cmd.reg = CCGX_RAB_VALIDATE_FW;
+	cmd.data = fwid;
+	cmd.len = 1;
+	cmd.delay = 500;
+
+	mutex_lock(&uc->lock);
+
+	ret = ccg_send_command(uc, &cmd);
+
+	mutex_unlock(&uc->lock);
+
+	if (ret != CMD_SUCCESS)
+		return ret;
+
+	return 0;
 }
 
 static int ucsi_ccg_probe(struct i2c_client *client,
