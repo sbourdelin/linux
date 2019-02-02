@@ -299,10 +299,21 @@ static int hci_uart_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 	return 0;
 }
 
+/* If pty master, return slave side */
+static struct tty_struct *hci_uart_get_real_tty(struct tty_struct *tty)
+{
+	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
+	    tty->driver->subtype == PTY_TYPE_MASTER)
+		tty->link;
+
+	return tty;
+}
+
 /* Flow control or un-flow control the device */
 void hci_uart_set_flow_control(struct hci_uart *hu, bool enable)
 {
 	struct tty_struct *tty = hu->tty;
+	struct tty_struct *real_tty;
 	struct ktermios ktermios;
 	int status;
 	unsigned int set = 0;
@@ -314,11 +325,14 @@ void hci_uart_set_flow_control(struct hci_uart *hu, bool enable)
 		return;
 	}
 
+	/* termios should be set from slave side if tty driver is pty */
+	real_tty = hci_uart_get_real_tty(tty);
+
 	if (enable) {
 		/* Disable hardware flow control */
-		ktermios = tty->termios;
+		ktermios = real_tty->termios;
 		ktermios.c_cflag &= ~CRTSCTS;
-		status = tty_set_termios(tty, &ktermios);
+		status = tty_set_termios(real_tty, &ktermios);
 		BT_DBG("Disabling hardware flow control: %s",
 		       status ? "failed" : "success");
 
@@ -350,9 +364,9 @@ void hci_uart_set_flow_control(struct hci_uart *hu, bool enable)
 		BT_DBG("Setting RTS: %s", status ? "failed" : "success");
 
 		/* Re-enable hardware flow control */
-		ktermios = tty->termios;
+		ktermios = real_tty->termios;
 		ktermios.c_cflag |= CRTSCTS;
-		status = tty_set_termios(tty, &ktermios);
+		status = tty_set_termios(real_tty, &ktermios);
 		BT_DBG("Enabling hardware flow control: %s",
 		       status ? "failed" : "success");
 	}
@@ -367,8 +381,11 @@ void hci_uart_set_speeds(struct hci_uart *hu, unsigned int init_speed,
 
 void hci_uart_set_baudrate(struct hci_uart *hu, unsigned int speed)
 {
-	struct tty_struct *tty = hu->tty;
+	struct tty_struct *tty;
 	struct ktermios ktermios;
+
+	/* termios should be set from slave side if tty driver is pty */
+	tty = hci_uart_get_real_tty(hu->tty);
 
 	ktermios = tty->termios;
 	ktermios.c_cflag &= ~CBAUD;
