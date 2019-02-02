@@ -37,15 +37,19 @@ void nft_lookup_eval(const struct nft_expr *expr,
 
 	found = set->ops->lookup(nft_net(pkt), set, &regs->data[priv->sreg],
 				 &ext) ^ priv->invert;
-	if (!found) {
+
+	if (set->flags & NFT_SET_MAP) {
+		if (!found) {
+			if (priv->dreg != NFT_REG_VERDICT)
+				regs->verdict.code = NFT_BREAK;
+			return;
+		}
+                nft_data_copy(&regs->data[priv->dreg],
+                              nft_set_ext_data(ext), set->dlen);
+
+	} else if (!found) {
 		regs->verdict.code = NFT_BREAK;
-		return;
 	}
-
-	if (set->flags & NFT_SET_MAP)
-		nft_data_copy(&regs->data[priv->dreg],
-			      nft_set_ext_data(ext), set->dlen);
-
 }
 
 static const struct nla_policy nft_lookup_policy[NFTA_LOOKUP_MAX + 1] = {
