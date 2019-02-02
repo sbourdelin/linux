@@ -117,6 +117,7 @@ struct ucsi_ccg {
 #define DEV_CMD_PENDING	1
 	struct ccg_resp dev_resp;
 	u8 cmd_resp;
+	int port_num;
 };
 
 static int ccg_read(struct ucsi_ccg *uc, u16 rab, u8 *data, u32 len)
@@ -463,6 +464,11 @@ static int ucsi_ccg_probe(struct i2c_client *client,
 		dev_err(uc->dev, "get_fw_info failed - %d\n", status);
 		return status;
 	}
+
+	uc->port_num = 1;
+
+	if (uc->info.mode & CCG_DEVINFO_PDPORTS_MASK)
+		uc->port_num++;
 
 	status = devm_request_threaded_irq(dev, client->irq, NULL,
 					   ccg_irq_handler,
