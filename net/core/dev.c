@@ -5006,6 +5006,9 @@ int netif_receive_skb_core(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_receive_skb_core);
 
+DYNAMIC_CALL_3(void, deliver_skb_list, struct list_head *, struct packet_type *,
+	       struct net_device *);
+
 static inline void __netif_receive_skb_list_ptype(struct list_head *head,
 						  struct packet_type *pt_prev,
 						  struct net_device *orig_dev)
@@ -5017,7 +5020,8 @@ static inline void __netif_receive_skb_list_ptype(struct list_head *head,
 	if (list_empty(head))
 		return;
 	if (pt_prev->list_func != NULL)
-		pt_prev->list_func(head, pt_prev, orig_dev);
+		dynamic_deliver_skb_list(pt_prev->list_func, head, pt_prev,
+					 orig_dev);
 	else
 		list_for_each_entry_safe(skb, next, head, list)
 			dynamic_deliver_skb(pt_prev->func, skb, skb->dev,
