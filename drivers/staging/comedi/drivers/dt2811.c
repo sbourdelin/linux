@@ -323,7 +323,8 @@ static unsigned int dt2811_ns_to_timer(unsigned int *nanosec,
 		for (_mult = 0; _mult <= 7; _mult++) {
 			unsigned int div = dt2811_clk_dividers[_div];
 			unsigned int mult = dt2811_clk_multipliers[_mult];
-			unsigned long long divider = div * mult;
+			unsigned long long divider =
+				(unsigned long long)div * mult;
 			unsigned int divisor = DT2811_TMRCTR_MANTISSA(_div) |
 					       DT2811_TMRCTR_EXPONENT(_mult);
 
