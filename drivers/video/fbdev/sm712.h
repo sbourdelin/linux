@@ -139,7 +139,10 @@ static inline u8 smtc_seqr(u8 reg)
 #define DE_CTRL_HOST_SHIFT			22
 #define DE_CTRL_HOST_SRC_IS_MONO		0x01
 #define DE_CTRL_FORMAT_XY			0x00
+#define DE_CTRL_FORMAT_8BIT			0x00
+#define DE_CTRL_FORMAT_16BIT			0x10
 #define DE_CTRL_FORMAT_24BIT			0x30
+#define DE_CTRL_FORMAT_32BIT			0x20
 
 /*
  * 32-bit I/O for 2D opeartions.
