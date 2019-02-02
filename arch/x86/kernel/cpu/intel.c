@@ -1029,3 +1029,28 @@ static const struct cpu_dev intel_cpu_dev = {
 
 cpu_dev_register(intel_cpu_dev);
 
+/* #AC handler for split lock is called by generic #AC handler. */
+bool do_ac_split_lock(struct pt_regs *regs)
+{
+	/* Generic #AC handler will handle split lock in user. */
+	if (user_mode(regs))
+		return false;
+
+	/*
+	 * On split lock in kernel, warn and disable #AC for split lock on
+	 * current CPU.
+	 */
+	msr_clear_bit(MSR_TEST_CTL, TEST_CTL_ENABLE_AC_SPLIT_LOCK_SHIFT);
+
+	WARN_ONCE(1, "A split lock issue is detected.\n");
+
+	return true;
+}
+
+void set_ac_split_lock(void)
+{
+	if (boot_cpu_has(X86_FEATURE_AC_SPLIT_LOCK)) {
+		msr_set_bit(MSR_TEST_CTL, TEST_CTL_ENABLE_AC_SPLIT_LOCK_SHIFT);
+		pr_info_once("#AC for split lock is enabled\n");
+	}
+}

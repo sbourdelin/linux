@@ -231,6 +231,9 @@ static void notrace start_secondary(void *unused)
 #endif
 	load_current_idt();
 	cpu_init();
+
+	set_ac_split_lock();
+
 	x86_cpuinit.early_percpu_clock_init();
 	preempt_disable();
 	smp_callin();

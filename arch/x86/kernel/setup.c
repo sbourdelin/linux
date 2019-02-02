@@ -961,6 +961,9 @@ void __init setup_arch(char **cmdline_p)
 
 	parse_early_param();
 
+	/* Set up #AC for split lock at the earliest phase. */
+	set_ac_split_lock();
+
 	if (efi_enabled(EFI_BOOT))
 		efi_memblock_x86_reserve_range();
 #ifdef CONFIG_MEMORY_HOTPLUG
