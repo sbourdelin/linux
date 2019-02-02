@@ -1779,6 +1779,17 @@ config PROFILING
 config TRACEPOINTS
 	bool
 
+config DYNAMIC_CALLS
+	bool "Dynamic call optimisation (EXPERIMENTAL)"
+	depends on HAVE_STATIC_CALL
+	help
+	  Say Y here to accelerate selected indirect calls with optpolines,
+	  using runtime learning to populate the optpoline call tables.  This
+	  should improve performance, particularly when retpolines are enabled,
+	  but increases the size of the kernel .text, and on some workloads may
+	  cause the kernel to spend a significant amount of time updating the
+	  call tables.
+
 endmenu		# General setup
 
 source "arch/Kconfig"
