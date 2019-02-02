@@ -2529,6 +2529,16 @@ static int pxa25x_udc_resume(struct platform_device *dev)
 
 /*-------------------------------------------------------------------------*/
 
+static const struct of_device_id udc_of_match[] = {
+	{
+		.compatible = "intel,ixp4xx-udc",
+	},
+	{
+		.compatible = "marvell,pxa25x-udc",
+	},
+	{},
+};
+
 static struct platform_driver udc_driver = {
 	.shutdown	= pxa25x_udc_shutdown,
 	.probe		= pxa25x_udc_probe,
@@ -2537,6 +2547,7 @@ static struct platform_driver udc_driver = {
 	.resume		= pxa25x_udc_resume,
 	.driver		= {
 		.name	= "pxa25x-udc",
+		.of_match_table = of_match_ptr(udc_of_match),
 	},
 };
 
