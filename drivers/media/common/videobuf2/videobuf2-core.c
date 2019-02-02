@@ -1043,6 +1043,8 @@ static int __prepare_userptr(struct vb2_buffer *vb)
 				reacquired = true;
 				call_void_vb_qop(vb, buf_cleanup, vb);
 			}
+			if (!q->is_output)
+				vb->timestamp = 0;
 			call_void_memop(vb, put_userptr, vb->planes[plane].mem_priv);
 		}
 
@@ -1157,6 +1159,8 @@ static int __prepare_dmabuf(struct vb2_buffer *vb)
 		/* Skip the plane if already verified */
 		if (dbuf == vb->planes[plane].dbuf &&
 			vb->planes[plane].length == planes[plane].length) {
+			if (!q->is_output)
+				vb->timestamp = 0;
 			dma_buf_put(dbuf);
 			continue;
 		}

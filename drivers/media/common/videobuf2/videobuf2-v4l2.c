@@ -603,6 +603,9 @@ int vb2_find_timestamp(const struct vb2_queue *q, u64 timestamp,
 {
 	unsigned int i;
 
+	if (!timestamp)
+		return -1;
+
 	for (i = start_idx; i < q->num_buffers; i++)
 		if (q->bufs[i]->timestamp == timestamp)
 			return i;
