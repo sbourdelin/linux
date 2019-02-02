@@ -437,4 +437,12 @@ config QCOM_IOMMU
 	help
 	  Support for IOMMU on certain Qualcomm SoCs.
 
+config HYPERV_IOMMU
+	bool "Hyper-V IRQ Remapping Support"
+	depends on HYPERV
+	select IOMMU_API
+	help
+	    Hyper-V stub IOMMU driver provides IRQ Remapping capability
+	    to run Linux guest with X2APIC mode on Hyper-V.
+
 endif # IOMMU_SUPPORT
