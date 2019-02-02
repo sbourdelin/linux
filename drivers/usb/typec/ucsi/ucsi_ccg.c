@@ -24,6 +24,29 @@ enum enum_fw_mode {
 	FW_INVALID,
 };
 
+#define CCGX_RAB_DEVICE_MODE			0x0000
+#define CCGX_RAB_INTR_REG			0x0006
+#define  DEV_INT				BIT(0)
+#define  PORT0_INT				BIT(1)
+#define  PORT1_INT				BIT(2)
+#define  UCSI_READ_INT				BIT(7)
+#define CCGX_RAB_READ_ALL_VER			0x0010
+#define CCGX_RAB_READ_FW2_VER			0x0020
+#define CCGX_RAB_UCSI_CONTROL			0x0039
+#define CCGX_RAB_UCSI_CONTROL_START		BIT(0)
+#define CCGX_RAB_UCSI_CONTROL_STOP		BIT(1)
+#define CCGX_RAB_UCSI_DATA_BLOCK(offset)	(0xf000 | ((offset) & 0xff))
+#define DEV_REG_IDX				CCGX_RAB_DEVICE_MODE
+#define CCGX_RAB_RESPONSE			0x007E
+#define  ASYNC_EVENT				BIT(7)
+
+/* CCGx events & async msg codes */
+#define RESET_COMPLETE		0x80
+#define EVENT_INDEX		RESET_COMPLETE
+#define PORT_CONNECT_DET	0x84
+#define PORT_DISCONNECT_DET	0x85
+#define ROLE_SWAP_COMPELETE	0x87
+
 struct ccg_dev_info {
 #define CCG_DEVINFO_FWMODE_SHIFT (0)
 #define CCG_DEVINFO_FWMODE_MASK (0x3 << CCG_DEVINFO_FWMODE_SHIFT)
@@ -50,6 +73,36 @@ struct version_info {
 	struct version_format app;
 };
 
+/* CCGx response codes */
+enum ccg_resp_code {
+	CMD_NO_RESP             = 0x00,
+	CMD_SUCCESS             = 0x02,
+	FLASH_DATA_AVAILABLE    = 0x03,
+	CMD_INVALID             = 0x05,
+	FLASH_UPDATE_FAIL       = 0x07,
+	INVALID_FW              = 0x08,
+	INVALID_ARG             = 0x09,
+	CMD_NOT_SUPPORT         = 0x0A,
+	TRANSACTION_FAIL        = 0x0C,
+	PD_CMD_FAIL             = 0x0D,
+	UNDEF_ERROR             = 0x0F,
+	INVALID_RESP		= 0x10,
+};
+
+#define CCG_EVENT_MAX	(EVENT_INDEX + 43)
+
+struct ccg_cmd {
+	u16 reg;
+	u32 data;
+	int len;
+	int delay; /* ms delay for cmd timeout  */
+};
+
+struct ccg_resp {
+	u8 code;
+	u8 length;
+};
+
 struct ucsi_ccg {
 	struct device *dev;
 	struct ucsi *ucsi;
@@ -58,16 +111,13 @@ struct ucsi_ccg {
 	struct ccg_dev_info info;
 	/* version info for boot, primary and secondary */
 	struct version_info version[FW2 + 1];
+	/* CCG HPI communication flags */
+	unsigned long flags;
+#define RESET_PENDING	0
+#define DEV_CMD_PENDING	1
+	struct ccg_resp dev_resp;
+	u8 cmd_resp;
 };
-
-#define CCGX_RAB_DEVICE_MODE			0x0000
-#define CCGX_RAB_INTR_REG			0x0006
-#define CCGX_RAB_READ_ALL_VER			0x0010
-#define CCGX_RAB_READ_FW2_VER			0x0020
-#define CCGX_RAB_UCSI_CONTROL			0x0039
-#define CCGX_RAB_UCSI_CONTROL_START		BIT(0)
-#define CCGX_RAB_UCSI_CONTROL_STOP		BIT(1)
-#define CCGX_RAB_UCSI_DATA_BLOCK(offset)	(0xf000 | ((offset) & 0xff))
 
 static int ccg_read(struct ucsi_ccg *uc, u16 rab, u8 *data, u32 len)
 {
@@ -274,6 +324,110 @@ static int get_fw_info(struct ucsi_ccg *uc)
 		return err;
 
 	return 0;
+}
+
+static inline bool invalid_async_evt(int code)
+{
+	return (code >= CCG_EVENT_MAX) || (code < EVENT_INDEX);
+}
+
+static void ccg_process_response(struct ucsi_ccg *uc)
+{
+	struct device *dev = uc->dev;
+
+	if (uc->dev_resp.code & ASYNC_EVENT) {
+		if (uc->dev_resp.code == RESET_COMPLETE) {
+			if (test_bit(RESET_PENDING, &uc->flags))
+				uc->cmd_resp = uc->dev_resp.code;
+			get_fw_info(uc);
+		}
+		if (invalid_async_evt(uc->dev_resp.code))
+			dev_err(dev, "invalid async evt %d\n",
+				uc->dev_resp.code);
+	} else {
+		if (test_bit(DEV_CMD_PENDING, &uc->flags)) {
+			uc->cmd_resp = uc->dev_resp.code;
+			clear_bit(DEV_CMD_PENDING, &uc->flags);
+		} else {
+			dev_err(dev, "dev resp 0x%04x but no cmd pending\n",
+				uc->dev_resp.code);
+		}
+	}
+}
+
+static int ccg_read_response(struct ucsi_ccg *uc)
+{
+	unsigned long target = jiffies + msecs_to_jiffies(1000);
+	struct device *dev = uc->dev;
+	u8 intval;
+	int status;
+
+	/* wait for interrupt status to get updated */
+	do {
+		status = ccg_read(uc, CCGX_RAB_INTR_REG, &intval,
+				  sizeof(intval));
+		if (status < 0)
+			return status;
+
+		if (intval & DEV_INT)
+			break;
+		usleep_range(500, 600);
+	} while (time_is_after_jiffies(target));
+
+	if (time_is_before_jiffies(target)) {
+		dev_err(dev, "response timeout error\n");
+		return -ETIME;
+	}
+
+	status = ccg_read(uc, CCGX_RAB_RESPONSE, (u8 *)&uc->dev_resp,
+			  sizeof(uc->dev_resp));
+	if (status < 0)
+		return status;
+
+	status = ccg_write(uc, CCGX_RAB_INTR_REG, &intval, sizeof(intval));
+	if (status < 0)
+		return status;
+
+	return 0;
+}
+
+/* Caller must hold uc->lock */
+static int ccg_send_command(struct ucsi_ccg *uc, struct ccg_cmd *cmd)
+{
+	struct device *dev = uc->dev;
+	int ret;
+
+	switch (cmd->reg & 0xF000) {
+	case DEV_REG_IDX:
+		set_bit(DEV_CMD_PENDING, &uc->flags);
+		break;
+	default:
+		dev_err(dev, "invalid cmd register\n");
+		break;
+	}
+
+	ret = ccg_write(uc, cmd->reg, (u8 *)&cmd->data, cmd->len);
+	if (ret < 0)
+		return ret;
+
+	msleep(cmd->delay);
+
+	ret = ccg_read_response(uc);
+	if (ret < 0) {
+		dev_err(dev, "response read error\n");
+		switch (cmd->reg & 0xF000) {
+		case DEV_REG_IDX:
+			clear_bit(DEV_CMD_PENDING, &uc->flags);
+			break;
+		default:
+			dev_err(dev, "invalid cmd register\n");
+			break;
+		}
+		return -EIO;
+	}
+	ccg_process_response(uc);
+
+	return uc->cmd_resp;
 }
 
 static int ucsi_ccg_probe(struct i2c_client *client,
