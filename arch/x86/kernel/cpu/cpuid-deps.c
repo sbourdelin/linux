@@ -119,3 +119,29 @@ void setup_clear_cpu_cap(unsigned int feature)
 {
 	do_clear_cpu_cap(NULL, feature);
 }
+
+/**
+ * find_cpu_cap - Given a cap flag string, find its corresponding feature bit.
+ * @cap_flag:	cap flag string as defined in x86_cap_flags[]
+ * @pfeature:	feature bit
+ *
+ * Return: true if the feature is found. false if not found
+ */
+bool find_cpu_cap(char *cap_flag, unsigned int *pfeature)
+{
+#ifdef CONFIG_X86_FEATURE_NAMES
+	unsigned int feature;
+
+	for (feature = 0; feature < NCAPINTS * 32; feature++) {
+		if (!x86_cap_flags[feature])
+			continue;
+
+		if (strcmp(cap_flag, x86_cap_flags[feature]) == 0) {
+			*pfeature = feature;
+
+			return true;
+		}
+	}
+#endif
+	return false;
+}

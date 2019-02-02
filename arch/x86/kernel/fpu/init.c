@@ -261,7 +261,8 @@ static void __init setup_cpuid_option(char *setup_cpuid_option)
 		/* Chang command line range for next search. */
 		cmdline_size = option_pos - boot_command_line + 1;
 		argptr = arg;
-		if (get_option(&argptr, &bit) &&
+		/* cpu cap can be specified by either feature bit or string */
+		if ((get_option(&argptr, &bit) || find_cpu_cap(arg, &bit)) &&
 		    bit >= 0 && bit < NCAPINTS * 32)
 			setup_cpu_cap(bit);
 	}
