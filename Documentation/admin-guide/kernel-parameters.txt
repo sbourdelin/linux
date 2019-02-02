@@ -558,10 +558,12 @@
 			loops can be debugged more effectively on production
 			systems.
 
-	clearcpuid=BITNUM [X86]
+	clearcpuid=BITNUM | FLAG [X86]
 			Disable CPUID feature X for the kernel. See
 			arch/x86/include/asm/cpufeatures.h for the valid bit
-			numbers. Note the Linux specific bits are not necessarily
+			numbers or /proc/cpuinfo for valid CPU flags.
+			Multiple options can be used to disable a few features.
+			Note the Linux specific bits are not necessarily
 			stable over kernel options, but the vendor specific
 			ones should be.
 			Also note that user programs calling CPUID directly
