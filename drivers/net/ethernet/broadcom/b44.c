@@ -1547,7 +1547,8 @@ static void b44_setup_pseudo_magicp(struct b44 *bp)
 	u32 val;
 	int plen0, plen1, plen2;
 	u8 *pwol_pattern;
-	u8 pwol_mask[B44_PMASK_SIZE];
+	/* Align to unsigned long for better performance in set_bit() */
+	u8 pwol_mask[B44_PMASK_SIZE] __aligned(sizeof(unsigned long));
 
 	pwol_pattern = kzalloc(B44_PATTERN_SIZE, GFP_KERNEL);
 	if (!pwol_pattern)
