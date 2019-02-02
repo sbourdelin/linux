@@ -4955,9 +4955,10 @@ static void rtl8192_cancel_deferred_work(struct r8192_priv *priv)
 static void rtl8192_usb_disconnect(struct usb_interface *intf)
 {
 	struct net_device *dev = usb_get_intfdata(intf);
-	struct r8192_priv *priv = ieee80211_priv(dev);
 
 	if (dev) {
+		struct r8192_priv *priv = ieee80211_priv(dev);
+
 		unregister_netdev(dev);
 
 		RT_TRACE(COMP_DOWN,
@@ -4969,8 +4970,8 @@ static void rtl8192_usb_disconnect(struct usb_interface *intf)
 		priv->pFirmware = NULL;
 		rtl8192_usb_deleteendpoints(dev);
 		usleep_range(10000, 11000);
+		free_ieee80211(dev);
 	}
-	free_ieee80211(dev);
 	RT_TRACE(COMP_DOWN, "wlan driver removed\n");
 }
 
