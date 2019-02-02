@@ -16,6 +16,7 @@
 #include <linux/bug.h>
 #include <linux/jiffies.h>
 #include <linux/refcount.h>
+#include <linux/dynamic_call.h>
 #include <net/neighbour.h>
 #include <asm/processor.h>
 
@@ -444,10 +445,12 @@ static inline int dst_output(struct net *net, struct sock *sk, struct sk_buff *s
 	return skb_dst(skb)->output(net, sk, skb);
 }
 
+DEFINE_DYNAMIC_CALL_1(int, dst_input, struct sk_buff *);
+
 /* Input packet from network to transport.  */
 static inline int dst_input(struct sk_buff *skb)
 {
-	return skb_dst(skb)->input(skb);
+	return dynamic_dst_input(skb_dst(skb)->input, skb);
 }
 
 static inline struct dst_entry *dst_check(struct dst_entry *dst, u32 cookie)
