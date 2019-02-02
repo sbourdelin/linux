@@ -243,16 +243,36 @@ static void __init fpu__init_system_ctx_switch(void)
 	WARN_ON_FPU(current->thread.fpu.initialized);
 }
 
+static void __init setup_cpuid_option(char *setup_cpuid_option)
+{
+	void (*setup_cpu_cap)(unsigned int feature);
+	char arg[32], *argptr, *option_pos;
+	int bit, cmdline_size;
+
+	if (!strcmp(setup_cpuid_option, "clearcpuid"))
+		setup_cpu_cap = setup_clear_cpu_cap;
+		return;
+
+	/* Find each option in boot_command_line and clear specified cpu cap. */
+	cmdline_size = COMMAND_LINE_SIZE;
+	while (cmdline_find_option_in_range(boot_command_line, cmdline_size,
+					    setup_cpuid_option, arg,
+					    sizeof(arg), &option_pos) >= 0) {
+		/* Chang command line range for next search. */
+		cmdline_size = option_pos - boot_command_line + 1;
+		argptr = arg;
+		if (get_option(&argptr, &bit) &&
+		    bit >= 0 && bit < NCAPINTS * 32)
+			setup_cpu_cap(bit);
+	}
+}
+
 /*
  * We parse fpu parameters early because fpu__init_system() is executed
  * before parse_early_param().
  */
 static void __init fpu__init_parse_early_param(void)
 {
-	char arg[32];
-	char *argptr = arg;
-	int bit;
-
 	if (cmdline_find_option_bool(boot_command_line, "no387"))
 		setup_clear_cpu_cap(X86_FEATURE_FPU);
 
@@ -271,12 +291,7 @@ static void __init fpu__init_parse_early_param(void)
 	if (cmdline_find_option_bool(boot_command_line, "noxsaves"))
 		setup_clear_cpu_cap(X86_FEATURE_XSAVES);
 
-	if (cmdline_find_option(boot_command_line, "clearcpuid", arg,
-				sizeof(arg)) &&
-	    get_option(&argptr, &bit) &&
-	    bit >= 0 &&
-	    bit < NCAPINTS * 32)
-		setup_clear_cpu_cap(bit);
+	setup_cpuid_option("clearcpuid");
 }
 
 /*

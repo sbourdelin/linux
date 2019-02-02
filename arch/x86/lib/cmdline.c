@@ -114,13 +114,15 @@ __cmdline_find_option_bool(const char *cmdline, int max_cmdline_size,
  * @option: option string to look for
  * @buffer: memory buffer to return the option argument
  * @bufsize: size of the supplied memory buffer
+ * @option_pos: pointer to the option if found
  *
  * Returns the length of the argument (regardless of if it was
  * truncated to fit in the buffer), or -1 on not found.
  */
 static int
 __cmdline_find_option(const char *cmdline, int max_cmdline_size,
-		      const char *option, char *buffer, int bufsize)
+		      const char *option, char *buffer, int bufsize,
+		      char **arg_pos)
 {
 	char c;
 	int pos = 0, len = -1;
@@ -164,6 +166,9 @@ __cmdline_find_option(const char *cmdline, int max_cmdline_size,
 				len = 0;
 				bufptr = buffer;
 				state = st_bufcpy;
+				if (arg_pos)
+					*arg_pos = (char *)cmdline -
+						   strlen(option) - 1;
 				break;
 			} else if (c == *opptr++) {
 				/*
@@ -211,5 +216,13 @@ int cmdline_find_option(const char *cmdline, const char *option, char *buffer,
 			int bufsize)
 {
 	return __cmdline_find_option(cmdline, COMMAND_LINE_SIZE, option,
-				     buffer, bufsize);
+				     buffer, bufsize, NULL);
+}
+
+int cmdline_find_option_in_range(const char *cmdline, int cmdline_size,
+				 char *option, char *buffer, int bufsize,
+				 char **arg_pos)
+{
+	return __cmdline_find_option(cmdline, cmdline_size, option, buffer,
+				     bufsize, arg_pos);
 }
