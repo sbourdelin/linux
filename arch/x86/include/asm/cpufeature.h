@@ -131,6 +131,7 @@ extern const char * const x86_bug_flags[NBUGINTS*32];
 #define set_cpu_cap(c, bit)	set_bit(bit, (unsigned long *)((c)->x86_capability))
 
 extern void setup_clear_cpu_cap(unsigned int bit);
+void setup_set_cpu_cap(unsigned int bit);
 extern void clear_cpu_cap(struct cpuinfo_x86 *c, unsigned int bit);
 bool find_cpu_cap(char *cap_flag, unsigned int *pfeature);
 

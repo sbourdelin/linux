@@ -62,25 +62,39 @@ static const struct cpuid_dep cpuid_deps[] = {
 	{}
 };
 
-static inline void clear_feature(struct cpuinfo_x86 *c, unsigned int feature)
+static inline void
+setup_feature(struct cpuinfo_x86 *c, unsigned int feature, bool enable)
 {
 	/*
 	 * Note: This could use the non atomic __*_bit() variants, but the
 	 * rest of the cpufeature code uses atomics as well, so keep it for
 	 * consistency. Cleanup all of it separately.
 	 */
-	if (!c) {
-		clear_cpu_cap(&boot_cpu_data, feature);
-		set_bit(feature, (unsigned long *)cpu_caps_cleared);
+	if (enable) {
+		/* Set the feature */
+		if (!c) {
+			set_cpu_cap(&boot_cpu_data, feature);
+			clear_bit(feature, (unsigned long *)cpu_caps_cleared);
+			setup_force_cpu_cap(feature);
+		} else {
+			set_bit(feature, (unsigned long *)c->x86_capability);
+		}
 	} else {
-		clear_bit(feature, (unsigned long *)c->x86_capability);
+		/* Clear the feature */
+		if (!c) {
+			clear_cpu_cap(&boot_cpu_data, feature);
+			set_bit(feature, (unsigned long *)cpu_caps_cleared);
+		} else {
+			clear_bit(feature, (unsigned long *)c->x86_capability);
+		}
 	}
 }
 
 /* Take the capabilities and the BUG bits into account */
 #define MAX_FEATURE_BITS ((NCAPINTS + NBUGINTS) * sizeof(u32) * 8)
 
-static void do_clear_cpu_cap(struct cpuinfo_x86 *c, unsigned int feature)
+static void
+do_setup_cpu_cap(struct cpuinfo_x86 *c, unsigned int feature, bool enable)
 {
 	DECLARE_BITMAP(disable, MAX_FEATURE_BITS);
 	const struct cpuid_dep *d;
@@ -89,7 +103,7 @@ static void do_clear_cpu_cap(struct cpuinfo_x86 *c, unsigned int feature)
 	if (WARN_ON(feature >= MAX_FEATURE_BITS))
 		return;
 
-	clear_feature(c, feature);
+	setup_feature(c, feature, enable);
 
 	/* Collect all features to disable, handling dependencies */
 	memset(disable, 0, sizeof(disable));
@@ -105,19 +119,27 @@ static void do_clear_cpu_cap(struct cpuinfo_x86 *c, unsigned int feature)
 				continue;
 
 			changed = true;
-			clear_feature(c, d->feature);
+			setup_feature(c, d->feature, enable);
 		}
 	} while (changed);
 }
 
 void clear_cpu_cap(struct cpuinfo_x86 *c, unsigned int feature)
 {
-	do_clear_cpu_cap(c, feature);
+	/* Disable the feature. */
+	do_setup_cpu_cap(c, feature, false);
 }
 
 void setup_clear_cpu_cap(unsigned int feature)
 {
-	do_clear_cpu_cap(NULL, feature);
+	/* Disable the feature. */
+	do_setup_cpu_cap(NULL, feature, false);
+}
+
+void setup_set_cpu_cap(unsigned int feature)
+{
+	/* Enable the feature. */
+	do_setup_cpu_cap(NULL, feature, true);
 }
 
 /**

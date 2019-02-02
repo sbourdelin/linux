@@ -4083,6 +4083,21 @@
 			incurs a small amount of overhead in the scheduler
 			but is useful for debugging and performance tuning.
 
+	setcpuid=BITNUM | FLAG [X86]
+			Enable CPUID feature X for the kernel. See
+			arch/x86/include/asm/cpufeatures.h for the valid bit
+			numbers or /proc/cpuinfo for the valid CPU flags.
+			Multiple options can be used to enable a few features.
+			Note the Linux specific bits are not necessarily
+			stable over kernel options, but the vendor specific
+			ones should be.
+			Also note that user programs calling CPUID directly
+			or using the feature without checking anything
+			may still disable it.
+			Also note the kernel might malfunction if you enable
+			some critical bits.
+			Please refer to clearcpuid for disabling CPUID feature.
+
 	skew_tick=	[KNL] Offset the periodic timer tick per cpu to mitigate
 			xtime_lock contention on larger systems, and/or RCU lock
 			contention on all systems with CONFIG_MAXSMP set.

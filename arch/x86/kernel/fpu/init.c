@@ -251,6 +251,9 @@ static void __init setup_cpuid_option(char *setup_cpuid_option)
 
 	if (!strcmp(setup_cpuid_option, "clearcpuid"))
 		setup_cpu_cap = setup_clear_cpu_cap;
+	else if (!strcmp(setup_cpuid_option, "setcpuid"))
+		setup_cpu_cap = setup_set_cpu_cap;
+	else
 		return;
 
 	/* Find each option in boot_command_line and clear specified cpu cap. */
@@ -293,6 +296,7 @@ static void __init fpu__init_parse_early_param(void)
 		setup_clear_cpu_cap(X86_FEATURE_XSAVES);
 
 	setup_cpuid_option("clearcpuid");
+	setup_cpuid_option("setcpuid");
 }
 
 /*
