@@ -550,6 +550,8 @@ static void suspend_finish(void)
 static int enter_state(suspend_state_t state)
 {
 	int error;
+	ktime_t start, end, elapsed;
+	unsigned int elapsed_msecs;
 
 	trace_suspend_resume(TPS("suspend_enter"), state, true);
 	if (state == PM_SUSPEND_TO_IDLE) {
@@ -570,9 +572,14 @@ static int enter_state(suspend_state_t state)
 
 #ifndef CONFIG_SUSPEND_SKIP_SYNC
 	trace_suspend_resume(TPS("sync_filesystems"), 0, true);
+	start = ktime_get_boottime();
 	pr_info("Syncing filesystems ... ");
 	ksys_sync();
-	pr_cont("done.\n");
+	end = ktime_get_boottime();
+	elapsed = ktime_sub(end, start);
+	elapsed_msecs = ktime_to_ms(elapsed);
+	pr_cont("(elapsed %d.%03d seconds) done.\n", elapsed_msecs / 1000,
+		elapsed_msecs % 1000);
 	trace_suspend_resume(TPS("sync_filesystems"), 0, false);
 #endif
 
