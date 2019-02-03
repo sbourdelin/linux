@@ -1862,8 +1862,6 @@ reader__process_events(struct reader *rd, struct perf_session *session,
 	file_offset = page_offset;
 	head = rd->data_offset - page_offset;
 
-	ui_progress__init_size(prog, data_size, "Processing events...");
-
 	data_size += rd->data_offset;
 
 	mmap_size = MMAP_SIZE;
@@ -1992,6 +1990,87 @@ out_err:
 	return err;
 }
 
+static s64 process_index(struct perf_session *session,
+			 union perf_event *event,
+			 u64 file_offset)
+{
+	struct perf_evlist *evlist = session->evlist;
+	u64 timestamp;
+	s64 ret;
+
+	if (session->header.needs_swap)
+		event_swap(event, perf_evlist__sample_id_all(evlist));
+
+	if (event->header.type >= PERF_RECORD_HEADER_MAX)
+		return -EINVAL;
+
+	events_stats__inc(&evlist->stats, event->header.type);
+
+	if (event->header.type >= PERF_RECORD_USER_TYPE_START)
+		return perf_session__process_user_event(session, event, file_offset);
+
+	ret = perf_evlist__parse_sample_timestamp(evlist, event, &timestamp);
+	if (ret)
+		return ret;
+
+	return ordered_events__queue(&session->ordered_events, event,
+				     timestamp, file_offset);
+}
+
+static int __perf_session__process_dir_events(struct perf_session *session)
+{
+	struct perf_data *data = session->data;
+	struct perf_tool *tool = session->tool;
+	struct reader rd = {
+		.fd		= perf_data__fd(session->data),
+		.data_size	= session->header.data_size,
+		.data_offset	= session->header.data_offset,
+		.process	= process_simple,
+	};
+	int i, ret = 0;
+	struct ui_progress prog;
+	u64 total_size = perf_data__size(session->data);
+
+	perf_tool__fill_defaults(tool);
+
+	ui_progress__init_size(&prog, total_size, "Processing events...");
+
+	ret = reader__process_events(&rd, session, &prog);
+	if (ret)
+		goto out_err;
+
+	for (i = 0; i < data->dir.nr ; i++) {
+		struct perf_data_file *file = &data->dir.files[i];
+
+		if (file->size == 0)
+			continue;
+
+		rd = (struct reader) {
+			.fd		= file->fd,
+			.data_size	= file->size,
+			.data_offset	= 0,
+			.process	= process_index,
+		};
+
+		ret = reader__process_events(&rd, session, &prog);
+		if (ret)
+			goto out_err;
+	}
+
+	ret = ordered_events__flush(&session->ordered_events, OE_FLUSH__FINAL);
+
+out_err:
+	if (!tool->no_warn)
+		perf_session__warn_about_errors(session);
+
+	/*
+	 * We may switching perf.data output, make ordered_events
+	 * reusable.
+	 */
+	ordered_events__reinit(&session->ordered_events);
+	return ret;
+}
+
 int perf_session__process_events(struct perf_session *session)
 {
 	if (perf_session__register_idle_thread(session) < 0)
@@ -1999,6 +2078,9 @@ int perf_session__process_events(struct perf_session *session)
 
 	if (perf_data__is_pipe(session->data))
 		return __perf_session__process_pipe_events(session);
+
+	if (perf_data__is_dir(session->data))
+		return __perf_session__process_dir_events(session);
 
 	return __perf_session__process_events(session);
 }
