@@ -125,8 +125,14 @@ int rm_rf(const char *path)
 	char namebuf[PATH_MAX];
 
 	dir = opendir(path);
-	if (dir == NULL)
-		return 0;
+	if (dir == NULL) {
+		/*
+		 * The path does not exist or is not directory,
+		 * so there's no harm to try remove it. This way
+		 * rm_rf will work over single file.
+		 */
+		return unlink(path);
+	}
 
 	while ((d = readdir(dir)) != NULL && !ret) {
 		struct stat statbuf;
