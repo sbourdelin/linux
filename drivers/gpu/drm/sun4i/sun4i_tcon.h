@@ -258,6 +258,7 @@ struct sun4i_tcon {
 	struct reset_control		*lvds_rst;
 
 	struct drm_panel		*panel;
+	struct drm_bridge		*bridge;
 
 	/* Platform adjustments */
 	const struct sun4i_tcon_quirks	*quirks;
