@@ -571,7 +571,9 @@ void imx_media_fill_default_mbus_fields(struct v4l2_mbus_framefmt *tryfmt,
 		tryfmt->quantization = is_rgb ?
 			V4L2_QUANTIZATION_FULL_RANGE :
 			V4L2_QUANTIZATION_LIM_RANGE;
-		tryfmt->ycbcr_enc = V4L2_YCBCR_ENC_601;
+		if (tryfmt->ycbcr_enc != V4L2_YCBCR_ENC_601 &&
+		    tryfmt->ycbcr_enc != V4L2_YCBCR_ENC_709)
+			tryfmt->ycbcr_enc = V4L2_YCBCR_ENC_601;
 	}
 }
 EXPORT_SYMBOL_GPL(imx_media_fill_default_mbus_fields);
