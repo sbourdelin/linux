@@ -480,6 +480,11 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 	if (tty->ops->write == NULL)
 		return -EOPNOTSUPP;
 
+	/* don't set HCI line discipline on PTYs */
+	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
+	    tty->driver->subtype == PTY_TYPE_MASTER)
+		return -EINVAL;
+
 	hu = kzalloc(sizeof(struct hci_uart), GFP_KERNEL);
 	if (!hu) {
 		BT_ERR("Can't allocate control structure");
