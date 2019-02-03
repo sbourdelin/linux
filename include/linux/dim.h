@@ -105,79 +105,17 @@ enum {
 	DIM_ON_EDGE,
 };
 
-static inline bool dim_on_top(struct dim *dim)
-{
-	switch (dim->tune_state) {
-	case DIM_PARKING_ON_TOP:
-	case DIM_PARKING_TIRED:
-		return true;
-	case DIM_GOING_RIGHT:
-		return (dim->steps_left > 1) && (dim->steps_right == 1);
-	default: /* DIM_GOING_LEFT */
-		return (dim->steps_right > 1) && (dim->steps_left == 1);
-	}
-}
+bool dim_on_top(struct dim *dim);
 
-static inline void dim_turn(struct dim *dim)
-{
-	switch (dim->tune_state) {
-	case DIM_PARKING_ON_TOP:
-	case DIM_PARKING_TIRED:
-		break;
-	case DIM_GOING_RIGHT:
-		dim->tune_state = DIM_GOING_LEFT;
-		dim->steps_left = 0;
-		break;
-	case DIM_GOING_LEFT:
-		dim->tune_state = DIM_GOING_RIGHT;
-		dim->steps_right = 0;
-		break;
-	}
-}
+void dim_turn(struct dim *dim);
 
-static inline void dim_park_on_top(struct dim *dim)
-{
-	dim->steps_right  = 0;
-	dim->steps_left   = 0;
-	dim->tired        = 0;
-	dim->tune_state   = DIM_PARKING_ON_TOP;
-}
+void dim_park_on_top(struct dim *dim);
 
-static inline void dim_park_tired(struct dim *dim)
-{
-	dim->steps_right  = 0;
-	dim->steps_left   = 0;
-	dim->tune_state   = DIM_PARKING_TIRED;
-}
+void dim_park_tired(struct dim *dim);
 
-static inline void dim_create_sample(u16 event_ctr,
-				     u64 packets,
-				     u64 bytes,
-				     struct dim_sample *s)
-{
-	s->time	     = ktime_get();
-	s->pkt_ctr   = packets;
-	s->byte_ctr  = bytes;
-	s->event_ctr = event_ctr;
-}
+void dim_create_sample(u16 event_ctr, u64 packets, u64 bytes, struct dim_sample *s);
 
-static inline void dim_calc_stats(struct dim_sample *start,
-				  struct dim_sample *end,
-				  struct dim_stats *curr_stats)
-{
-	/* u32 holds up to 71 minutes, should be enough */
-	u32 delta_us = ktime_us_delta(end->time, start->time);
-	u32 npkts = BIT_GAP(BITS_PER_TYPE(u32), end->pkt_ctr, start->pkt_ctr);
-	u32 nbytes = BIT_GAP(BITS_PER_TYPE(u32), end->byte_ctr,
-			     start->byte_ctr);
-
-	if (!delta_us)
-		return;
-
-	curr_stats->ppms = DIV_ROUND_UP(npkts * USEC_PER_MSEC, delta_us);
-	curr_stats->bpms = DIV_ROUND_UP(nbytes * USEC_PER_MSEC, delta_us);
-	curr_stats->epms = DIV_ROUND_UP(DIM_NEVENTS * USEC_PER_MSEC,
-					delta_us);
-}
+void dim_calc_stats(struct dim_sample *start, struct dim_sample *end,
+		    struct dim_stats *curr_stats);
 
 #endif /* DIM_H */
