@@ -149,6 +149,9 @@ bool sun6i_csi_is_format_supported(struct sun6i_csi *csi,
 	case V4L2_PIX_FMT_RGB565X:
 		return (mbus_code == MEDIA_BUS_FMT_RGB565_2X8_BE);
 
+	case V4L2_PIX_FMT_JPEG:
+		return (mbus_code == MEDIA_BUS_FMT_JPEG_1X8);
+
 	default:
 		dev_dbg(sdev->dev, "Unsupported pixformat: 0x%x\n", pixformat);
 		break;
@@ -278,6 +281,9 @@ static enum csi_output_fmt get_csi_output_format(struct sun6i_csi_dev *sdev,
 	case V4L2_PIX_FMT_RGB565:
 	case V4L2_PIX_FMT_RGB565X:
 		return buf_interlaced ? CSI_FRAME_RGB565 : CSI_FIELD_RGB565;
+
+	case V4L2_PIX_FMT_JPEG:
+		return buf_interlaced ? CSI_FRAME_RAW_8 : CSI_FIELD_RAW_8;
 
 	default:
 		dev_warn(sdev->dev, "Unsupported pixformat: 0x%x\n", pixformat);
