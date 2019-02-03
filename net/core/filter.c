@@ -4111,6 +4111,9 @@ BPF_CALL_5(bpf_setsockopt, struct bpf_sock_ops_kern *, bpf_sock,
 
 		/* Only some socketops are supported */
 		switch (optname) {
+		case SO_DEBUG:
+			sock_valbool_flag(sk, SOCK_DBG, val);
+			break;
 		case SO_RCVBUF:
 			sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
 			sk->sk_rcvbuf = max_t(int, val * 2, SOCK_MIN_RCVBUF);

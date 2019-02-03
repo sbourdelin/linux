@@ -1935,6 +1935,14 @@ static inline void sock_confirm_neigh(struct sk_buff *skb, struct neighbour *n)
 	}
 }
 
+static inline void sock_valbool_flag(struct sock *sk, int bit, int valbool)
+{
+	if (valbool)
+		sock_set_flag(sk, bit);
+	else
+		sock_reset_flag(sk, bit);
+}
+
 bool sk_mc_loop(struct sock *sk);
 
 static inline bool sk_can_gso(const struct sock *sk)
