@@ -1058,9 +1058,11 @@ static int __send_signal(int sig, struct kernel_siginfo *info, struct task_struc
 	result = TRACE_SIGNAL_DELIVERED;
 	/*
 	 * Skip useless siginfo allocation for SIGKILL SIGSTOP,
-	 * and kernel threads.
+	 * and kernel threads. SI_TKILL is an exception to allow
+	 * processes to discern signals originating from tgkill.
 	 */
-	if (sig_kernel_only(sig) || (t->flags & PF_KTHREAD))
+	if ((sig_kernel_only(sig) && info->si_code != SI_TKILL) ||
+	    (t->flags & PF_KTHREAD))
 		goto out_set;
 
 	/*
