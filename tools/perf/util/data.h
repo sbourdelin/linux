@@ -78,4 +78,5 @@ int perf_data__switch(struct perf_data *data,
 
 int perf_data__create_dir(struct perf_data *data, int nr);
 void perf_data__free_dir(struct perf_data *data);
+int perf_data__update_dir(struct perf_data *data);
 #endif /* __PERF_DATA_H */
