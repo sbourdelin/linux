@@ -505,6 +505,9 @@ config terms. For example: 'cycles/overwrite/' and 'instructions/no-overwrite/'.
 
 Implies --tail-synthesize.
 
+--dir::
+Store data into directory with one data file for cpu.
+
 SEE ALSO
 --------
 linkperf:perf-stat[1], linkperf:perf-list[1]
