@@ -36,7 +36,7 @@
 
 #include <linux/module.h>
 
-#define NET_DIM_NEVENTS 64
+#define DIM_NEVENTS 64
 #define IS_SIGNIFICANT_DIFF(val, ref) \
 	(((100UL * abs((val) - (ref))) / (ref)) > 10) /* more than 10% difference */
 #define BIT_GAP(bits, end, start) ((((end) - (start)) + BIT_ULL(bits)) & (BIT_ULL(bits) - 1))
@@ -55,7 +55,7 @@ struct net_dim_sample {
 	u16     event_ctr;
 };
 
-struct net_dim_stats {
+struct dim_stats {
 	int ppms; /* packets per msec */
 	int bpms; /* bytes per msec */
 	int epms; /* events per msec */
@@ -63,7 +63,7 @@ struct net_dim_stats {
 
 struct net_dim { /* Dynamic Interrupt Moderation */
 	u8                                      state;
-	struct net_dim_stats                    prev_stats;
+	struct dim_stats                        prev_stats;
 	struct net_dim_sample                   start_sample;
 	struct work_struct                      work;
 	u8                                      profile_ix;
@@ -87,67 +87,67 @@ enum {
 };
 
 enum {
-	NET_DIM_PARKING_ON_TOP,
-	NET_DIM_PARKING_TIRED,
-	NET_DIM_GOING_RIGHT,
-	NET_DIM_GOING_LEFT,
+	DIM_PARKING_ON_TOP,
+	DIM_PARKING_TIRED,
+	DIM_GOING_RIGHT,
+	DIM_GOING_LEFT,
 };
 
 enum {
-	NET_DIM_STATS_WORSE,
-	NET_DIM_STATS_SAME,
-	NET_DIM_STATS_BETTER,
+	DIM_STATS_WORSE,
+	DIM_STATS_SAME,
+	DIM_STATS_BETTER,
 };
 
 enum {
-	NET_DIM_STEPPED,
-	NET_DIM_TOO_TIRED,
-	NET_DIM_ON_EDGE,
+	DIM_STEPPED,
+	DIM_TOO_TIRED,
+	DIM_ON_EDGE,
 };
 
-static inline bool net_dim_on_top(struct net_dim *net_dim)
+static inline bool dim_on_top(struct net_dim *dim)
 {
-	switch (net_dim->tune_state) {
-	case NET_DIM_PARKING_ON_TOP:
-	case NET_DIM_PARKING_TIRED:
+	switch (dim->tune_state) {
+	case DIM_PARKING_ON_TOP:
+	case DIM_PARKING_TIRED:
 		return true;
-	case NET_DIM_GOING_RIGHT:
-		return (net_dim->steps_left > 1) && (net_dim->steps_right == 1);
-	default: /* NET_DIM_GOING_LEFT */
-		return (net_dim->steps_right > 1) && (net_dim->steps_left == 1);
+	case DIM_GOING_RIGHT:
+		return (dim->steps_left > 1) && (dim->steps_right == 1);
+	default: /* DIM_GOING_LEFT */
+		return (dim->steps_right > 1) && (dim->steps_left == 1);
 	}
 }
 
-static inline void net_dim_turn(struct net_dim *net_dim)
+static inline void dim_turn(struct net_dim *dim)
 {
-	switch (net_dim->tune_state) {
-	case NET_DIM_PARKING_ON_TOP:
-	case NET_DIM_PARKING_TIRED:
+	switch (dim->tune_state) {
+	case DIM_PARKING_ON_TOP:
+	case DIM_PARKING_TIRED:
 		break;
-	case NET_DIM_GOING_RIGHT:
-		net_dim->tune_state = NET_DIM_GOING_LEFT;
-		net_dim->steps_left = 0;
+	case DIM_GOING_RIGHT:
+		dim->tune_state = DIM_GOING_LEFT;
+		dim->steps_left = 0;
 		break;
-	case NET_DIM_GOING_LEFT:
-		net_dim->tune_state = NET_DIM_GOING_RIGHT;
-		net_dim->steps_right = 0;
+	case DIM_GOING_LEFT:
+		dim->tune_state = DIM_GOING_RIGHT;
+		dim->steps_right = 0;
 		break;
 	}
 }
 
-static inline void net_dim_park_on_top(struct net_dim *net_dim)
+static inline void dim_park_on_top(struct net_dim *dim)
 {
-	net_dim->steps_right  = 0;
-	net_dim->steps_left   = 0;
-	net_dim->tired        = 0;
-	net_dim->tune_state   = NET_DIM_PARKING_ON_TOP;
+	dim->steps_right  = 0;
+	dim->steps_left   = 0;
+	dim->tired        = 0;
+	dim->tune_state   = DIM_PARKING_ON_TOP;
 }
 
-static inline void net_dim_park_tired(struct net_dim *net_dim)
+static inline void dim_park_tired(struct net_dim *dim)
 {
-	net_dim->steps_right  = 0;
-	net_dim->steps_left   = 0;
-	net_dim->tune_state   = NET_DIM_PARKING_TIRED;
+	dim->steps_right  = 0;
+	dim->steps_left   = 0;
+	dim->tune_state   = DIM_PARKING_TIRED;
 }
 
 static inline void net_dim_sample(u16 event_ctr,
@@ -161,9 +161,9 @@ static inline void net_dim_sample(u16 event_ctr,
 	s->event_ctr = event_ctr;
 }
 
-static inline void net_dim_calc_stats(struct net_dim_sample *start,
+static inline void dim_calc_stats(struct net_dim_sample *start,
 				  struct net_dim_sample *end,
-				  struct net_dim_stats *curr_stats)
+				  struct dim_stats *curr_stats)
 {
 	/* u32 holds up to 71 minutes, should be enough */
 	u32 delta_us = ktime_us_delta(end->time, start->time);
@@ -176,7 +176,7 @@ static inline void net_dim_calc_stats(struct net_dim_sample *start,
 
 	curr_stats->ppms = DIV_ROUND_UP(npkts * USEC_PER_MSEC, delta_us);
 	curr_stats->bpms = DIV_ROUND_UP(nbytes * USEC_PER_MSEC, delta_us);
-	curr_stats->epms = DIV_ROUND_UP(NET_DIM_NEVENTS * USEC_PER_MSEC,
+	curr_stats->epms = DIV_ROUND_UP(DIM_NEVENTS * USEC_PER_MSEC,
 					delta_us);
 }
 
