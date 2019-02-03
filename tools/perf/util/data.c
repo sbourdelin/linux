@@ -34,6 +34,9 @@ int perf_data__create_dir(struct perf_data *data, int nr)
 	struct perf_data_file *files = NULL;
 	int i, ret = -1;
 
+	if (WARN_ON(!data->is_dir))
+		return -EINVAL;
+
 	files = malloc(nr * sizeof(*files));
 	if (!files)
 		return -ENOMEM;
@@ -61,7 +64,6 @@ out_err:
 	return ret;
 }
 
-__maybe_unused
 static int perf_data__open_dir(struct perf_data *data)
 {
 	struct perf_data_file *files = NULL;
@@ -69,6 +71,9 @@ static int perf_data__open_dir(struct perf_data *data)
 	int ret = -1;
 	DIR *dir;
 	int nr = 0;
+
+	if (WARN_ON(!data->is_dir))
+		return -EINVAL;
 
 	dir = opendir(data->path);
 	if (!dir)
@@ -159,6 +164,16 @@ static int check_backup(struct perf_data *data)
 	return 0;
 }
 
+static bool is_dir(struct perf_data *data)
+{
+	struct stat st;
+
+	if (stat(data->path, &st))
+		return false;
+
+	return (st.st_mode & S_IFMT) == S_IFDIR;
+}
+
 static int open_file_read(struct perf_data *data)
 {
 	struct stat st;
@@ -240,6 +255,22 @@ static int open_file_dup(struct perf_data *data)
 	return open_file(data);
 }
 
+static int open_dir(struct perf_data *data)
+{
+	if (perf_data__is_write(data)) {
+		if (mkdir(data->path, S_IRWXU) < 0)
+			return -1;
+	} else {
+		if (perf_data__open_dir(data))
+			return -1;
+	}
+
+	if (asprintf(&data->file.path, "%s/header", data->path) < 0)
+		return -ENOMEM;
+
+	return open_file(data);
+}
+
 int perf_data__open(struct perf_data *data)
 {
 	if (check_pipe(data))
@@ -251,7 +282,11 @@ int perf_data__open(struct perf_data *data)
 	if (check_backup(data))
 		return -1;
 
-	return open_file_dup(data);
+	if (perf_data__is_read(data))
+		data->is_dir = is_dir(data);
+
+	return perf_data__is_dir(data) ?
+	       open_dir(data) : open_file_dup(data);
 }
 
 void perf_data__close(struct perf_data *data)
