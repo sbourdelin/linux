@@ -2181,7 +2181,10 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 	if (!card->erase_size)
 		return -EOPNOTSUPP;
 
-	if (mmc_card_sd(card) && arg != MMC_ERASE_ARG)
+	if (mmc_card_sd(card) && arg == SD_DISCARD_ARG)
+		goto skip_arg_testing;
+
+	if (mmc_card_sd(card) && arg != SD_ERASE_ARG)
 		return -EOPNOTSUPP;
 
 	if ((arg & MMC_SECURE_ARGS) &&
@@ -2200,6 +2203,7 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 	if (arg == MMC_ERASE_ARG)
 		nr = mmc_align_erase_size(card, &from, &to, nr);
 
+skip_arg_testing:
 	if (nr == 0)
 		return 0;
 
