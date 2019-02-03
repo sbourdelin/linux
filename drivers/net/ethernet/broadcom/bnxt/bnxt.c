@@ -2110,6 +2110,7 @@ static int bnxt_poll(struct napi_struct *napi, int budget)
 		dim_create_sample(cpr->event_ctr,
 				  cpr->rx_packets,
 				  cpr->rx_bytes,
+				  0,
 				  &dim_sample);
 		net_dim(&cpr->dim, dim_sample);
 	}

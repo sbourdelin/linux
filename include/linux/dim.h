@@ -45,6 +45,7 @@
 struct dim_cq_moder {
 	u16 usec;
 	u16 pkts;
+	u16 comps;
 	u8 cq_period_mode;
 };
 
@@ -53,18 +54,22 @@ struct dim_sample {
 	u32     pkt_ctr;
 	u32     byte_ctr;
 	u16     event_ctr;
+	u32     comp_ctr;
 };
 
 struct dim_stats {
 	int ppms; /* packets per msec */
 	int bpms; /* bytes per msec */
 	int epms; /* events per msec */
+	int cpms; /* completions per msec */
+	int cpe_ratio; /* ratio of completions to events */
 };
 
 struct dim { /* Dynamic Interrupt Moderation */
 	u8                                      state;
 	struct dim_stats                        prev_stats;
 	struct dim_sample                       start_sample;
+	struct dim_sample                       measuring_sample;
 	struct work_struct                      work;
 	u8                                      profile_ix;
 	u8                                      mode;
@@ -113,7 +118,7 @@ void dim_park_on_top(struct dim *dim);
 
 void dim_park_tired(struct dim *dim);
 
-void dim_create_sample(u16 event_ctr, u64 packets, u64 bytes, struct dim_sample *s);
+void dim_create_sample(u16 event_ctr, u64 packets, u64 bytes, u64 comps, struct dim_sample *s);
 
 void dim_calc_stats(struct dim_sample *start, struct dim_sample *end,
 		    struct dim_stats *curr_stats);

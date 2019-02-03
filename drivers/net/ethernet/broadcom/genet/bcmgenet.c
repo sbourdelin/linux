@@ -1910,7 +1910,7 @@ static int bcmgenet_rx_poll(struct napi_struct *napi, int budget)
 
 	if (ring->dim.use_dim) {
 		dim_create_sample(ring->dim.event_ctr, ring->dim.packets,
-				  ring->dim.bytes, &dim_sample);
+				  ring->dim.bytes, 0, &dim_sample);
 		net_dim(&ring->dim.dim, dim_sample);
 	}
 

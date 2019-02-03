@@ -183,7 +183,7 @@ void net_dim(struct dim *dim, struct dim_sample end_sample)
 		/* fall through */
 	case DIM_START_MEASURE:
 		dim_create_sample(end_sample.event_ctr, end_sample.pkt_ctr,
-				  end_sample.byte_ctr, &dim->start_sample);
+				  end_sample.byte_ctr, 0, &dim->start_sample);
 		dim->state = DIM_MEASURE_IN_PROGRESS;
 		break;
 	case DIM_APPLY_NEW_PROFILE:

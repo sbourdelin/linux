@@ -1035,7 +1035,7 @@ static int bcm_sysport_poll(struct napi_struct *napi, int budget)
 
 	if (priv->dim.use_dim) {
 		dim_create_sample(priv->dim.event_ctr, priv->dim.packets,
-				  priv->dim.bytes, &dim_sample);
+				  priv->dim.bytes, 0, &dim_sample);
 		net_dim(&priv->dim.dim, dim_sample);
 	}
 
