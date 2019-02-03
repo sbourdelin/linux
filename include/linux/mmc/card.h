@@ -308,6 +308,8 @@ struct mmc_card {
 	unsigned int    nr_parts;
 
 	unsigned int		bouncesz;	/* Bounce buffer size */
+
+	unsigned int		discard_arg;	/* discard args */
 };
 
 static inline bool mmc_large_sector(struct mmc_card *card)
