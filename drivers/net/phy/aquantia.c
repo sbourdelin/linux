@@ -100,8 +100,7 @@ static int aqr_read_status(struct phy_device *phydev)
 
 static struct phy_driver aqr_driver[] = {
 {
-	.phy_id		= PHY_ID_AQ1202,
-	.phy_id_mask	= 0xfffffff0,
+	PHY_ID_MATCH_MODEL(PHY_ID_AQ1202),
 	.name		= "Aquantia AQ1202",
 	.features	= PHY_10GBIT_FULL_FEATURES,
 	.aneg_done	= genphy_c45_aneg_done,
@@ -111,8 +110,7 @@ static struct phy_driver aqr_driver[] = {
 	.read_status	= aqr_read_status,
 },
 {
-	.phy_id		= PHY_ID_AQ2104,
-	.phy_id_mask	= 0xfffffff0,
+	PHY_ID_MATCH_MODEL(PHY_ID_AQ2104),
 	.name		= "Aquantia AQ2104",
 	.features	= PHY_10GBIT_FULL_FEATURES,
 	.aneg_done	= genphy_c45_aneg_done,
@@ -122,8 +120,7 @@ static struct phy_driver aqr_driver[] = {
 	.read_status	= aqr_read_status,
 },
 {
-	.phy_id		= PHY_ID_AQR105,
-	.phy_id_mask	= 0xfffffff0,
+	PHY_ID_MATCH_MODEL(PHY_ID_AQR105),
 	.name		= "Aquantia AQR105",
 	.features	= PHY_10GBIT_FULL_FEATURES,
 	.aneg_done	= genphy_c45_aneg_done,
@@ -133,8 +130,7 @@ static struct phy_driver aqr_driver[] = {
 	.read_status	= aqr_read_status,
 },
 {
-	.phy_id		= PHY_ID_AQR106,
-	.phy_id_mask	= 0xfffffff0,
+	PHY_ID_MATCH_MODEL(PHY_ID_AQR106),
 	.name		= "Aquantia AQR106",
 	.features	= PHY_10GBIT_FULL_FEATURES,
 	.aneg_done	= genphy_c45_aneg_done,
@@ -144,8 +140,7 @@ static struct phy_driver aqr_driver[] = {
 	.read_status	= aqr_read_status,
 },
 {
-	.phy_id		= PHY_ID_AQR107,
-	.phy_id_mask	= 0xfffffff0,
+	PHY_ID_MATCH_MODEL(PHY_ID_AQR107),
 	.name		= "Aquantia AQR107",
 	.features	= PHY_10GBIT_FULL_FEATURES,
 	.aneg_done	= genphy_c45_aneg_done,
@@ -155,8 +150,7 @@ static struct phy_driver aqr_driver[] = {
 	.read_status	= aqr_read_status,
 },
 {
-	.phy_id		= PHY_ID_AQR405,
-	.phy_id_mask	= 0xfffffff0,
+	PHY_ID_MATCH_MODEL(PHY_ID_AQR405),
 	.name		= "Aquantia AQR405",
 	.features	= PHY_10GBIT_FULL_FEATURES,
 	.aneg_done	= genphy_c45_aneg_done,
@@ -170,12 +164,12 @@ static struct phy_driver aqr_driver[] = {
 module_phy_driver(aqr_driver);
 
 static struct mdio_device_id __maybe_unused aqr_tbl[] = {
-	{ PHY_ID_AQ1202, 0xfffffff0 },
-	{ PHY_ID_AQ2104, 0xfffffff0 },
-	{ PHY_ID_AQR105, 0xfffffff0 },
-	{ PHY_ID_AQR106, 0xfffffff0 },
-	{ PHY_ID_AQR107, 0xfffffff0 },
-	{ PHY_ID_AQR405, 0xfffffff0 },
+	{ PHY_ID_MATCH_MODEL(PHY_ID_AQ1202) },
+	{ PHY_ID_MATCH_MODEL(PHY_ID_AQ2104) },
+	{ PHY_ID_MATCH_MODEL(PHY_ID_AQR105) },
+	{ PHY_ID_MATCH_MODEL(PHY_ID_AQR106) },
+	{ PHY_ID_MATCH_MODEL(PHY_ID_AQR107) },
+	{ PHY_ID_MATCH_MODEL(PHY_ID_AQR405) },
 	{ }
 };
 
