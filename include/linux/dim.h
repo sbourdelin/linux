@@ -42,13 +42,13 @@
 #define BIT_GAP(bits, end, start) ((((end) - (start)) + BIT_ULL(bits)) & (BIT_ULL(bits) - 1))
 
 
-struct net_dim_cq_moder {
+struct dim_cq_moder {
 	u16 usec;
 	u16 pkts;
 	u8 cq_period_mode;
 };
 
-struct net_dim_sample {
+struct dim_sample {
 	ktime_t time;
 	u32     pkt_ctr;
 	u32     byte_ctr;
@@ -61,10 +61,10 @@ struct dim_stats {
 	int epms; /* events per msec */
 };
 
-struct net_dim { /* Dynamic Interrupt Moderation */
+struct dim { /* Dynamic Interrupt Moderation */
 	u8                                      state;
 	struct dim_stats                        prev_stats;
-	struct net_dim_sample                   start_sample;
+	struct dim_sample                       start_sample;
 	struct work_struct                      work;
 	u8                                      profile_ix;
 	u8                                      mode;
@@ -105,7 +105,7 @@ enum {
 	DIM_ON_EDGE,
 };
 
-static inline bool dim_on_top(struct net_dim *dim)
+static inline bool dim_on_top(struct dim *dim)
 {
 	switch (dim->tune_state) {
 	case DIM_PARKING_ON_TOP:
@@ -118,7 +118,7 @@ static inline bool dim_on_top(struct net_dim *dim)
 	}
 }
 
-static inline void dim_turn(struct net_dim *dim)
+static inline void dim_turn(struct dim *dim)
 {
 	switch (dim->tune_state) {
 	case DIM_PARKING_ON_TOP:
@@ -135,7 +135,7 @@ static inline void dim_turn(struct net_dim *dim)
 	}
 }
 
-static inline void dim_park_on_top(struct net_dim *dim)
+static inline void dim_park_on_top(struct dim *dim)
 {
 	dim->steps_right  = 0;
 	dim->steps_left   = 0;
@@ -143,17 +143,17 @@ static inline void dim_park_on_top(struct net_dim *dim)
 	dim->tune_state   = DIM_PARKING_ON_TOP;
 }
 
-static inline void dim_park_tired(struct net_dim *dim)
+static inline void dim_park_tired(struct dim *dim)
 {
 	dim->steps_right  = 0;
 	dim->steps_left   = 0;
 	dim->tune_state   = DIM_PARKING_TIRED;
 }
 
-static inline void net_dim_create_sample(u16 event_ctr,
-					 u64 packets,
-					 u64 bytes,
-					 struct net_dim_sample *s)
+static inline void dim_create_sample(u16 event_ctr,
+				     u64 packets,
+				     u64 bytes,
+				     struct dim_sample *s)
 {
 	s->time	     = ktime_get();
 	s->pkt_ctr   = packets;
@@ -161,8 +161,8 @@ static inline void net_dim_create_sample(u16 event_ctr,
 	s->event_ctr = event_ctr;
 }
 
-static inline void dim_calc_stats(struct net_dim_sample *start,
-				  struct net_dim_sample *end,
+static inline void dim_calc_stats(struct dim_sample *start,
+				  struct dim_sample *end,
 				  struct dim_stats *curr_stats)
 {
 	/* u32 holds up to 71 minutes, should be enough */
