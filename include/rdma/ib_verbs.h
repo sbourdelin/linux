@@ -1584,6 +1584,13 @@ enum ib_poll_context {
 	IB_POLL_UNBOUND_WORKQUEUE, /* poll from unbound workqueue */
 };
 
+struct ib_cq_workqueue_poll {
+	struct dim              dim;
+	struct work_struct      work;
+	bool                    dim_used;
+};
+
+
 struct ib_cq {
 	struct ib_device       *device;
 	struct ib_uobject      *uobject;
@@ -1595,8 +1602,8 @@ struct ib_cq {
 	enum ib_poll_context	poll_ctx;
 	struct ib_wc		*wc;
 	union {
-		struct irq_poll		iop;
-		struct work_struct	work;
+		struct irq_poll			iop;
+		struct ib_cq_workqueue_poll	workqueue_poll;
 	};
 	struct workqueue_struct *comp_wq;
 	/*

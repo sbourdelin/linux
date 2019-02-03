@@ -53,6 +53,8 @@ static void __irq_poll_complete(struct irq_poll *iop)
 	list_del(&iop->list);
 	smp_mb__before_atomic();
 	clear_bit_unlock(IRQ_POLL_F_SCHED, &iop->state);
+	if (iop->dim_used)
+		blk_dim(&iop->dim, iop->dim.measuring_sample);
 }
 
 /**
@@ -86,6 +88,7 @@ static void __latent_entropy irq_poll_softirq(struct softirq_action *h)
 	while (!list_empty(list)) {
 		struct irq_poll *iop;
 		int work, weight;
+		struct dim_sample *m_sample;
 
 		/*
 		 * If softirq window is exhausted then punt.
@@ -104,10 +107,16 @@ static void __latent_entropy irq_poll_softirq(struct softirq_action *h)
 		 */
 		iop = list_entry(list->next, struct irq_poll, list);
 
+		m_sample = &iop->dim.measuring_sample;
 		weight = iop->weight;
 		work = 0;
-		if (test_bit(IRQ_POLL_F_SCHED, &iop->state))
+		if (test_bit(IRQ_POLL_F_SCHED, &iop->state)) {
 			work = iop->poll(iop, weight);
+			if (iop->dim_used)
+				dim_create_sample(m_sample->event_ctr + 1, m_sample->pkt_ctr,
+					m_sample->byte_ctr, m_sample->comp_ctr + work,
+						&iop->dim.measuring_sample);
+		}
 
 		budget -= work;
 
@@ -144,6 +153,8 @@ static void __latent_entropy irq_poll_softirq(struct softirq_action *h)
  **/
 void irq_poll_disable(struct irq_poll *iop)
 {
+	if (iop->dim_used)
+		flush_work(&iop->dim.work);
 	set_bit(IRQ_POLL_F_DISABLE, &iop->state);
 	while (test_and_set_bit(IRQ_POLL_F_SCHED, &iop->state))
 		msleep(1);

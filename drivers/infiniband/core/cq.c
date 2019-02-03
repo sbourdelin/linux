@@ -14,6 +14,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <rdma/ib_verbs.h>
+#include <linux/blk_dim.h>
 
 /* # of WCs to poll for with a single call to ib_poll_cq */
 #define IB_POLL_BATCH			16
@@ -25,6 +26,51 @@
 
 #define IB_POLL_FLAGS \
 	(IB_CQ_NEXT_COMP | IB_CQ_REPORT_MISSED_EVENTS)
+
+static bool use_am = true;
+module_param(use_am, bool, 0444);
+MODULE_PARM_DESC(use_am, "Use cq adaptive moderation");
+
+static int ib_cq_dim_modify_cq(struct ib_cq *cq, unsigned short level)
+{
+	u16 usec = blk_dim_prof[level].usec;
+	u16 comps = blk_dim_prof[level].comps;
+
+	return cq->device->modify_cq(cq, comps, usec);
+}
+
+static void update_cq_moderation(struct dim *dim, struct ib_cq *cq)
+{
+	dim->state = DIM_START_MEASURE;
+
+	ib_cq_dim_modify_cq(cq, dim->profile_ix);
+}
+
+static void ib_cq_blk_dim_workqueue_work(struct work_struct *w)
+{
+	struct dim *dim = container_of(w, struct dim, work);
+	struct ib_cq *cq = container_of(dim, struct ib_cq, workqueue_poll.dim);
+
+	update_cq_moderation(dim, cq);
+}
+
+static void ib_cq_blk_dim_irqpoll_work(struct work_struct *w)
+{
+	struct dim *dim = container_of(w, struct dim, work);
+	struct irq_poll *iop = container_of(dim, struct irq_poll, dim);
+	struct ib_cq *cq = container_of(iop, struct ib_cq, iop);
+
+	update_cq_moderation(dim, cq);
+}
+
+void blk_dim_init(struct dim *dim, work_func_t func)
+{
+	memset(dim, 0, sizeof(*dim));
+	dim->state = DIM_START_MEASURE;
+	dim->tune_state = DIM_GOING_RIGHT;
+	dim->profile_ix = BLK_DIM_START_PROFILE;
+	INIT_WORK(&dim->work, func);
+}
 
 static int __ib_process_cq(struct ib_cq *cq, int budget, struct ib_wc *wcs,
 			   int batch)
@@ -105,19 +151,28 @@ static void ib_cq_completion_softirq(struct ib_cq *cq, void *private)
 
 static void ib_cq_poll_work(struct work_struct *work)
 {
-	struct ib_cq *cq = container_of(work, struct ib_cq, work);
+	struct ib_cq *cq = container_of(work, struct ib_cq, workqueue_poll.work);
 	int completed;
+	struct dim_sample e_sample;
+	struct dim_sample *m_sample = &cq->workqueue_poll.dim.measuring_sample;
 
 	completed = __ib_process_cq(cq, IB_POLL_BUDGET_WORKQUEUE, cq->wc,
 				    IB_POLL_BATCH);
+
+	if (cq->workqueue_poll.dim_used)
+		dim_create_sample(m_sample->event_ctr + 1, m_sample->pkt_ctr, m_sample->byte_ctr,
+							m_sample->comp_ctr + completed, &e_sample);
+
 	if (completed >= IB_POLL_BUDGET_WORKQUEUE ||
 	    ib_req_notify_cq(cq, IB_POLL_FLAGS) > 0)
-		queue_work(cq->comp_wq, &cq->work);
+		queue_work(cq->comp_wq, &cq->workqueue_poll.work);
+	else if (cq->workqueue_poll.dim_used)
+		blk_dim(&cq->workqueue_poll.dim, e_sample);
 }
 
 static void ib_cq_completion_workqueue(struct ib_cq *cq, void *private)
 {
-	queue_work(cq->comp_wq, &cq->work);
+	queue_work(cq->comp_wq, &cq->workqueue_poll.work);
 }
 
 /**
@@ -172,12 +227,20 @@ struct ib_cq *__ib_alloc_cq(struct ib_device *dev, void *private,
 		cq->comp_handler = ib_cq_completion_softirq;
 
 		irq_poll_init(&cq->iop, IB_POLL_BUDGET_IRQ, ib_poll_handler);
+		if (cq->device->modify_cq && use_am) {
+			blk_dim_init(&cq->iop.dim, ib_cq_blk_dim_irqpoll_work);
+			cq->iop.dim_used = true;
+		}
 		ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
 		break;
 	case IB_POLL_WORKQUEUE:
 	case IB_POLL_UNBOUND_WORKQUEUE:
 		cq->comp_handler = ib_cq_completion_workqueue;
-		INIT_WORK(&cq->work, ib_cq_poll_work);
+		INIT_WORK(&cq->workqueue_poll.work, ib_cq_poll_work);
+		if (cq->device->modify_cq && use_am) {
+			blk_dim_init(&cq->workqueue_poll.dim, ib_cq_blk_dim_workqueue_work);
+			cq->workqueue_poll.dim_used = true;
+		}
 		ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
 		cq->comp_wq = (cq->poll_ctx == IB_POLL_WORKQUEUE) ?
 				ib_comp_wq : ib_comp_unbound_wq;
@@ -217,7 +280,9 @@ void ib_free_cq(struct ib_cq *cq)
 		break;
 	case IB_POLL_WORKQUEUE:
 	case IB_POLL_UNBOUND_WORKQUEUE:
-		cancel_work_sync(&cq->work);
+		cancel_work_sync(&cq->workqueue_poll.work);
+		if (cq->workqueue_poll.dim_used)
+			flush_work(&cq->iop.dim.work);
 		break;
 	default:
 		WARN_ON_ONCE(1);

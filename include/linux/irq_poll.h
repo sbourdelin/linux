@@ -2,14 +2,21 @@
 #ifndef IRQ_POLL_H
 #define IRQ_POLL_H
 
+#include <linux/blk_dim.h>
+
 struct irq_poll;
 typedef int (irq_poll_fn)(struct irq_poll *, int);
+typedef int (irq_poll_dim_fn)(struct irq_poll *);
 
 struct irq_poll {
 	struct list_head list;
 	unsigned long state;
 	int weight;
 	irq_poll_fn *poll;
+
+	bool dim_used;
+	struct dim dim;
+	irq_poll_dim_fn *dimfn;
 };
 
 enum {

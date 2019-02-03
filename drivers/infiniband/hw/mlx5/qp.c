@@ -6102,7 +6102,7 @@ static void handle_drain_completion(struct ib_cq *cq,
 				irq_poll_enable(&cq->iop);
 				break;
 			case IB_POLL_WORKQUEUE:
-				cancel_work_sync(&cq->work);
+				cancel_work_sync(&cq->workqueue_poll.work);
 				break;
 			default:
 				WARN_ON_ONCE(1);
