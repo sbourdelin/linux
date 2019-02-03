@@ -61,6 +61,7 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
 	u32 vsync = mode->vsync_end - mode->vsync_start;
 	unsigned long rate = mode->clock * 1000;
 	long rounded_rate;
+	long tolerance = 0;
 
 	DRM_DEBUG_DRIVER("Validating modes...\n");
 
@@ -95,10 +96,14 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
 	tcon->dclk_min_div = 6;
 	tcon->dclk_max_div = 127;
 	rounded_rate = clk_round_rate(tcon->dclk, rate);
-	if (rounded_rate < rate)
+	if (tcon->bridge)
+		/* Check against a 1% tolerance for the dot clock for bridge */
+		tolerance = rate / 100;
+
+	if (rounded_rate < (rate - tolerance))
 		return MODE_CLOCK_LOW;
 
-	if (rounded_rate > rate)
+	if (rounded_rate > (rate + tolerance))
 		return MODE_CLOCK_HIGH;
 
 	DRM_DEBUG_DRIVER("Clock rate OK\n");
@@ -172,7 +177,6 @@ static struct drm_encoder_funcs sun4i_rgb_enc_funcs = {
 int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 {
 	struct drm_encoder *encoder;
-	struct drm_bridge *bridge;
 	struct sun4i_rgb *rgb;
 	int ret;
 
@@ -183,7 +187,7 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 	encoder = &rgb->encoder;
 
 	ret = drm_of_find_panel_or_bridge(tcon->dev->of_node, 1, 0,
-					  &tcon->panel, &bridge);
+					  &tcon->panel, &tcon->bridge);
 	if (ret) {
 		dev_info(drm->dev, "No panel or bridge found... RGB output disabled\n");
 		return 0;
@@ -225,8 +229,8 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 		}
 	}
 
-	if (bridge) {
-		ret = drm_bridge_attach(encoder, bridge, NULL);
+	if (tcon->bridge) {
+		ret = drm_bridge_attach(encoder, tcon->bridge, NULL);
 		if (ret) {
 			dev_err(drm->dev, "Couldn't attach our bridge\n");
 			goto err_cleanup_connector;
