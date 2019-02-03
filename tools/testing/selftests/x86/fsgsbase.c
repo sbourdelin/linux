@@ -379,7 +379,7 @@ static void test_unexpected_base(void)
 	}
 }
 
-int main()
+int test()
 {
 	pthread_t thread;
 
@@ -434,6 +434,31 @@ int main()
 
 	if (pthread_join(thread, NULL) != 0)
 		err(1, "pthread_join");
+
+	return nerrs == 0 ? 0 : 1;
+}
+
+int main()
+{
+	int tries = 5000;
+	int i;
+
+	if (tries > 1)
+		quiet = true;
+
+	for (i = 0; i < tries; i++) {
+		if (test() != 0)
+			break;
+	}
+
+	if (quiet) {
+		if (nerrs) {
+			printf("[FAIL] %d errors detected in %d tries\n",
+				nerrs, i + 1);
+		} else {
+			printf("[PASS] %d runs succeeded\n", i);
+		}
+	}
 
 	return nerrs == 0 ? 0 : 1;
 }
