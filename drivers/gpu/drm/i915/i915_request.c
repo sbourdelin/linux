@@ -377,12 +377,24 @@ void __i915_request_submit(struct i915_request *request)
 
 	/* We may be recursing from the signal callback of another i915 fence */
 	spin_lock_nested(&request->lock, SINGLE_DEPTH_NESTING);
+
 	GEM_BUG_ON(test_bit(I915_FENCE_FLAG_ACTIVE, &request->fence.flags));
 	set_bit(I915_FENCE_FLAG_ACTIVE, &request->fence.flags);
+
 	request->global_seqno = seqno;
 	if (test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &request->fence.flags) &&
 	    !i915_request_enable_breadcrumb(request))
 		intel_engine_queue_breadcrumbs(engine);
+
+	/*
+	 * As we do not allow WAIT to preempt inflight requests,
+	 * once we have executed a request, along with triggering
+	 * any execution callbacks, we must preserve its ordering
+	 * within the non-preemptible FIFO.
+	 */
+	BUILD_BUG_ON(__NO_PREEMPTION & ~I915_PRIORITY_MASK); /* only internal */
+	request->sched.attr.priority |= __NO_PREEMPTION;
+
 	spin_unlock(&request->lock);
 
 	engine->emit_fini_breadcrumb(request,
