@@ -2500,6 +2500,7 @@ static int snd_pcm_open_file(struct file *file,
 		return -ENOMEM;
 	}
 	pcm_file->substream = substream;
+	pcm_file->perm = 0;
 	if (substream->ref_count == 1)
 		substream->pcm_release = pcm_release_private;
 	file->private_data = pcm_file;
@@ -2892,17 +2893,30 @@ static int snd_pcm_anonymous_dup(struct file *file,
 	int fd, err, perm, flags;
 	struct file *nfile;
 	struct snd_pcm *pcm = substream->pcm;
+	struct snd_pcm_file *pcm_file;
+	const char *aname;
+	const struct file_operations *f_op;
 
 	if (get_user(perm, arg))
 		return -EFAULT;
-	if (perm < 0)
-		return -EPERM;
+	switch (perm) {
+	case SNDRV_PCM_PERM_MODE_FULL:
+		aname = "snd-pcm";
+		f_op = file->f_op;
+		break;
+	case SNDRV_PCM_PERM_MODE_BUFFER:
+		aname = "snd-pcm-buf";
+		f_op = &snd_pcm_f_op_buffer;
+		break;
+	default:
+		return -EINVAL;
+	}
 	flags = file->f_flags & (O_ACCMODE | O_NONBLOCK);
 	flags |= O_APPEND | O_CLOEXEC;
 	fd = get_unused_fd_flags(flags);
 	if (fd < 0)
 		return fd;
-	nfile = anon_inode_getfile("snd-pcm", file->f_op, NULL, flags);
+	nfile = anon_inode_getfile(aname, f_op, NULL, flags);
 	if (IS_ERR(nfile)) {
 		put_unused_fd(fd);
 		return PTR_ERR(nfile);
@@ -2920,6 +2934,8 @@ static int snd_pcm_anonymous_dup(struct file *file,
 	err = snd_pcm_open_file(nfile, substream->pcm,
 				substream->stream, substream->number);
 	if (err >= 0) {
+		pcm_file = nfile->private_data;
+		pcm_file->perm = perm;
 		put_user(fd, arg);
 		return 0;
 	}
@@ -3303,6 +3319,8 @@ static int snd_pcm_mmap_status(struct snd_pcm_substream *substream, struct file 
 	if (pcm_file->user_pversion < SNDRV_PROTOCOL_VERSION(2, 0, 14) &&
 	    (pcm_file->substream->runtime->hw.info & SNDRV_PCM_INFO_SYNC_APPLPTR))
 		return -ENXIO;
+	if (pcm_file->perm != SNDRV_PCM_PERM_MODE_FULL)
+		return -EPERM;
 	if (!(area->vm_flags & VM_READ))
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
@@ -3348,6 +3366,8 @@ static int snd_pcm_mmap_control(struct snd_pcm_substream *substream, struct file
 	 */
 	if (pcm_file->substream->runtime->hw.info & SNDRV_PCM_INFO_SYNC_APPLPTR)
 		return -ENXIO;
+	if (pcm_file->perm != SNDRV_PCM_PERM_MODE_FULL)
+		return -EPERM;
 	if (!(area->vm_flags & VM_READ))
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
@@ -3723,6 +3743,14 @@ static unsigned long snd_pcm_get_unmapped_area(struct file *file,
 /*
  *  Register section
  */
+
+const struct file_operations snd_pcm_f_op_buffer = {
+	.owner =		THIS_MODULE,
+	.release =		snd_pcm_release,
+	.llseek =		no_llseek,
+	.mmap =			snd_pcm_mmap,
+	.get_unmapped_area =	snd_pcm_get_unmapped_area
+};
 
 const struct file_operations snd_pcm_f_ops[2] = {
 	{
