@@ -717,7 +717,8 @@ static int dsu_pmu_device_probe(struct platform_device *pdev)
 
 	dsu_pmu->irq = irq;
 	platform_set_drvdata(pdev, dsu_pmu);
-	rc = cpuhp_state_add_instance(dsu_pmu_cpuhp_state,
+	cpus_read_lock();
+	rc = cpuhp_state_add_instance_cpuslocked(dsu_pmu_cpuhp_state,
 						&dsu_pmu->cpuhp_node);
 	if (rc)
 		return rc;
@@ -738,9 +739,10 @@ static int dsu_pmu_device_probe(struct platform_device *pdev)
 	};
 
 	rc = perf_pmu_register(&dsu_pmu->pmu, name, -1);
+	cpus_read_unlock();
 	if (rc) {
-		cpuhp_state_remove_instance(dsu_pmu_cpuhp_state,
-						 &dsu_pmu->cpuhp_node);
+		cpuhp_state_remove_instance_nocalls(dsu_pmu_cpuhp_state,
+						    &dsu_pmu->cpuhp_node);
 		irq_set_affinity_hint(dsu_pmu->irq, NULL);
 	}
 
