@@ -599,14 +599,23 @@ static const struct vb2_buf_ops v4l2_buf_ops = {
 };
 
 int vb2_find_timestamp(const struct vb2_queue *q, u64 timestamp,
-		       unsigned int start_idx)
+		       const struct vb2_buffer *match, unsigned int start_idx)
 {
 	unsigned int i;
 
 	for (i = start_idx; i < q->num_buffers; i++)
 		if (q->bufs[i]->copied_timestamp &&
-		    q->bufs[i]->timestamp == timestamp)
-			return i;
+		    q->bufs[i]->timestamp == timestamp &&
+		    q->bufs[i]->num_planes == match->num_planes) {
+			unsigned int p;
+
+			for (p = 0; p < match->num_planes; p++)
+				if (q->bufs[i]->planes[p].length <
+				    match->planes[p].length)
+					break;
+			if (p == match->num_planes)
+				return i;
+		}
 	return -1;
 }
 EXPORT_SYMBOL_GPL(vb2_find_timestamp);

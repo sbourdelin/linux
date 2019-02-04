@@ -60,6 +60,7 @@ struct vb2_v4l2_buffer {
  *
  * @q:		pointer to &struct vb2_queue with videobuf2 queue.
  * @timestamp:	the timestamp to find.
+ * @match:	the properties of the buffer to find must match this buffer.
  * @start_idx:	the start index (usually 0) in the buffer array to start
  *		searching from. Note that there may be multiple buffers
  *		with the same timestamp value, so you can restart the search
@@ -69,7 +70,7 @@ struct vb2_v4l2_buffer {
  * -1 if no buffer with @timestamp was found.
  */
 int vb2_find_timestamp(const struct vb2_queue *q, u64 timestamp,
-		       unsigned int start_idx);
+		       const struct vb2_buffer *match, unsigned int start_idx);
 
 int vb2_querybuf(struct vb2_queue *q, struct v4l2_buffer *b);
 
