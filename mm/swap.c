@@ -133,6 +133,27 @@ void put_pages_list(struct list_head *pages)
 }
 EXPORT_SYMBOL(put_pages_list);
 
+/**
+ * put_user_page() - release a gup-pinned page
+ * @page:            pointer to page to be released
+ *
+ * Pages that were pinned via get_user_pages*() must be released via
+ * either put_user_page(), or one of the put_user_pages*() routines
+ * below. This is so that eventually, pages that are pinned via
+ * get_user_pages*() can be separately tracked and uniquely handled. In
+ * particular, interactions with RDMA and filesystems need special
+ * handling.
+ */
+void put_user_page(struct page *page)
+{
+	page = compound_head(page);
+
+	VM_BUG_ON_PAGE(page_ref_count(page) < GUP_PIN_COUNTING_BIAS, page);
+
+	page_ref_sub(page, GUP_PIN_COUNTING_BIAS);
+}
+EXPORT_SYMBOL(put_user_page);
+
 typedef int (*set_dirty_func)(struct page *page);
 
 static void __put_user_pages_dirty(struct page **pages,

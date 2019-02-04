@@ -25,6 +25,26 @@ struct follow_page_context {
 	unsigned int page_mask;
 };
 
+/**
+ * get_gup_pin_page() - mark a page as being used by get_user_pages().
+ * @page:	pointer to page to be marked
+ * @Returns:	0 for success, -EOVERFLOW if the page refcount would have
+ *		overflowed.
+ *
+ */
+int get_gup_pin_page(struct page *page)
+{
+	page = compound_head(page);
+
+	if (page_ref_count(page) >= (UINT_MAX - GUP_PIN_COUNTING_BIAS)) {
+		WARN_ONCE(1, "get_user_pages pin count overflowed");
+		return -EOVERFLOW;
+	}
+
+	page_ref_add(page, GUP_PIN_COUNTING_BIAS);
+	return 0;
+}
+
 static struct page *no_page_table(struct vm_area_struct *vma,
 		unsigned int flags)
 {
@@ -157,8 +177,14 @@ retry:
 		goto retry;
 	}
 
-	if (flags & FOLL_GET)
-		get_page(page);
+	if (flags & FOLL_GET) {
+		int ret = get_gup_pin_page(page);
+
+		if (ret) {
+			page = ERR_PTR(ret);
+			goto out;
+		}
+	}
 	if (flags & FOLL_TOUCH) {
 		if ((flags & FOLL_WRITE) &&
 		    !pte_dirty(pte) && !PageDirty(page))
@@ -497,7 +523,10 @@ static int get_gate_page(struct mm_struct *mm, unsigned long address,
 		if (is_device_public_page(*page))
 			goto unmap;
 	}
-	get_page(*page);
+
+	ret = get_gup_pin_page(*page);
+	if (ret)
+		goto unmap;
 out:
 	ret = 0;
 unmap:
@@ -1429,11 +1458,11 @@ static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
 		page = pte_page(pte);
 		head = compound_head(page);
 
-		if (!page_cache_get_speculative(head))
+		if (!page_cache_gup_pin_speculative(head))
 			goto pte_unmap;
 
 		if (unlikely(pte_val(pte) != pte_val(*ptep))) {
-			put_page(head);
+			put_user_page(head);
 			goto pte_unmap;
 		}
 
@@ -1488,7 +1517,11 @@ static int __gup_device_huge(unsigned long pfn, unsigned long addr,
 		}
 		SetPageReferenced(page);
 		pages[*nr] = page;
-		get_page(page);
+		if (get_gup_pin_page(page)) {
+			undo_dev_pagemap(nr, nr_start, pages);
+			return 0;
+		}
+
 		(*nr)++;
 		pfn++;
 	} while (addr += PAGE_SIZE, addr != end);
@@ -1569,15 +1602,14 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
 	} while (addr += PAGE_SIZE, addr != end);
 
 	head = compound_head(pmd_page(orig));
-	if (!page_cache_add_speculative(head, refs)) {
+	if (!page_cache_gup_pin_speculative(head)) {
 		*nr -= refs;
 		return 0;
 	}
 
 	if (unlikely(pmd_val(orig) != pmd_val(*pmdp))) {
 		*nr -= refs;
-		while (refs--)
-			put_page(head);
+		put_user_page(head);
 		return 0;
 	}
 
@@ -1607,15 +1639,14 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
 	} while (addr += PAGE_SIZE, addr != end);
 
 	head = compound_head(pud_page(orig));
-	if (!page_cache_add_speculative(head, refs)) {
+	if (!page_cache_gup_pin_speculative(head)) {
 		*nr -= refs;
 		return 0;
 	}
 
 	if (unlikely(pud_val(orig) != pud_val(*pudp))) {
 		*nr -= refs;
-		while (refs--)
-			put_page(head);
+		put_user_page(head);
 		return 0;
 	}
 
@@ -1644,15 +1675,14 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
 	} while (addr += PAGE_SIZE, addr != end);
 
 	head = compound_head(pgd_page(orig));
-	if (!page_cache_add_speculative(head, refs)) {
+	if (!page_cache_gup_pin_speculative(head)) {
 		*nr -= refs;
 		return 0;
 	}
 
 	if (unlikely(pgd_val(orig) != pgd_val(*pgdp))) {
 		*nr -= refs;
-		while (refs--)
-			put_page(head);
+		put_user_page(head);
 		return 0;
 	}
 
