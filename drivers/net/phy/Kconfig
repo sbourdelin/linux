@@ -87,6 +87,20 @@ config MDIO_BUS_MUX_MMIOREG
 
 	  Currently, only 8/16/32 bits registers are supported.
 
+config MDIO_BUS_MUX_REGMAP
+	tristate "regmap device controlled MDIO bus multiplexers"
+	depends on OF_MDIO && REGMAP
+	select MDIO_BUS_MUX
+	help
+	  This module provides a driver for MDIO bus multiplexers that
+	  are controlled via a regmap device, like an FPGA connected to i2c bus
+	  or spi bus or memory mapped FPGA.
+	  The multiplexer connects one of several child MDIO busses to a
+	  parent bus.  Child bus selection is under the control of one of
+	  the FPGA's registers.
+
+	  Currently, only 32 bits registers are supported.
+
 config MDIO_CAVIUM
 	tristate
 

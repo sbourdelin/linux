@@ -29,4 +29,38 @@ int mdio_mux_init(struct device *dev,
 
 void mdio_mux_uninit(void *mux_handle);
 
+#ifdef CONFIG_MDIO_BUS_MUX_REGMAP
+/**
+ * mdio_mux_regmap_init - control MDIO bus muxing using regmap constructs.
+ * @dev: device with which regmap construct is associated.
+ * @mux_node: mdio bus mux node that contains parent mdio bus phandle.
+ *	      This node also contains sub nodes, where each subnode denotes
+ *	      a child mdio bus. All the child mdio buses are muxed, i.e. at a
+ *	      time only one of the child mdio buses can be used.
+ * @data: to store the address of data allocated by this function
+ */
+int mdio_mux_regmap_init(struct device *dev,
+			 struct device_node *mux_node,
+			 void **data);
+
+/**
+ * mdio_mux_regmap_uninit - relinquish the control of MDIO bus muxing using
+ *			    regmap constructs.
+ * @data: address of data allocated by mdio_mux_regmap_init
+ */
+int mdio_mux_regmap_uninit(void *data);
+#else /* CONFIG_MDIO_BUS_MUX_REGMAP */
+static inline int mdio_mux_regmap_init(struct device *dev,
+				       struct device_node *mux_node,
+				       void **data)
+{
+	return -ENODEV;
+}
+
+static inline int mdio_mux_regmap_uninit(void *data)
+{
+	return 0;
+}
+#endif /* CONFIG_MDIO_BUS_MUX_REGMAP */
+
 #endif /* __LINUX_MDIO_MUX_H */
