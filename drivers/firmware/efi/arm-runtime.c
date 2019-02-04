@@ -44,7 +44,8 @@ static int __init ptdump_init(void)
 	if (!efi_enabled(EFI_RUNTIME_SERVICES))
 		return 0;
 
-	return ptdump_debugfs_register(&efi_ptdump_info, "efi_page_tables");
+	ptdump_debugfs_register(&efi_ptdump_info, "efi_page_tables");
+	return 0;
 }
 device_initcall(ptdump_init);
 
