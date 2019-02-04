@@ -912,7 +912,7 @@ static void start_dma(struct net2280_ep *ep, struct net2280_request *req)
 	tmp = dmactl_default;
 
 	/* force packet boundaries between dma requests, but prevent the
-	 * controller from automagically writing a last "short" packet
+	 * controller from automatically writing a last "short" packet
 	 * (zero length) unless the driver explicitly said to do that.
 	 */
 	if (ep->is_in) {
