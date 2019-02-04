@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/phy.h>
+#include <linux/bitfield.h>
 
 #define PHY_ID_AQ1202	0x03a1b445
 #define PHY_ID_AQ2104	0x03a1b460
@@ -33,6 +34,21 @@
 
 #define MDIO_AN_TX_VEND_INT_MASK2		0xd401
 #define MDIO_AN_TX_VEND_INT_MASK2_LINK		BIT(0)
+
+/* PHY XS System Interface Connection Status */
+#define MDIO_XS_SYSIF_STATUS			0xe812
+#define MDIO_XS_SYSIF_MODE_MASK			GENMASK(7, 3)
+#define MDIO_XS_SYSIF_MODE_BACKPLANE_KR		0
+#define MDIO_XS_SYSIF_MODE_BACKPLANE_KX		1
+#define MDIO_XS_SYSIF_MODE_XFI			2
+#define MDIO_XS_SYSIF_MODE_USXGMII		3
+#define MDIO_XS_SYSIF_MODE_XAUI			4
+#define MDIO_XS_SYSIF_MODE_XAUI_PAUSE		5
+#define MDIO_XS_SYSIF_MODE_SGMII		6
+#define MDIO_XS_SYSIF_MODE_RXAUI		7
+#define MDIO_XS_SYSIF_MODE_MAC			8
+#define MDIO_XS_SYSIF_MODE_OFF			9
+#define MDIO_XS_SYSIF_MODE_OCSGMII		10
 
 /* Vendor specific 1, MDIO_MMD_VEND1 */
 #define VEND1_GLOBAL_INT_STD_STATUS		0xfc00
@@ -157,6 +173,27 @@ static int aqr_read_status(struct phy_device *phydev)
 	}
 
 	phydev->duplex = !!(reg & MDIO_AN_TX_VEND_STATUS1_FULL_DUPLEX);
+
+	reg = phy_read_mmd(phydev, MDIO_MMD_PHYXS, MDIO_XS_SYSIF_STATUS);
+
+	switch (FIELD_GET(MDIO_XS_SYSIF_MODE_MASK, reg)) {
+	case MDIO_XS_SYSIF_MODE_BACKPLANE_KR:
+		phydev->interface = PHY_INTERFACE_MODE_10GKR;
+		break;
+	case MDIO_XS_SYSIF_MODE_SGMII:
+		phydev->interface = PHY_INTERFACE_MODE_SGMII;
+		break;
+	case MDIO_XS_SYSIF_MODE_XAUI:
+	case MDIO_XS_SYSIF_MODE_XAUI_PAUSE:
+		phydev->interface = PHY_INTERFACE_MODE_XAUI;
+		break;
+	case MDIO_XS_SYSIF_MODE_RXAUI:
+		phydev->interface = PHY_INTERFACE_MODE_RXAUI;
+		break;
+	default:
+		phydev->interface = PHY_INTERFACE_MODE_NA;
+		break;
+	}
 
 	return 0;
 }
