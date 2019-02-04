@@ -579,11 +579,11 @@ static inline int snd_pcm_suspend_all(struct snd_pcm *pcm)
 }
 #endif
 int snd_pcm_kernel_ioctl(struct snd_pcm_substream *substream, unsigned int cmd, void *arg);
-int snd_pcm_open_substream(struct snd_pcm *pcm, int stream, struct file *file,
-			   struct snd_pcm_substream **rsubstream);
+int snd_pcm_open_substream(struct snd_pcm *pcm, int stream, int subdevice,
+                           struct file *file, struct snd_pcm_substream **rsubstream);
 void snd_pcm_release_substream(struct snd_pcm_substream *substream);
-int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream, struct file *file,
-			     struct snd_pcm_substream **rsubstream);
+int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream, int subdevice,
+			     struct file *file, struct snd_pcm_substream **rsubstream);
 void snd_pcm_detach_substream(struct snd_pcm_substream *substream);
 int snd_pcm_mmap_data(struct snd_pcm_substream *substream, struct file *file, struct vm_area_struct *area);
 

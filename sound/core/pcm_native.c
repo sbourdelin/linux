@@ -37,6 +37,8 @@
 #include <sound/minors.h>
 #include <linux/uio.h>
 #include <linux/delay.h>
+#include <linux/anon_inodes.h>
+#include <linux/syscalls.h>
 
 #include "pcm_local.h"
 
@@ -2435,14 +2437,17 @@ void snd_pcm_release_substream(struct snd_pcm_substream *substream)
 }
 EXPORT_SYMBOL(snd_pcm_release_substream);
 
-int snd_pcm_open_substream(struct snd_pcm *pcm, int stream,
+int snd_pcm_open_substream(struct snd_pcm *pcm, int stream, int subdevice,
 			   struct file *file,
 			   struct snd_pcm_substream **rsubstream)
 {
 	struct snd_pcm_substream *substream;
 	int err;
 
-	err = snd_pcm_attach_substream(pcm, stream, file, &substream);
+	if (subdevice < 0 && pcm)
+		subdevice = snd_ctl_get_preferred_subdevice(pcm->card, SND_CTL_SUBDEV_PCM);
+
+	err = snd_pcm_attach_substream(pcm, stream, subdevice, file, &substream);
 	if (err < 0)
 		return err;
 	if (substream->ref_count > 1) {
@@ -2478,13 +2483,14 @@ EXPORT_SYMBOL(snd_pcm_open_substream);
 
 static int snd_pcm_open_file(struct file *file,
 			     struct snd_pcm *pcm,
-			     int stream)
+			     int stream,
+			     int subdevice)
 {
 	struct snd_pcm_file *pcm_file;
 	struct snd_pcm_substream *substream;
 	int err;
 
-	err = snd_pcm_open_substream(pcm, stream, file, &substream);
+	err = snd_pcm_open_substream(pcm, stream, subdevice, file, &substream);
 	if (err < 0)
 		return err;
 
@@ -2549,7 +2555,7 @@ static int snd_pcm_open(struct file *file, struct snd_pcm *pcm, int stream)
 	add_wait_queue(&pcm->open_wait, &wait);
 	mutex_lock(&pcm->open_mutex);
 	while (1) {
-		err = snd_pcm_open_file(file, pcm, stream);
+		err = snd_pcm_open_file(file, pcm, stream, -1);
 		if (err >= 0)
 			break;
 		if (err == -EAGAIN) {
@@ -2593,6 +2599,9 @@ static int snd_pcm_release(struct inode *inode, struct file *file)
 	struct snd_pcm_file *pcm_file;
 
 	pcm_file = file->private_data;
+	/* a problem in the anonymous dup can hit the NULL pcm_file */
+	if (pcm_file == NULL)
+		return 0;
 	substream = pcm_file->substream;
 	if (snd_BUG_ON(!substream))
 		return -ENXIO;
@@ -2876,6 +2885,52 @@ static int snd_pcm_forward_ioctl(struct snd_pcm_substream *substream,
 	return result < 0 ? result : 0;
 }
 
+static int snd_pcm_anonymous_dup(struct file *file,
+				 struct snd_pcm_substream *substream,
+				 int __user *arg)
+{
+	int fd, err, perm, flags;
+	struct file *nfile;
+	struct snd_pcm *pcm = substream->pcm;
+
+	if (get_user(perm, arg))
+		return -EFAULT;
+	if (perm < 0)
+		return -EPERM;
+	flags = file->f_flags & (O_ACCMODE | O_NONBLOCK);
+	flags |= O_APPEND | O_CLOEXEC;
+	fd = get_unused_fd_flags(flags);
+	if (fd < 0)
+		return fd;
+	nfile = anon_inode_getfile("snd-pcm", file->f_op, NULL, flags);
+	if (IS_ERR(nfile)) {
+		put_unused_fd(fd);
+		return PTR_ERR(nfile);
+	}
+	/* anon_inode_getfile() filters the O_APPEND flag out */
+	nfile->f_flags |= O_APPEND;
+	fd_install(fd, nfile);
+	if (!try_module_get(pcm->card->module)) {
+		err = -EFAULT;
+		goto __error1;
+	}
+	err = snd_card_file_add(pcm->card, nfile);
+	if (err < 0)
+		goto __error2;
+	err = snd_pcm_open_file(nfile, substream->pcm,
+				substream->stream, substream->number);
+	if (err >= 0) {
+		put_user(fd, arg);
+		return 0;
+	}
+	snd_card_file_remove(pcm->card, nfile);
+      __error2:
+	module_put(pcm->card->module);
+      __error1:
+	ksys_close(fd);
+	return err;
+}
+
 static int snd_pcm_common_ioctl(struct file *file,
 				 struct snd_pcm_substream *substream,
 				 unsigned int cmd, void __user *arg)
@@ -2904,6 +2959,8 @@ static int snd_pcm_common_ioctl(struct file *file,
 			     (unsigned int __user *)arg))
 			return -EFAULT;
 		return 0;
+	case SNDRV_PCM_IOCTL_ANONYMOUS_DUP:
+		return snd_pcm_anonymous_dup(file, substream, (int __user *)arg);
 	case SNDRV_PCM_IOCTL_HW_REFINE:
 		return snd_pcm_hw_refine_user(substream, arg);
 	case SNDRV_PCM_IOCTL_HW_PARAMS:
