@@ -3293,6 +3293,16 @@ static int snd_pcm_mmap_status(struct snd_pcm_substream *substream, struct file 
 			       struct vm_area_struct *area)
 {
 	long size;
+	struct snd_pcm_file *pcm_file = file->private_data;
+	if (pcm_file->no_compat_mmap)
+		return -ENXIO;
+	/* See snd_pcm_mmap_control() below.
+	 * Since older alsa-lib requires both status and control mmaps to be
+	 * coupled, we have to disable the status mmap for old alsa-lib, too.
+	 */
+	if (pcm_file->user_pversion < SNDRV_PROTOCOL_VERSION(2, 0, 14) &&
+	    (pcm_file->substream->runtime->hw.info & SNDRV_PCM_INFO_SYNC_APPLPTR))
+		return -ENXIO;
 	if (!(area->vm_flags & VM_READ))
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
@@ -3329,6 +3339,15 @@ static int snd_pcm_mmap_control(struct snd_pcm_substream *substream, struct file
 				struct vm_area_struct *area)
 {
 	long size;
+	struct snd_pcm_file *pcm_file = file->private_data;
+	if (pcm_file->no_compat_mmap)
+		return -ENXIO;
+	/* Disallow the control mmap when SYNC_APPLPTR flag is set;
+	 * it enforces the user-space to fall back to snd_pcm_sync_ptr(),
+	 * thus it effectively assures the manual update of appl_ptr.
+	 */
+	if (pcm_file->substream->runtime->hw.info & SNDRV_PCM_INFO_SYNC_APPLPTR)
+		return -ENXIO;
 	if (!(area->vm_flags & VM_READ))
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
@@ -3340,50 +3359,23 @@ static int snd_pcm_mmap_control(struct snd_pcm_substream *substream, struct file
 	return 0;
 }
 
-static bool pcm_status_mmap_allowed(struct snd_pcm_file *pcm_file)
-{
-	if (pcm_file->no_compat_mmap)
-		return false;
-	/* See pcm_control_mmap_allowed() below.
-	 * Since older alsa-lib requires both status and control mmaps to be
-	 * coupled, we have to disable the status mmap for old alsa-lib, too.
-	 */
-	if (pcm_file->user_pversion < SNDRV_PROTOCOL_VERSION(2, 0, 14) &&
-	    (pcm_file->substream->runtime->hw.info & SNDRV_PCM_INFO_SYNC_APPLPTR))
-		return false;
-	return true;
-}
-
-static bool pcm_control_mmap_allowed(struct snd_pcm_file *pcm_file)
-{
-	if (pcm_file->no_compat_mmap)
-		return false;
-	/* Disallow the control mmap when SYNC_APPLPTR flag is set;
-	 * it enforces the user-space to fall back to snd_pcm_sync_ptr(),
-	 * thus it effectively assures the manual update of appl_ptr.
-	 */
-	if (pcm_file->substream->runtime->hw.info & SNDRV_PCM_INFO_SYNC_APPLPTR)
-		return false;
-	return true;
-}
-
 #else /* ! coherent mmap */
+
 /*
  * don't support mmap for status and control records.
  */
-#define pcm_status_mmap_allowed(pcm_file)	false
-#define pcm_control_mmap_allowed(pcm_file)	false
-
 static int snd_pcm_mmap_status(struct snd_pcm_substream *substream, struct file *file,
 			       struct vm_area_struct *area)
 {
 	return -ENXIO;
 }
+
 static int snd_pcm_mmap_control(struct snd_pcm_substream *substream, struct file *file,
 				struct vm_area_struct *area)
 {
 	return -ENXIO;
 }
+
 #endif /* coherent mmap */
 
 static inline struct page *
@@ -3557,12 +3549,8 @@ static int snd_pcm_mmap(struct file *file, struct vm_area_struct *area)
 	offset = area->vm_pgoff << PAGE_SHIFT;
 	switch (offset) {
 	case SNDRV_PCM_MMAP_OFFSET_STATUS:
-		if (!pcm_status_mmap_allowed(pcm_file))
-			return -ENXIO;
 		return snd_pcm_mmap_status(substream, file, area);
 	case SNDRV_PCM_MMAP_OFFSET_CONTROL:
-		if (!pcm_control_mmap_allowed(pcm_file))
-			return -ENXIO;
 		return snd_pcm_mmap_control(substream, file, area);
 	default:
 		return snd_pcm_mmap_data(substream, file, area);
