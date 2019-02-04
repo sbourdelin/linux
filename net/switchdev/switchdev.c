@@ -594,20 +594,18 @@ EXPORT_SYMBOL_GPL(call_switchdev_blocking_notifiers);
 bool switchdev_port_same_parent_id(struct net_device *a,
 				   struct net_device *b)
 {
-	struct switchdev_attr a_attr = {
-		.orig_dev = a,
-		.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
-	};
-	struct switchdev_attr b_attr = {
-		.orig_dev = b,
-		.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
-	};
+	struct netdev_phys_item_id id_a = { };
+	struct netdev_phys_item_id id_b = { };
 
-	if (switchdev_port_attr_get(a, &a_attr) ||
-	    switchdev_port_attr_get(b, &b_attr))
+	if (!a->netdev_ops->ndo_get_port_parent_id ||
+	    !b->netdev_ops->ndo_get_port_parent_id)
+		return -EOPNOTSUPP;
+
+	if (a->netdev_ops->ndo_get_port_parent_id(a, &id_a) ||
+	    b->netdev_ops->ndo_get_port_parent_id(b, &id_b))
 		return false;
 
-	return netdev_phys_item_id_same(&a_attr.u.ppid, &b_attr.u.ppid);
+	return netdev_phys_item_id_same(&id_a, &id_b);
 }
 EXPORT_SYMBOL_GPL(switchdev_port_same_parent_id);
 

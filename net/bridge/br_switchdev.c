@@ -24,18 +24,13 @@ static int br_switchdev_mark_get(struct net_bridge *br, struct net_device *dev)
 int nbp_switchdev_mark_set(struct net_bridge_port *p)
 {
 	const struct net_device_ops *ops = p->dev->netdev_ops;
-	struct switchdev_attr attr = {
-		.orig_dev = p->dev,
-		.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
-	};
-	int err;
+	struct netdev_phys_item_id ppid = { };
+	int err = -EOPNOTSUPP;
 
 	ASSERT_RTNL();
 
 	if (ops->ndo_get_port_parent_id)
-		err = ops->ndo_get_port_parent_id(p->dev, &attr.u.ppid);
-	else
-		err = switchdev_port_attr_get(p->dev, &attr);
+		err = ops->ndo_get_port_parent_id(p->dev, &ppid);
 	if (err) {
 		if (err == -EOPNOTSUPP)
 			return 0;
