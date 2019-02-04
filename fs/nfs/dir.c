@@ -671,7 +671,7 @@ int nfs_readdir_filler(nfs_readdir_descriptor_t *desc, struct page* page)
 
 	if (invalidate_inode_pages2_range(inode->i_mapping, page->index + 1, -1) < 0) {
 		/* Should never happen */
-		nfs_zap_mapping(inode, inode->i_mapping);
+		nfs_zap_mapping(inode);
 	}
 	unlock_page(page);
 	return 0;

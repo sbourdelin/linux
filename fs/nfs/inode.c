@@ -247,9 +247,9 @@ void nfs_zap_caches(struct inode *inode)
 	spin_unlock(&inode->i_lock);
 }
 
-void nfs_zap_mapping(struct inode *inode, struct address_space *mapping)
+void nfs_zap_mapping(struct inode *inode)
 {
-	if (mapping->nrpages != 0) {
+	if (inode->i_mapping->nrpages != 0) {
 		spin_lock(&inode->i_lock);
 		nfs_set_cache_invalid(inode, NFS_INO_INVALID_DATA);
 		spin_unlock(&inode->i_lock);

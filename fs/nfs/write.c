@@ -237,12 +237,6 @@ out:
 	spin_unlock(&inode->i_lock);
 }
 
-/* A writeback failed: mark the page as bad, and invalidate the page cache */
-static void nfs_set_pageerror(struct page *page)
-{
-	nfs_zap_mapping(page_file_mapping(page)->host, page_file_mapping(page));
-}
-
 /*
  * nfs_page_group_search_locked
  * @head - head request of page group
@@ -994,7 +988,7 @@ static void nfs_write_completion(struct nfs_pgio_header *hdr)
 		nfs_list_remove_request(req);
 		if (test_bit(NFS_IOHDR_ERROR, &hdr->flags) &&
 		    (hdr->good_bytes < bytes)) {
-			nfs_set_pageerror(req->wb_page);
+			nfs_zap_mapping(hdr->inode);
 			nfs_context_set_write_error(req->wb_context, hdr->error);
 			goto remove_req;
 		}
@@ -1366,7 +1360,7 @@ int nfs_updatepage(struct file *file, struct page *page,
 
 	status = nfs_writepage_setup(ctx, page, offset, count);
 	if (status < 0)
-		nfs_set_pageerror(page);
+		nfs_zap_mapping(file_inode(file));
 	else
 		__set_page_dirty_nobuffers(page);
 out:
