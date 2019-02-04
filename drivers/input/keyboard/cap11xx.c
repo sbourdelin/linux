@@ -312,7 +312,11 @@ static int cap11xx_init_leds(struct device *dev,
 		led->reg = reg;
 		led->priv = priv;
 
-		INIT_WORK(&led->work, cap11xx_led_work);
+		error = devm_init_work(dev, &led->work, cap11xx_led_work);
+		if (error) {
+			of_node_put(child);
+			return error;
+		}
 
 		error = devm_led_classdev_register(dev, &led->cdev);
 		if (error) {
