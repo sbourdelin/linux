@@ -11,6 +11,8 @@
 #include <linux/stop_machine.h>
 #include <linux/slab.h>
 #include <linux/kdebug.h>
+#include <linux/kprobes.h>
+#include <linux/bsearch.h>
 #include <asm/text-patching.h>
 #include <asm/alternative.h>
 #include <asm/sections.h>
@@ -738,10 +740,26 @@ static void do_sync_core(void *info)
 }
 
 static bool bp_patching_in_progress;
-static void *bp_int3_handler, *bp_int3_addr;
+static struct text_to_poke *bp_int3_tpv;
+static unsigned int bp_int3_tpv_nr;
+
+static int text_bp_batch_bsearch(const void *key, const void *elt)
+{
+	struct text_to_poke *tp = (struct text_to_poke *) elt;
+
+	if (key < tp->addr)
+		return -1;
+	if (key > tp->addr)
+		return 1;
+	return 0;
+}
+NOKPROBE_SYMBOL(text_bp_batch_bsearch);
 
 int poke_int3_handler(struct pt_regs *regs)
 {
+	void *ip;
+	struct text_to_poke *tp;
+
 	/*
 	 * Having observed our INT3 instruction, we now must observe
 	 * bp_patching_in_progress.
@@ -757,21 +775,40 @@ int poke_int3_handler(struct pt_regs *regs)
 	if (likely(!bp_patching_in_progress))
 		return 0;
 
-	if (user_mode(regs) || regs->ip != (unsigned long)bp_int3_addr)
+	if (user_mode(regs))
 		return 0;
 
-	/* set up the specified breakpoint handler */
-	regs->ip = (unsigned long) bp_int3_handler;
+	ip = (void *) regs->ip - sizeof(unsigned char);
 
-	return 1;
+	/*
+	 * Skip the binary search if there is a single member in the vector.
+	 */
+	if (unlikely(bp_int3_tpv_nr == 1))
+		goto single_poke;
 
+	tp = bsearch(ip, bp_int3_tpv, bp_int3_tpv_nr,
+		     sizeof(struct text_to_poke),
+		     text_bp_batch_bsearch);
+	if (tp) {
+		/* set up the specified breakpoint handler */
+		regs->ip = (unsigned long) tp->handler;
+		return 1;
+	}
+
+	return 0;
+
+single_poke:
+	if (ip == bp_int3_tpv->addr) {
+		regs->ip = (unsigned long) bp_int3_tpv->handler;
+		return 1;
+	}
+
+	return 0;
 }
 
 static void text_poke_bp_set_handler(void *addr, void *handler,
 				     unsigned char int3)
 {
-	bp_int3_handler = handler;
-	bp_int3_addr = (u8 *)addr + sizeof(int3);
 	text_poke(addr, &int3, sizeof(int3));
 }
 
@@ -791,31 +828,36 @@ static void patch_first_byte(void *addr, const void *opcode, unsigned char int3)
 }
 
 /**
- * text_poke_bp() -- update instructions on live kernel on SMP
- * @addr:	address to patch
- * @opcode:	opcode of new instruction
- * @len:	length to copy
- * @handler:	address to jump to when the temporary breakpoint is hit
+ * text_poke_bp_batch() -- update instructions on live kernel on SMP
+ * @tp:		vector of instructions to patch
+ * @nr_entries:	number of entries in the vector
  *
  * Modify multi-byte instruction by using int3 breakpoint on SMP.
  * We completely avoid stop_machine() here, and achieve the
  * synchronization using int3 breakpoint.
  *
  * The way it is done:
- *	- add a int3 trap to the address that will be patched
+ *	- For each entry in the vector:
+ *	    - add a int3 trap to the address that will be patched
  *	- sync cores
- *	- update all but the first byte of the patched range
+ *	- For each entry in the vector:
+ *	    - update all but the first byte of the patched range
  *	- sync cores
- *	- replace the first byte (int3) by the first byte of
- *	  replacing opcode
+ *	- For each entry in the vector:
+ *	    - replace the first byte (int3) by the first byte of
+ *	      replacing opcode
  *	- sync cores
  */
-void *text_poke_bp(void *addr, const void *opcode, size_t len, void *handler)
+void text_poke_bp_batch(struct text_to_poke *tp, unsigned int nr_entries)
 {
+	unsigned int i;
 	unsigned char int3 = 0xcc;
+	int patched_all_but_first = 0;
 
 	lockdep_assert_held(&text_mutex);
 
+	bp_int3_tpv = tp;
+	bp_int3_tpv_nr = nr_entries;
 	bp_patching_in_progress = true;
 	/*
 	 * Corresponding read barrier in int3 notifier for making sure the
@@ -823,12 +865,20 @@ void *text_poke_bp(void *addr, const void *opcode, size_t len, void *handler)
 	 */
 	smp_wmb();
 
-	text_poke_bp_set_handler(addr, handler, int3);
+	for (i = 0; i < nr_entries; i++)
+		text_poke_bp_set_handler(tp[i].addr, tp[i].handler, int3);
 
 	on_each_cpu(do_sync_core, NULL, 1);
 
-	if (len - sizeof(int3) > 0) {
-		patch_all_but_first_byte(addr, opcode, len, int3);
+	for (i = 0; i < nr_entries; i++) {
+		if (tp[i].len - sizeof(int3) > 0) {
+			patch_all_but_first_byte(tp[i].addr, tp[i].opcode,
+						 tp[i].len, int3);
+			patched_all_but_first++;
+		}
+	}
+
+	if (patched_all_but_first) {
 		/*
 		 * According to Intel, this core syncing is very likely
 		 * not necessary and we'd be safe even without it. But
@@ -837,14 +887,46 @@ void *text_poke_bp(void *addr, const void *opcode, size_t len, void *handler)
 		on_each_cpu(do_sync_core, NULL, 1);
 	}
 
-	patch_first_byte(addr, opcode, int3);
+	for (i = 0; i < nr_entries; i++)
+		patch_first_byte(tp[i].addr, tp[i].opcode, int3);
 
 	on_each_cpu(do_sync_core, NULL, 1);
 	/*
 	 * sync_core() implies an smp_mb() and orders this store against
 	 * the writing of the new instruction.
 	 */
+	bp_int3_tpv_nr = 0;
+	bp_int3_tpv = NULL;
 	bp_patching_in_progress = false;
+}
+
+/**
+ * text_poke_bp() -- update instructions on live kernel on SMP
+ * @addr:	address to patch
+ * @opcode:	opcode of new instruction
+ * @len:	length to copy
+ * @handler:	address to jump to when the temporary breakpoint is hit
+ *
+ * Update a single instruction with the vector in the stack, avoiding
+ * dynamically allocated memory. This function should be used when it is
+ * not possible to allocate memory.
+ */
+void *text_poke_bp(void *addr, const void *opcode, size_t len, void *handler)
+{
+	struct text_to_poke tp = {
+		.handler = handler,
+		.addr = addr,
+		.len = len,
+	};
+
+	if (len > POKE_MAX_OPCODE_SIZE) {
+		WARN_ONCE(1, "len is larger than %d\n", POKE_MAX_OPCODE_SIZE);
+		return NULL;
+	}
+
+	memcpy((void *)tp.opcode, opcode, len);
+
+	text_poke_bp_batch(&tp, 1);
 
 	return addr;
 }
