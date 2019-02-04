@@ -11,6 +11,7 @@
 #include <linux/netdevice.h>
 #include <net/dsa.h>
 #include <linux/of_net.h>
+#include <linux/of_mdio.h>
 #include <linux/of_platform.h>
 #include <linux/if_bridge.h>
 #include <linux/mdio.h>
@@ -621,19 +622,49 @@ qca8k_adjust_link(struct dsa_switch *ds, int port, struct phy_device *phy)
 }
 
 static int
+qca8k_to_real_phy(struct dsa_switch *ds, int phy)
+{
+	struct device_node *phy_dn, *port_dn;
+	int id;
+
+	if (phy >= ds->num_ports)
+		return -EINVAL;
+
+	port_dn = ds->ports[phy].dn;
+	if (!port_dn)
+		return -EINVAL;
+
+	phy_dn = of_parse_phandle(port_dn, "phy-handle", 0);
+	if (!phy_dn)
+		return phy;
+
+	id = of_mdio_parse_addr(ds->dev, phy_dn);
+	of_node_put(phy_dn);
+	return id;
+}
+
+static int
 qca8k_phy_read(struct dsa_switch *ds, int phy, int regnum)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
+	int realphy = qca8k_to_real_phy(ds, phy);
 
-	return mdiobus_read(priv->bus, phy, regnum);
+	if (realphy < 0)
+		return realphy;
+
+	return mdiobus_read(priv->bus, realphy, regnum);
 }
 
 static int
 qca8k_phy_write(struct dsa_switch *ds, int phy, int regnum, u16 val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
+	int realphy = qca8k_to_real_phy(ds, phy);
 
-	return mdiobus_write(priv->bus, phy, regnum, val);
+	if (realphy < 0)
+		return realphy;
+
+	return mdiobus_write(priv->bus, realphy, regnum, val);
 }
 
 static void
