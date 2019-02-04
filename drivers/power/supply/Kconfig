@@ -660,4 +660,13 @@ config FUEL_GAUGE_SC27XX
 	 Say Y here to enable support for fuel gauge with SC27XX
 	 PMIC chips.
 
+config CHARGER_BD70528
+	tristate "ROHM bd70528 charger driver"
+	depends on MFD_ROHM_BD70528
+	default n
+	help
+	 Say Y here to enable support for getting battery status
+	 information and altering charger configurations from charger
+	 block of the ROHM BD70528 Power Management IC.
+
 endif # POWER_SUPPLY
