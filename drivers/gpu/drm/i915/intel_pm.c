@@ -4694,8 +4694,11 @@ static void skl_compute_plane_wm(const struct intel_crtc_state *cstate,
 	uint_fixed_16_16_t selected_result;
 	u32 res_blocks, res_lines, min_ddb_alloc = 0;
 
-	if (latency == 0)
+	if (latency == 0) {
+		/* reject it */
+		result->min_ddb_alloc = U16_MAX;
 		return;
+	}
 
 	/* Display WA #1141: kbl,cfl */
 	if ((IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv) ||
