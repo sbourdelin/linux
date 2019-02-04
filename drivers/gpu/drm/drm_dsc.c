@@ -17,6 +17,12 @@
 /**
  * DOC: dsc helpers
  *
+ * VESA specification for DP 1.4 adds a new feature called Display Stream
+ * Compression (DSC) used to compress the pixel bits before sending it on
+ * DP/eDP/MIPI DSI interface. DSC is required to be enabled so that the existing
+ * display interfaces can support high resolutions at higher frames rates uisng
+ * the maximum available link capacity of these interfaces.
+ *
  * These functions contain some common logic and helpers to deal with VESA
  * Display Stream Compression standard required for DSC on Display Port/eDP or
  * MIPI display interfaces.
@@ -26,6 +32,7 @@
  * drm_dsc_dp_pps_header_init() - Initializes the PPS Header
  * for DisplayPort as per the DP 1.4 spec.
  * @pps_sdp: Secondary data packet for DSC Picture Parameter Set
+ *           as defined in &struct drm_dsc_pps_infoframe
  */
 void drm_dsc_dp_pps_header_init(struct drm_dsc_pps_infoframe *pps_sdp)
 {
@@ -44,9 +51,11 @@ EXPORT_SYMBOL(drm_dsc_dp_pps_header_init);
  * that span more than 1 byte.
  *
  * @pps_sdp:
- * Secondary data packet for DSC Picture Parameter Set
+ * Secondary data packet for DSC Picture Parameter Set. This is defined
+ * by &struct drm_dsc_pps_infoframe
  * @dsc_cfg:
- * DSC Configuration data filled by driver
+ * DSC Configuration data filled by driver as defined by
+ * &struct drm_dsc_config
  */
 void drm_dsc_pps_infoframe_pack(struct drm_dsc_pps_infoframe *pps_sdp,
 				const struct drm_dsc_config *dsc_cfg)
