@@ -37,6 +37,8 @@ int get_gup_pin_page(struct page *page)
 	page = compound_head(page);
 
 	if (page_ref_count(page) >= (UINT_MAX - GUP_PIN_COUNTING_BIAS)) {
+		mod_node_page_state(page_pgdat(page),
+				    NR_GUP_PAGE_COUNT_OVERFLOWS, 1);
 		WARN_ONCE(1, "get_user_pages pin count overflowed");
 		return -EOVERFLOW;
 	}
@@ -184,6 +186,8 @@ retry:
 			page = ERR_PTR(ret);
 			goto out;
 		}
+		mod_node_page_state(page_pgdat(page),
+				    NR_GUP_SLOW_PAGES_REQUESTED, 1);
 	}
 	if (flags & FOLL_TOUCH) {
 		if ((flags & FOLL_WRITE) &&
@@ -527,6 +531,8 @@ static int get_gate_page(struct mm_struct *mm, unsigned long address,
 	ret = get_gup_pin_page(*page);
 	if (ret)
 		goto unmap;
+
+	mod_node_page_state(page_pgdat(*page), NR_GUP_SLOW_PAGES_REQUESTED, 1);
 out:
 	ret = 0;
 unmap:
@@ -1461,7 +1467,12 @@ static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
 		if (!page_cache_gup_pin_speculative(head))
 			goto pte_unmap;
 
+		mod_node_page_state(page_pgdat(head),
+				    NR_GUP_FAST_PAGES_REQUESTED, 1);
+
 		if (unlikely(pte_val(pte) != pte_val(*ptep))) {
+			mod_node_page_state(page_pgdat(head),
+					    NR_GUP_FAST_PAGE_BACKOFFS, 1);
 			put_user_page(head);
 			goto pte_unmap;
 		}
@@ -1521,6 +1532,9 @@ static int __gup_device_huge(unsigned long pfn, unsigned long addr,
 			undo_dev_pagemap(nr, nr_start, pages);
 			return 0;
 		}
+
+		mod_node_page_state(page_pgdat(page),
+				    NR_GUP_FAST_PAGES_REQUESTED, 1);
 
 		(*nr)++;
 		pfn++;
@@ -1607,6 +1621,8 @@ static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
 		return 0;
 	}
 
+	mod_node_page_state(page_pgdat(head), NR_GUP_FAST_PAGES_REQUESTED, 1);
+
 	if (unlikely(pmd_val(orig) != pmd_val(*pmdp))) {
 		*nr -= refs;
 		put_user_page(head);
@@ -1644,6 +1660,8 @@ static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
 		return 0;
 	}
 
+	mod_node_page_state(page_pgdat(head), NR_GUP_FAST_PAGES_REQUESTED, 1);
+
 	if (unlikely(pud_val(orig) != pud_val(*pudp))) {
 		*nr -= refs;
 		put_user_page(head);
@@ -1679,6 +1697,8 @@ static int gup_huge_pgd(pgd_t orig, pgd_t *pgdp, unsigned long addr,
 		*nr -= refs;
 		return 0;
 	}
+
+	mod_node_page_state(page_pgdat(head), NR_GUP_FAST_PAGES_REQUESTED, 1);
 
 	if (unlikely(pgd_val(orig) != pgd_val(*pgdp))) {
 		*nr -= refs;

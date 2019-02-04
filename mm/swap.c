@@ -150,6 +150,7 @@ void put_user_page(struct page *page)
 
 	VM_BUG_ON_PAGE(page_ref_count(page) < GUP_PIN_COUNTING_BIAS, page);
 
+	mod_node_page_state(page_pgdat(page), NR_GUP_PAGES_RETURNED, 1);
 	page_ref_sub(page, GUP_PIN_COUNTING_BIAS);
 }
 EXPORT_SYMBOL(put_user_page);
