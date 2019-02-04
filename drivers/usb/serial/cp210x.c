@@ -1111,9 +1111,12 @@ static void cp210x_change_speed(struct tty_struct *tty,
 	 */
 	if (priv->use_actual_rate)
 		baud = cp210x_get_actual_rate(serial, baud);
-	else if (baud < 1000000)
+	else if (baud < 1000000) {
+		if (priv->partnum == CP210X_PARTNUM_CP2105 &&
+		    cp210x_interface_num(serial) == 1)
+			baud = clamp(baud, 2400u, priv->max_speed);
 		baud = cp210x_get_an205_rate(baud);
-	else if (baud > priv->max_speed)
+	} else if (baud > priv->max_speed)
 		baud = priv->max_speed;
 
 	dev_dbg(&port->dev, "%s - setting baud rate to %u\n", __func__, baud);
