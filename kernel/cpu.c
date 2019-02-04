@@ -1683,6 +1683,7 @@ unlock:
 	mutex_unlock(&cpuhp_state_mutex);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(__cpuhp_state_add_instance_cpuslocked);
 
 int __cpuhp_state_add_instance(enum cpuhp_state state, struct hlist_node *node,
 			       bool invoke)
