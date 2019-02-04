@@ -118,6 +118,8 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
 		goto out_put_pllx_clk;
 	}
 
+	of_node_put(np);
+
 	ret = tegra124_cpu_switch_to_dfll(priv);
 	if (ret)
 		goto out_put_pllp_clk;
