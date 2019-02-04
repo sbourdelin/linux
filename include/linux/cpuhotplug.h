@@ -290,6 +290,12 @@ static inline int cpuhp_state_add_instance(enum cpuhp_state state,
 	return __cpuhp_state_add_instance(state, node, true);
 }
 
+static inline int cpuhp_state_add_instance_cpuslocked(enum cpuhp_state state,
+						      struct hlist_node *node)
+{
+	return __cpuhp_state_add_instance_cpuslocked(state, node, true);
+}
+
 /**
  * cpuhp_state_add_instance_nocalls - Add an instance for a state without
  *                                    invoking the startup callback.
