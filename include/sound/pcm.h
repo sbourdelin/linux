@@ -227,6 +227,7 @@ struct snd_pcm_ops {
 struct snd_pcm_file {
 	struct snd_pcm_substream *substream;
 	int no_compat_mmap;
+	unsigned int perm;		/* file descriptor permissions */
 	unsigned int user_pversion;	/* supported protocol version */
 };
 
@@ -537,6 +538,7 @@ struct snd_pcm {
  *  Registering
  */
 
+extern const struct file_operations snd_pcm_f_op_buffer;
 extern const struct file_operations snd_pcm_f_ops[2];
 
 int snd_pcm_new(struct snd_card *card, const char *id, int device,

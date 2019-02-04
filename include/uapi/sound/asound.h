@@ -571,6 +571,9 @@ enum {
 #define SNDRV_CHMAP_PHASE_INVERSE	(0x01 << 16)
 #define SNDRV_CHMAP_DRIVER_SPEC		(0x02 << 16)
 
+#define SNDRV_PCM_PERM_MODE_FULL 	0	/* full access - no restrictions */
+#define SNDRV_PCM_PERM_MODE_BUFFER	1	/* allow to export only sound buffer through mmap */
+
 #define SNDRV_PCM_IOCTL_PVERSION	_IOR('A', 0x00, int)
 #define SNDRV_PCM_IOCTL_INFO		_IOR('A', 0x01, struct snd_pcm_info)
 #define SNDRV_PCM_IOCTL_TSTAMP		_IOW('A', 0x02, int)
