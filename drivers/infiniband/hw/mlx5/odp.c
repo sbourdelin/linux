@@ -713,7 +713,8 @@ static int get_indirect_num_descs(struct mlx5_core_mkey *mmkey)
  * -EFAULT when there's an error mapping the requested pages. The caller will
  *  abort the page fault handling.
  */
-static int pagefault_single_data_segment(struct mlx5_ib_dev *dev, u32 key,
+static int pagefault_single_data_segment(struct mlx5_ib_dev *dev,
+					 struct ib_pd *pd, u32 key,
 					 u64 io_virt, size_t bcnt,
 					 u32 *bytes_committed,
 					 u32 *bytes_mapped, u32 flags)
@@ -763,9 +764,15 @@ next_mr:
 			goto srcu_unlock;
 		}
 
-		if (prefetch && !is_odp_mr(mr)) {
-			ret = -EINVAL;
-			goto srcu_unlock;
+		if (prefetch) {
+			if (!is_odp_mr(mr) ||
+			    mr->ibmr.pd != pd) {
+				mlx5_ib_dbg(dev, "Invalid prefetch request: %s\n",
+					    is_odp_mr(mr) ?  "MR is not ODP" :
+					    "PD is not of the MR");
+				ret = -EINVAL;
+				goto srcu_unlock;
+			}
 		}
 
 		if (!is_odp_mr(mr)) {
@@ -953,7 +960,8 @@ static int pagefault_data_segments(struct mlx5_ib_dev *dev,
 			continue;
 		}
 
-		ret = pagefault_single_data_segment(dev, key, io_virt, bcnt,
+		ret = pagefault_single_data_segment(dev, NULL, key,
+						    io_virt, bcnt,
 						    &pfault->bytes_committed,
 						    bytes_mapped, 0);
 		if (ret < 0)
@@ -1265,7 +1273,7 @@ static void mlx5_ib_mr_rdma_pfault_handler(struct mlx5_ib_dev *dev,
 		prefetch_len = min(MAX_PREFETCH_LEN, prefetch_len);
 	}
 
-	ret = pagefault_single_data_segment(dev, rkey, address, length,
+	ret = pagefault_single_data_segment(dev, NULL, rkey, address, length,
 					    &pfault->bytes_committed, NULL,
 					    0);
 	if (ret == -EAGAIN) {
@@ -1292,7 +1300,7 @@ static void mlx5_ib_mr_rdma_pfault_handler(struct mlx5_ib_dev *dev,
 	if (prefetch_activated) {
 		u32 bytes_committed = 0;
 
-		ret = pagefault_single_data_segment(dev, rkey, address,
+		ret = pagefault_single_data_segment(dev, NULL, rkey, address,
 						    prefetch_len,
 						    &bytes_committed, NULL,
 						    0);
@@ -1589,23 +1597,24 @@ int mlx5_ib_odp_init(void)
 
 struct prefetch_mr_work {
 	struct work_struct work;
-	struct mlx5_ib_dev *dev;
+	struct ib_pd *pd;
 	u32 pf_flags;
 	u32 num_sge;
 	struct ib_sge sg_list[0];
 };
 
-static int mlx5_ib_prefetch_sg_list(struct mlx5_ib_dev *dev, u32 pf_flags,
+static int mlx5_ib_prefetch_sg_list(struct ib_pd *pd, u32 pf_flags,
 				    struct ib_sge *sg_list, u32 num_sge)
 {
 	int i;
 	int ret = 0;
+	struct mlx5_ib_dev *dev = to_mdev(pd->device);
 
 	for (i = 0; i < num_sge; ++i) {
 		struct ib_sge *sg = &sg_list[i];
 		int bytes_committed = 0;
 
-		ret = pagefault_single_data_segment(dev, sg->lkey, sg->addr,
+		ret = pagefault_single_data_segment(dev, pd, sg->lkey, sg->addr,
 						    sg->length,
 						    &bytes_committed, NULL,
 						    pf_flags);
@@ -1641,9 +1650,9 @@ static void mlx5_ib_prefetch_mr_work(struct work_struct *work)
 	struct prefetch_mr_work *w =
 		container_of(work, struct prefetch_mr_work, work);
 
-	if (w->dev->ib_dev.reg_state == IB_DEV_REGISTERED)
-		mlx5_ib_prefetch_sg_list(w->dev, w->pf_flags, w->sg_list,
-					 w->num_sge);
+	if (w->pd->device->reg_state == IB_DEV_REGISTERED)
+		mlx5_ib_prefetch_sg_list(w->pd, w->pf_flags,
+					 w->sg_list, w->num_sge);
 
 	kfree(w);
 }
@@ -1664,10 +1673,10 @@ int mlx5_ib_advise_mr_prefetch(struct ib_pd *pd,
 		pf_flags |= MLX5_PF_FLAGS_DOWNGRADE;
 
 	if (flags & IB_UVERBS_ADVISE_MR_FLAG_FLUSH)
-		return mlx5_ib_prefetch_sg_list(dev, pf_flags, sg_list,
-						num_sge);
+		return mlx5_ib_prefetch_sg_list(pd, pf_flags,
+						sg_list, num_sge);
 
-	if (dev->ib_dev.reg_state != IB_DEV_REGISTERED)
+	if (pd->device->reg_state != IB_DEV_REGISTERED)
 		return -ENODEV;
 
 	work = kvzalloc(struct_size(work, sg_list, num_sge), GFP_KERNEL);
@@ -1676,7 +1685,7 @@ int mlx5_ib_advise_mr_prefetch(struct ib_pd *pd,
 
 	memcpy(work->sg_list, sg_list, num_sge * sizeof(struct ib_sge));
 
-	work->dev = dev;
+	work->pd = pd;
 	work->pf_flags = pf_flags | MLX5_PF_FLAGS_PREFETCH_DEFERRED;
 	work->num_sge = num_sge;
 
