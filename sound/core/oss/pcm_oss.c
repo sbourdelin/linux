@@ -2420,7 +2420,7 @@ static int snd_pcm_oss_open_file(struct file *file,
 			if (! (f_mode & FMODE_READ))
 				continue;
 		}
-		err = snd_pcm_open_substream(pcm, idx, file, &substream);
+		err = snd_pcm_open_substream(pcm, idx, -1, file, &substream);
 		if (err < 0) {
 			snd_pcm_oss_release_file(pcm_oss_file);
 			return err;

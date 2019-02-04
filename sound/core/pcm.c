@@ -918,15 +918,14 @@ static int snd_pcm_dev_free(struct snd_device *device)
 	return snd_pcm_free(pcm);
 }
 
-int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream,
-			     struct file *file,
+int snd_pcm_attach_substream(struct snd_pcm *pcm,
+			     int stream, int subdevice, struct file *file,
 			     struct snd_pcm_substream **rsubstream)
 {
 	struct snd_pcm_str * pstr;
 	struct snd_pcm_substream *substream;
 	struct snd_pcm_runtime *runtime;
 	struct snd_card *card;
-	int prefer_subdevice;
 	size_t size;
 
 	if (snd_BUG_ON(!pcm || !rsubstream))
@@ -940,7 +939,6 @@ int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream,
 		return -ENODEV;
 
 	card = pcm->card;
-	prefer_subdevice = snd_ctl_get_preferred_subdevice(card, SND_CTL_SUBDEV_PCM);
 
 	if (pcm->info_flags & SNDRV_PCM_INFO_HALF_DUPLEX) {
 		int opposite = !stream;
@@ -953,14 +951,14 @@ int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream,
 	}
 
 	if (file->f_flags & O_APPEND) {
-		if (prefer_subdevice < 0) {
+		if (subdevice < 0) {
 			if (pstr->substream_count > 1)
 				return -EINVAL; /* must be unique */
 			substream = pstr->substream;
 		} else {
 			for (substream = pstr->substream; substream;
 			     substream = substream->next)
-				if (substream->number == prefer_subdevice)
+				if (substream->number == subdevice)
 					break;
 		}
 		if (! substream)
@@ -974,8 +972,7 @@ int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream,
 
 	for (substream = pstr->substream; substream; substream = substream->next) {
 		if (!SUBSTREAM_BUSY(substream) &&
-		    (prefer_subdevice == -1 ||
-		     substream->number == prefer_subdevice))
+		    (subdevice == -1 || substream->number == subdevice))
 			break;
 	}
 	if (substream == NULL)
