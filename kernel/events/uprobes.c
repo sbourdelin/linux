@@ -82,6 +82,11 @@ struct delayed_uprobe {
 	struct mm_struct *mm;
 };
 
+/*
+ * Any memory allocation happening within lock(delayed_uprobe_lock)
+ * must use memalloc_nofs_save()/memalloc_nofs_restore() to avoid
+ * calling file system code from memory allocation code.
+ */
 static DEFINE_MUTEX(delayed_uprobe_lock);
 static LIST_HEAD(delayed_uprobe_list);
 
@@ -416,6 +421,7 @@ static int update_ref_ctr(struct uprobe *uprobe, struct mm_struct *mm,
 	struct vm_area_struct *rc_vma;
 	unsigned long rc_vaddr;
 	int ret = 0;
+	unsigned int nofs_flags;
 
 	rc_vma = find_ref_ctr_vma(uprobe, mm);
 
@@ -429,12 +435,30 @@ static int update_ref_ctr(struct uprobe *uprobe, struct mm_struct *mm,
 			return ret;
 	}
 
+	/*
+	 * There is a possibility of deadlock here:
+	 *
+	 *   CPU0                         CPU1
+	 *   ----                         ----
+	 *   lock(fs_reclaim);
+	 *                                lock(delayed_uprobe_lock);
+	 *                                lock(fs_reclaim);
+	 *   lock(delayed_uprobe_lock);
+	 *
+	 * Here CPU0 is a file system code path which results in
+	 * mmput()->__mmput()->uprobe_clear_state() with fs_reclaim locked.
+	 * And, CPU1 is a uprobe event creation path.
+	 *
+	 * Avoid calling into filesystem code inside lock(delayed_uprobe_lock).
+	 */
+	nofs_flags = memalloc_nofs_save();
 	mutex_lock(&delayed_uprobe_lock);
 	if (d > 0)
 		ret = delayed_uprobe_add(uprobe, mm);
 	else
 		delayed_uprobe_remove(uprobe, mm);
 	mutex_unlock(&delayed_uprobe_lock);
+	memalloc_nofs_restore(nofs_flags);
 
 	return ret;
 }
