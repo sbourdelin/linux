@@ -6,6 +6,10 @@
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM xfs
 
+#ifndef CONFIG_XFS_TRACEPOINTS
+#define NOTRACE
+#endif
+
 #if !defined(_TRACE_XFS_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_XFS_H
 

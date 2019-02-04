@@ -141,3 +141,12 @@ config XFS_ASSERT_FATAL
 	  result in warnings.
 
 	  This behavior can be modified at runtime via sysfs.
+
+config XFS_TRACEPOINTS
+	bool "XFS tracepoints"
+	default y
+	depends on XFS_FS && TRACEPOINTS
+	help
+	  Say Y here to build XFS with tracepoints.
+
+	  You can say N here to reduce the size of the kernel image.
