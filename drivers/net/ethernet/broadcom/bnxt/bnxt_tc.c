@@ -12,6 +12,7 @@
 #include <linux/if_vlan.h>
 #include <net/flow_dissector.h>
 #include <net/pkt_cls.h>
+#include <net/switchdev.h>
 #include <net/tc_act/tc_gact.h>
 #include <net/tc_act/tc_skbedit.h>
 #include <net/tc_act/tc_mirred.h>
