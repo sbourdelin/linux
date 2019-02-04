@@ -1688,9 +1688,9 @@ static int aio_poll_wake(struct wait_queue_entry *wait, unsigned mode, int sync,
 			return 0;
 
 		/* try to complete the iocb inline if we can: */
-		if (spin_trylock(&iocb->ki_ctx->ctx_lock)) {
+		if (spin_trylock_irq(&iocb->ki_ctx->ctx_lock)) {
 			list_del(&iocb->ki_list);
-			spin_unlock(&iocb->ki_ctx->ctx_lock);
+			spin_unlock_irq(&iocb->ki_ctx->ctx_lock);
 
 			list_del_init(&req->wait.entry);
 			aio_poll_complete(iocb, mask);
