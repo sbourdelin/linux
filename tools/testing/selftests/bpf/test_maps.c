@@ -642,7 +642,7 @@ static void test_stackmap(int task, void *data)
 #define SOCKMAP_PARSE_PROG "./sockmap_parse_prog.o"
 #define SOCKMAP_VERDICT_PROG "./sockmap_verdict_prog.o"
 #define SOCKMAP_TCP_MSG_PROG "./sockmap_tcp_msg_prog.o"
-static void test_sockmap(int tasks, void *data)
+static void test_sockmap(unsigned int tasks, void *data)
 {
 	struct bpf_map *bpf_map_rx, *bpf_map_tx, *bpf_map_msg, *bpf_map_break;
 	int map_fd_msg = 0, map_fd_rx = 0, map_fd_tx = 0, map_fd_break;
@@ -1271,7 +1271,7 @@ static void test_map_large(void)
 	printf("Fork %d tasks to '" #FN "'\n", N); \
 	__run_parallel(N, FN, DATA)
 
-static void __run_parallel(int tasks, void (*fn)(int task, void *data),
+static void __run_parallel(unsigned int tasks, void (*fn)(int task, void *data),
 			   void *data)
 {
 	pid_t pid[tasks];
