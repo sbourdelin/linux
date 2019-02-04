@@ -133,6 +133,12 @@ static int aqr_read_status(struct phy_device *phydev)
 	reg = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_AN_TX_VEND_STATUS1);
 
 	switch (reg & MDIO_AN_TX_VEND_STATUS1_RATE_MASK) {
+	case MDIO_AN_TX_VEND_STATUS1_10GBASET:
+		phydev->speed = SPEED_10000;
+		break;
+	case MDIO_AN_TX_VEND_STATUS1_5000BASET:
+		phydev->speed = SPEED_5000;
+		break;
 	case MDIO_AN_TX_VEND_STATUS1_2500BASET:
 		phydev->speed = SPEED_2500;
 		break;
@@ -142,11 +148,15 @@ static int aqr_read_status(struct phy_device *phydev)
 	case MDIO_AN_TX_VEND_STATUS1_100BASETX:
 		phydev->speed = SPEED_100;
 		break;
+	case MDIO_AN_TX_VEND_STATUS1_10BASET:
+		phydev->speed = SPEED_10;
+		break;
 	default:
-		phydev->speed = SPEED_10000;
+		phydev->speed = SPEED_UNKNOWN;
 		break;
 	}
-	phydev->duplex = DUPLEX_FULL;
+
+	phydev->duplex = !!(reg & MDIO_AN_TX_VEND_STATUS1_FULL_DUPLEX);
 
 	return 0;
 }
