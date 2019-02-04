@@ -21,6 +21,21 @@ Required properties for ISC:
 - pinctrl-names, pinctrl-0
 	Please refer to pinctrl-bindings.txt.
 
+Optional properties for ISC:
+- bus-type
+	When set to 6, Bt.656 decoding (embedded sync) with CRC decoding
+	is enabled. If omitted, then the default bus-type is parallel and
+	the additional properties to follow can be specified:
+- hsync-active
+	Active state of the HSYNC signal, 0/1 for LOW/HIGH respectively.
+	If unspecified, this signal is set as active HIGH.
+- vsync-active
+	Active state of the VSYNC signal, 0/1 for LOW/HIGH respectively.
+	If unspecified, this signal is set as active HIGH.
+- pclk-sample
+	Sample data on rising (1) or falling (0) edge of the pixel clock
+	signal. If unspecified, data is sampled on the rising edge.
+
 ISC supports a single port node with parallel bus. It should contain one
 'port' child node with child 'endpoint' node. Please refer to the bindings
 defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
