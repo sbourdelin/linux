@@ -5817,3 +5817,57 @@ int __init workqueue_init(void)
 
 	return 0;
 }
+
+static void devm_work_release(void *data)
+{
+	struct work_struct *work = data;
+
+	cancel_work_sync(work);
+}
+
+/**
+ * devm_init_work - resource-controlled version of INIT_WORK()
+ * @dev: valid struct device pointer
+ * @work: work pointer to initialize
+ * @func: work function to initialize 'work' with
+ *
+ * Initialize the work pointer just like INIT_WORK(), but use resource control
+ * to help ensure work is not left running or pending when dev is destroyed.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+int __must_check devm_init_work(struct device *dev, struct work_struct *work,
+					work_func_t func)
+{
+	INIT_WORK(work, func);
+	return devm_add_action(dev, devm_work_release, work);
+}
+EXPORT_SYMBOL_GPL(devm_init_work);
+
+static void devm_delayed_work_release(void *data)
+{
+	struct delayed_work *dw = data;
+
+	cancel_delayed_work_sync(dw);
+}
+
+/**
+ * devm_init_delayed_work - resource-controlled version of INIT_DELAYED_WORK()
+ * @dev: valid struct device pointer
+ * @dw: delayed_work pointer to initialize
+ * @func: work function to initialize 'dw' with
+ *
+ * Initialize the delayed_work pointer just like INIT_DELAYED_WORK(), but use
+ * resource control to help ensure delayed work is not left running or pending
+ * when dev is destroyed.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+int __must_check devm_init_delayed_work(struct device *dev,
+					struct delayed_work *dw,
+					work_func_t func)
+{
+	INIT_DELAYED_WORK(dw, func);
+	return devm_add_action(dev, devm_delayed_work_release, dw);
+}
+EXPORT_SYMBOL_GPL(devm_init_delayed_work);

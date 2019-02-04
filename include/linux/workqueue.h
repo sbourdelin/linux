@@ -15,6 +15,7 @@
 #include <linux/cpumask.h>
 #include <linux/rcupdate.h>
 
+struct device;
 struct workqueue_struct;
 
 struct work_struct;
@@ -669,5 +670,11 @@ int workqueue_offline_cpu(unsigned int cpu);
 
 int __init workqueue_init_early(void);
 int __init workqueue_init(void);
+
+int __must_check devm_init_work(struct device *dev, struct work_struct *work,
+					work_func_t func);
+int __must_check devm_init_delayed_work(struct device *dev,
+					struct delayed_work *dw,
+					work_func_t func);
 
 #endif
