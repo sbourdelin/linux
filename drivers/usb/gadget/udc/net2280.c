@@ -867,7 +867,7 @@ static void start_queue(struct net2280_ep *ep, u32 dmactl, u32 td_dma)
 
 	writel(BIT(DMA_START), &dma->dmastat);
 
-	if (!ep->is_in)
+	if (!ep->is_in && readl(&ep->regs->ep_avail) == 0)
 		stop_out_naking(ep);
 }
 
