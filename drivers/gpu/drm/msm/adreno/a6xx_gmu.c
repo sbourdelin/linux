@@ -2,6 +2,7 @@
 /* Copyright (c) 2017-2018 The Linux Foundation. All rights reserved. */
 
 #include <linux/clk.h>
+#include <linux/pm_domain.h>
 #include <linux/pm_opp.h>
 #include <soc/qcom/cmd-db.h>
 
@@ -671,6 +672,16 @@ int a6xx_gmu_reset(struct a6xx_gpu *a6xx_gpu)
 	gmu_poll_timeout(gmu, REG_A6XX_RSCC_TCS3_DRV0_STATUS, val,
 		(val & 1), 100, 1000);
 
+	/*
+	 * Depending on the state of the GMU at this point the GX domain might
+	 * have been left on. Hardware sequencing rules state that the GX has to
+	 * be turned off before the CX domain so this is that one time that
+	 * that calling pm_runtime_put_sync() is expected to do something useful
+	 * (turn off the headswitch)
+	 */
+	if (!IS_ERR(gmu->gxpd))
+		pm_runtime_put_sync(gmu->gxpd);
+
 	/* Disable the resources */
 	clk_bulk_disable_unprepare(gmu->nr_clocks, gmu->clocks);
 	pm_runtime_put_sync(gmu->dev);
@@ -731,6 +742,14 @@ int a6xx_gmu_resume(struct a6xx_gpu *a6xx_gpu)
 
 	/* Set the GPU to the highest power frequency */
 	__a6xx_gmu_set_freq(gmu, gmu->nr_gpu_freqs - 1);
+
+	/*
+	 * "enable" the GX power domain which won't actually do anything but it
+	 * will make sure that the refcounting is correct in case we need to
+	 * bring down the GX after a GMU failure
+	 */
+	if (!IS_ERR(gmu->gxpd))
+		pm_runtime_get(gmu->gxpd);
 
 out:
 	/* Make sure to turn off the boot OOB request on error */
@@ -802,6 +821,14 @@ int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
 
 	/* Tell RPMh to power off the GPU */
 	a6xx_rpmh_stop(gmu);
+
+	/*
+	 * Mark the GPU power domain as off. During the shutdown process the GMU
+	 * should actually turn off the power so this is really just a
+	 * houskeeping step
+	 */
+	if (!IS_ERR(gmu->gxpd))
+		pm_runtime_put_sync(gmu->gxpd);
 
 	clk_bulk_disable_unprepare(gmu->nr_clocks, gmu->clocks);
 
@@ -1172,8 +1199,14 @@ void a6xx_gmu_remove(struct a6xx_gpu *a6xx_gpu)
 	if (IS_ERR_OR_NULL(gmu->mmio))
 		return;
 
-	pm_runtime_disable(gmu->dev);
 	a6xx_gmu_stop(a6xx_gpu);
+
+	pm_runtime_disable(gmu->dev);
+
+	if (!IS_ERR(gmu->gxpd)) {
+		pm_runtime_disable(gmu->gxpd);
+		dev_pm_domain_detach(gmu->gxpd, false);
+	}
 
 	a6xx_gmu_irq_disable(gmu);
 	a6xx_gmu_memory_free(gmu, gmu->hfi);
@@ -1232,6 +1265,12 @@ int a6xx_gmu_probe(struct a6xx_gpu *a6xx_gpu, struct device_node *node)
 
 	if (gmu->hfi_irq < 0 || gmu->gmu_irq < 0)
 		goto err;
+
+	/*
+	 * Get a link to the GX power domain to reset the GPU in case of GMU
+	 * crash
+	 */
+	gmu->gxpd = dev_pm_domain_attach_by_name(gmu->dev, "gx");
 
 	/* Get the power levels for the GMU and GPU */
 	a6xx_gmu_pwrlevels_probe(gmu);
