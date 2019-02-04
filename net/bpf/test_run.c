@@ -28,12 +28,13 @@ static __always_inline u32 bpf_test_run_one(struct bpf_prog *prog, void *ctx,
 	return ret;
 }
 
-static int bpf_test_run(struct bpf_prog *prog, void *ctx, u32 repeat, u32 *ret,
-			u32 *time)
+static int bpf_test_run(struct bpf_prog *prog, void *ctx, u32 repeat,
+			u32 *retval, u32 *time)
 {
 	struct bpf_cgroup_storage *storage[MAX_BPF_CGROUP_STORAGE_TYPE] = { 0 };
 	enum bpf_cgroup_storage_type stype;
 	u64 time_start, time_spent = 0;
+	int ret = 0;
 	u32 i;
 
 	for_each_cgroup_storage_type(stype) {
@@ -50,10 +51,12 @@ static int bpf_test_run(struct bpf_prog *prog, void *ctx, u32 repeat, u32 *ret,
 		repeat = 1;
 	time_start = ktime_get_ns();
 	for (i = 0; i < repeat; i++) {
-		*ret = bpf_test_run_one(prog, ctx, storage);
+		*retval = bpf_test_run_one(prog, ctx, storage);
+		if (signal_pending(current)) {
+			ret = -ERESTARTSYS;
+			break;
+		}
 		if (need_resched()) {
-			if (signal_pending(current))
-				break;
 			time_spent += ktime_get_ns() - time_start;
 			cond_resched();
 			time_start = ktime_get_ns();
@@ -66,7 +69,7 @@ static int bpf_test_run(struct bpf_prog *prog, void *ctx, u32 repeat, u32 *ret,
 	for_each_cgroup_storage_type(stype)
 		bpf_cgroup_storage_free(storage[stype]);
 
-	return 0;
+	return ret;
 }
 
 static int bpf_test_finish(const union bpf_attr *kattr,
