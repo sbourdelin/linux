@@ -753,6 +753,65 @@ static int eb_select_context(struct i915_execbuffer *eb)
 	return 0;
 }
 
+static bool __eb_ring_full(const struct intel_ring *ring)
+{
+	/* We assume that any user request will fit within a page. */
+	return READ_ONCE(ring->space) < PAGE_SIZE;
+}
+
+static struct i915_request *__eb_wait_for_ring(struct intel_ring *ring)
+{
+	struct i915_request *rq;
+
+	if (intel_ring_update_space(ring) >= PAGE_SIZE)
+		return NULL;
+
+	/*
+	 * Find a request that after waiting upon, there will be at least half
+	 * the ring available. The hystersis allows us to compete for the
+	 * shared ring and should mean that we sleep less often prior to
+	 * claiming our resources, but not so long that the ring completely
+	 * drains before we can submit our next request.
+	 */
+	list_for_each_entry(rq, &ring->request_list, ring_link) {
+		if (__intel_ring_space(rq->postfix,
+				       ring->emit, ring->size) > ring->size / 2)
+			break;
+	}
+	if (&rq->ring_link == &ring->request_list)
+		return NULL; /* weird, we will check again later for real */
+
+	return i915_request_get(rq);
+}
+
+static int eb_wait_for_ring(const struct i915_execbuffer *eb)
+{
+	const struct intel_context *ce;
+	struct i915_request *rq;
+	int ret = 0;
+
+	ce = to_intel_context(eb->ctx, eb->engine);
+	if (!ce->ring) /* first use, assume empty! */
+		return 0;
+
+	if (!__eb_ring_full(ce->ring))
+		return 0;
+
+	mutex_lock(&eb->i915->drm.struct_mutex);
+	rq = __eb_wait_for_ring(ce->ring);
+	mutex_unlock(&eb->i915->drm.struct_mutex);
+	if (rq) {
+		if (i915_request_wait(rq,
+				      I915_WAIT_INTERRUPTIBLE,
+				      MAX_SCHEDULE_TIMEOUT) < 0)
+			ret = -EINTR;
+
+		i915_request_put(rq);
+	}
+
+	return ret;
+}
+
 static int eb_lookup_vmas(struct i915_execbuffer *eb)
 {
 	struct radix_tree_root *handles_vma = &eb->ctx->handles_vma;
@@ -2278,6 +2337,10 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	if (unlikely(err))
 		goto err_destroy;
 
+	err = eb_wait_for_ring(&eb);
+	if (unlikely(err))
+		goto err_context;
+
 	/*
 	 * Take a local wakeref for preparing to dispatch the execbuf as
 	 * we expect to access the hardware fairly frequently in the
@@ -2438,6 +2501,7 @@ err_vma:
 	mutex_unlock(&dev->struct_mutex);
 err_rpm:
 	intel_runtime_pm_put(eb.i915, wakeref);
+err_context:
 	i915_gem_context_put(eb.ctx);
 err_destroy:
 	eb_destroy(&eb);
