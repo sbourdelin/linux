@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/security.h>
 #include <linux/hash.h>
+#include <linux/stringhash.h>
 
 #include "kernfs-internal.h"
 
@@ -616,7 +617,53 @@ struct kernfs_node *kernfs_node_from_dentry(struct dentry *dentry)
 	return NULL;
 }
 
+static int kernfs_node_init_security(struct kernfs_node *parent,
+				     struct kernfs_node *kn)
+{
+	struct simple_xattrs xattr_child, xattr_parent, *pxattr_parent;
+	struct iattr iattr_child, iattr_parent, *piattr_parent;
+	struct qstr q;
+	int ret;
+
+	if (!parent->iattr) {
+		kernfs_iattr_init(&iattr_parent, parent);
+		simple_xattrs_init(&xattr_parent);
+		piattr_parent = &iattr_parent;
+		pxattr_parent = &xattr_parent;
+	} else {
+		piattr_parent = &parent->iattr->ia_iattr;
+		pxattr_parent = &parent->iattr->xattrs_security;
+	}
+
+	kernfs_iattr_init(&iattr_child, kn);
+	simple_xattrs_init(&xattr_child);
+
+	q.name = kn->name;
+	q.hash_len = hashlen_string(parent, kn->name);
+
+	ret = security_kernfs_init_security(&q, piattr_parent, pxattr_parent,
+					    &iattr_child, &xattr_child);
+	if (pxattr_parent == &xattr_parent)
+		simple_xattrs_free(&xattr_parent);
+	if (!ret && !simple_xattrs_empty(&xattr_child)) {
+		/*
+		 * Child has new security xattrs, allocate its kernfs_iattrs
+		 * and put our local xattrs in there.
+		 */
+		struct kernfs_iattrs *attrs = kernfs_iattrs(kn);
+
+		if (!attrs) {
+			simple_xattrs_free(&xattr_child);
+			return -ENOMEM;
+		}
+		simple_xattrs_move(&attrs->xattrs_security, &xattr_child);
+	}
+	simple_xattrs_free(&xattr_child);
+	return ret;
+}
+
 static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
+					     struct kernfs_node *parent,
 					     const char *name, umode_t mode,
 					     kuid_t uid, kgid_t gid,
 					     unsigned flags)
@@ -673,6 +720,12 @@ static struct kernfs_node *__kernfs_new_node(struct kernfs_root *root,
 			goto err_out3;
 	}
 
+	if (parent) {
+		ret = kernfs_node_init_security(parent, kn);
+		if (ret)
+			goto err_out3;
+	}
+
 	return kn;
 
  err_out3:
@@ -691,7 +744,7 @@ struct kernfs_node *kernfs_new_node(struct kernfs_node *parent,
 {
 	struct kernfs_node *kn;
 
-	kn = __kernfs_new_node(kernfs_root(parent),
+	kn = __kernfs_new_node(kernfs_root(parent), parent,
 			       name, mode, uid, gid, flags);
 	if (kn) {
 		kernfs_get(parent);
@@ -961,7 +1014,7 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 	INIT_LIST_HEAD(&root->supers);
 	root->next_generation = 1;
 
-	kn = __kernfs_new_node(root, "", S_IFDIR | S_IRUGO | S_IXUGO,
+	kn = __kernfs_new_node(root, NULL, "", S_IFDIR | S_IRUGO | S_IXUGO,
 			       GLOBAL_ROOT_UID, GLOBAL_ROOT_GID,
 			       KERNFS_DIR);
 	if (!kn) {
