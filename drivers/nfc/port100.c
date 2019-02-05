@@ -1630,19 +1630,19 @@ static void port100_disconnect(struct usb_interface *interface)
 	struct port100 *dev;
 
 	dev = usb_get_intfdata(interface);
-	usb_set_intfdata(interface, NULL);
 
 	nfc_digital_unregister_device(dev->nfc_digital_dev);
-	nfc_digital_free_device(dev->nfc_digital_dev);
-
 	usb_kill_urb(dev->in_urb);
 	usb_kill_urb(dev->out_urb);
+
+	cancel_work_sync(&dev->cmd_complete_work);
 
 	usb_free_urb(dev->in_urb);
 	usb_free_urb(dev->out_urb);
 	usb_put_dev(dev->udev);
-
+	nfc_digital_free_device(dev->nfc_digital_dev);
 	kfree(dev->cmd);
+	usb_set_intfdata(interface, NULL);
 
 	nfc_info(&interface->dev, "Sony Port-100 NFC device disconnected\n");
 }
