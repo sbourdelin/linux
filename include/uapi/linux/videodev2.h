@@ -2303,6 +2303,37 @@ struct v4l2_event {
 	__u32				reserved[8];
 };
 
+struct v4l2_event_ext_ctrl {
+	__u32 changes;
+	__u32 type;
+	union {
+		__s32 value;
+		__s64 value64;
+	};
+	__s64 minimum;
+	__s64 maximum;
+	__s64 step;
+	__s64 default_value;
+	__u32 flags;
+};
+
+struct v4l2_ext_event {
+	__u32				type;
+	__u32				id;
+	union {
+		struct v4l2_event_vsync		vsync;
+		struct v4l2_event_ext_ctrl	ctrl;
+		struct v4l2_event_frame_sync	frame_sync;
+		struct v4l2_event_src_change	src_change;
+		struct v4l2_event_motion_det	motion_det;
+		__u8				data[64];
+	} u;
+	__u32				reserved[8];
+	__u64				timestamp;
+	__u32				pending;
+	__u32				sequence;
+};
+
 #define V4L2_EVENT_SUB_FL_SEND_INITIAL		(1 << 0)
 #define V4L2_EVENT_SUB_FL_ALLOW_FEEDBACK	(1 << 1)
 
@@ -2475,6 +2506,7 @@ struct v4l2_create_buffers {
 #define VIDIOC_DBG_G_CHIP_INFO  _IOWR('V', 102, struct v4l2_dbg_chip_info)
 
 #define VIDIOC_QUERY_EXT_CTRL	_IOWR('V', 103, struct v4l2_query_ext_ctrl)
+#define	VIDIOC_DQ_EXT_EVENT	 _IOR('V', 104, struct v4l2_ext_event)
 
 /* Reminder: when adding new ioctls please add support for them to
    drivers/media/v4l2-core/v4l2-compat-ioctl32.c as well! */
