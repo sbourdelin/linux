@@ -272,26 +272,77 @@ static int rockchip_vpu_s_ctrl(struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
+void *rockchip_vpu_find_control_data(struct rockchip_vpu_ctx *ctx, unsigned int id)
+{
+	unsigned int i;
+
+	for (i = 0; i < ctx->num_ctrls; i++) {
+		if (!ctx->ctrls[i])
+			continue;
+		if (ctx->ctrls[i]->id == id)
+			return ctx->ctrls[i]->p_cur.p;
+	}
+	return NULL;
+}
+
 static const struct v4l2_ctrl_ops rockchip_vpu_ctrl_ops = {
 	.s_ctrl = rockchip_vpu_s_ctrl,
+};
+
+static struct rockchip_vpu_ctrl controls[] = {
+	{
+		.id = V4L2_CID_JPEG_COMPRESSION_QUALITY,
+		.codec = RK_VPU_JPEG_ENCODER,
+		.is_std = 1,
+		.cfg = {
+			.min = 5,
+			.max = 100,
+			.step = 1,
+			.def = 50,
+		},
+	},
 };
 
 static int rockchip_vpu_ctrls_setup(struct rockchip_vpu_dev *vpu,
 				    struct rockchip_vpu_ctx *ctx)
 {
-	v4l2_ctrl_handler_init(&ctx->ctrl_handler, 1);
-	if (vpu->variant->codec & RK_VPU_CODEC_JPEG) {
-		v4l2_ctrl_new_std(&ctx->ctrl_handler, &rockchip_vpu_ctrl_ops,
-				  V4L2_CID_JPEG_COMPRESSION_QUALITY,
-				  5, 100, 1, 50);
+	int j, i, num_ctrls = ARRAY_SIZE(controls);
+	int allowed_codecs;
+
+	if (ctx->is_enc)
+		allowed_codecs = vpu->variant->codec & RK_VPU_ENCODERS;
+	else
+		allowed_codecs = vpu->variant->codec & RK_VPU_DECODERS;
+
+	if (num_ctrls > ARRAY_SIZE(ctx->ctrls)) {
+		vpu_err("context control array not large enough\n");
+		return -EINVAL;
+	}
+
+	v4l2_ctrl_handler_init(&ctx->ctrl_handler, num_ctrls);
+
+	for (i = 0, j = 0; i < num_ctrls; i++) {
+		if (!(allowed_codecs & controls[i].codec))
+			continue;
+		if (controls[i].is_std) {
+			v4l2_ctrl_new_std(&ctx->ctrl_handler, &rockchip_vpu_ctrl_ops,
+					  controls[i].id, controls[i].cfg.min, controls[i].cfg.max,
+					  controls[i].cfg.step, controls[i].cfg.def);
+		} else {
+			controls[i].cfg.id = controls[i].id;
+			ctx->ctrls[j++] = v4l2_ctrl_new_custom(&ctx->ctrl_handler,
+							       &controls[i].cfg, NULL);
+		}
+
 		if (ctx->ctrl_handler.error) {
-			vpu_err("Adding JPEG control failed %d\n",
+			vpu_err("Adding control (%d) failed %d\n",
+				controls[i].id,
 				ctx->ctrl_handler.error);
 			v4l2_ctrl_handler_free(&ctx->ctrl_handler);
 			return ctx->ctrl_handler.error;
 		}
 	}
-
+	ctx->num_ctrls = j;
 	return v4l2_ctrl_handler_setup(&ctx->ctrl_handler);
 }
 

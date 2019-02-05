@@ -25,6 +25,7 @@
 
 #include "rockchip_vpu_hw.h"
 
+#define ROCKCHIP_VPU_MAX_CTRLS          32
 #define ROCKCHIP_VPU_MAX_CLOCKS		4
 
 #define JPEG_MB_DIM			16
@@ -34,7 +35,10 @@
 struct rockchip_vpu_ctx;
 struct rockchip_vpu_codec_ops;
 
-#define RK_VPU_CODEC_JPEG BIT(0)
+#define RK_VPU_JPEG_ENCODER	BIT(0)
+#define RK_VPU_ENCODERS		0x0000ffff
+
+#define RK_VPU_DECODERS		0xffff0000
 
 /**
  * struct rockchip_vpu_variant - information about VPU hardware variant
@@ -77,6 +81,20 @@ struct rockchip_vpu_variant {
 enum rockchip_vpu_codec_mode {
 	RK_VPU_MODE_NONE = -1,
 	RK_VPU_MODE_JPEG_ENC,
+};
+
+/*
+ * struct rockchip_vpu_ctrl - helper type to declare supported controls
+ * @id:		V4L2 control ID (V4L2_CID_xxx)
+ * @is_std:	boolean to distinguish standard from customs control.
+ * @codec:	codec id this control belong to (RK_VPU_JPEG_ENCODER, etc.)
+ * @cfg:	control configuration
+ */
+struct rockchip_vpu_ctrl {
+	unsigned int id;
+	unsigned int is_std;
+	unsigned int codec;
+	struct v4l2_ctrl_config cfg;
 };
 
 /*
@@ -169,6 +187,8 @@ struct rockchip_vpu_dev {
  * @dst_fmt:		V4L2 pixel format of active destination format.
  *
  * @ctrl_handler:	Control handler used to register controls.
+ * @ctrls:		Array of supported controls.
+ * @num_ctrls:		Number of controls populated in the array.
  * @jpeg_quality:	User-specified JPEG compression quality.
  *
  * @codec_ops:		Set of operations related to codec mode.
@@ -188,6 +208,8 @@ struct rockchip_vpu_ctx {
 	struct v4l2_pix_format_mplane dst_fmt;
 
 	struct v4l2_ctrl_handler ctrl_handler;
+	struct v4l2_ctrl *ctrls[ROCKCHIP_VPU_MAX_CTRLS];
+	unsigned int num_ctrls;
 	int jpeg_quality;
 
 	const struct rockchip_vpu_codec_ops *codec_ops;
