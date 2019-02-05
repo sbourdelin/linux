@@ -17,6 +17,23 @@ config PRINTK_TIME
 	  The behavior is also controlled by the kernel command line
 	  parameter printk.time=1. See Documentation/admin-guide/kernel-parameters.rst
 
+config PRINTK_CALLER
+	bool "Show caller information on printks"
+	depends on PRINTK
+	help
+	  Selecting this option causes printk() to add a caller "thread id" (if
+	  in task context) or a caller "processor id" (if not in task context)
+	  to every message.
+
+	  This option is intended for environments where multiple threads
+	  concurrently call printk() for many times, for it is difficult to
+	  interpret without knowing where these lines (or sometimes individual
+	  line which was divided into multiple lines due to race) came from.
+
+	  Since toggling after boot makes the code racy, currently there is
+	  no option to enable/disable at the kernel command line parameter or
+	  sysfs interface.
+
 config CONSOLE_LOGLEVEL_DEFAULT
 	int "Default console loglevel (1-15)"
 	range 1 15
@@ -1682,7 +1699,6 @@ if RUNTIME_TESTING_MENU
 config LKDTM
 	tristate "Linux Kernel Dump Test Tool Module"
 	depends on DEBUG_FS
-	depends on BLOCK
 	help
 	This module enables testing of the different dumping mechanisms by
 	inducing system failures at predefined crash points.
@@ -1985,6 +2001,28 @@ config TEST_MEMCAT_P
 
 	  If unsure, say N.
 
+config TEST_LIVEPATCH
+	tristate "Test livepatching"
+	default n
+	depends on DYNAMIC_DEBUG
+	depends on LIVEPATCH
+	depends on m
+	help
+	  Test kernel livepatching features for correctness.  The tests will
+	  load test modules that will be livepatched in various scenarios.
+
+	  To run all the livepatching tests:
+
+	  make -C tools/testing/selftests TARGETS=livepatch run_tests
+
+	  Alternatively, individual tests may be invoked:
+
+	  tools/testing/selftests/livepatch/test-callbacks.sh
+	  tools/testing/selftests/livepatch/test-livepatch.sh
+	  tools/testing/selftests/livepatch/test-shadow-vars.sh
+
+	  If unsure, say N.
+
 config TEST_OBJAGG
 	tristate "Perform selftest on object aggreration manager"
 	default n
@@ -1993,7 +2031,6 @@ config TEST_OBJAGG
 	  Enable this option to test object aggregation manager on boot
 	  (or module load).
 
-	  If unsure, say N.
 
 endif # RUNTIME_TESTING_MENU
 

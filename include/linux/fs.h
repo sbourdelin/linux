@@ -37,6 +37,7 @@
 #include <linux/uuid.h>
 #include <linux/errseq.h>
 #include <linux/ioprio.h>
+#include <linux/fs_types.h>
 
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
@@ -61,6 +62,8 @@ struct workqueue_struct;
 struct iov_iter;
 struct fscrypt_info;
 struct fscrypt_operations;
+struct fs_context;
+struct fs_parameter_description;
 
 extern void __init inode_init(void);
 extern void __init inode_init_early(void);
@@ -698,7 +701,7 @@ struct inode {
 	struct fsnotify_mark_connector __rcu	*i_fsnotify_marks;
 #endif
 
-#if IS_ENABLED(CONFIG_FS_ENCRYPTION)
+#ifdef CONFIG_FS_ENCRYPTION
 	struct fscrypt_info	*i_crypt_info;
 #endif
 
@@ -1337,6 +1340,7 @@ extern int send_sigurg(struct fown_struct *fown);
 
 /* These sb flags are internal to the kernel */
 #define SB_SUBMOUNT     (1<<26)
+#define SB_FORCE    	(1<<27)
 #define SB_NOSEC	(1<<28)
 #define SB_BORN		(1<<29)
 #define SB_ACTIVE	(1<<30)
@@ -1403,7 +1407,7 @@ struct super_block {
 	void                    *s_security;
 #endif
 	const struct xattr_handler **s_xattr;
-#if IS_ENABLED(CONFIG_FS_ENCRYPTION)
+#ifdef CONFIG_FS_ENCRYPTION
 	const struct fscrypt_operations	*s_cop;
 #endif
 	struct hlist_bl_head	s_roots;	/* alternate root dentries for NFS */
@@ -1447,7 +1451,7 @@ struct super_block {
 	 * Filesystem subtype.  If non-empty the filesystem type field
 	 * in /proc/mounts will be "type.subtype"
 	 */
-	char *s_subtype;
+	const char *s_subtype;
 
 	const struct dentry_operations *s_d_op; /* default d_op for dentries */
 
@@ -1699,22 +1703,6 @@ struct fiemap_extent_info {
 int fiemap_fill_next_extent(struct fiemap_extent_info *info, u64 logical,
 			    u64 phys, u64 len, u32 flags);
 int fiemap_check_flags(struct fiemap_extent_info *fieinfo, u32 fs_flags);
-
-/*
- * File types
- *
- * NOTE! These match bits 12..15 of stat.st_mode
- * (ie "(i_mode >> 12) & 15").
- */
-#define DT_UNKNOWN	0
-#define DT_FIFO		1
-#define DT_CHR		2
-#define DT_DIR		4
-#define DT_BLK		6
-#define DT_REG		8
-#define DT_LNK		10
-#define DT_SOCK		12
-#define DT_WHT		14
 
 /*
  * This is the "filldir" function type, used by readdir() to let
@@ -2173,6 +2161,8 @@ struct file_system_type {
 #define FS_HAS_SUBTYPE		4
 #define FS_USERNS_MOUNT		8	/* Can be mounted by userns root */
 #define FS_RENAME_DOES_D_MOVE	32768	/* FS will handle d_move() during rename() internally. */
+	int (*init_fs_context)(struct fs_context *);
+	const struct fs_parameter_description *parameters;
 	struct dentry *(*mount) (struct file_system_type *, int,
 		       const char *, void *);
 	void (*kill_sb) (struct super_block *);
@@ -2228,8 +2218,12 @@ void kill_litter_super(struct super_block *sb);
 void deactivate_super(struct super_block *sb);
 void deactivate_locked_super(struct super_block *sb);
 int set_anon_super(struct super_block *s, void *data);
+int set_anon_super_fc(struct super_block *s, struct fs_context *fc);
 int get_anon_bdev(dev_t *);
 void free_anon_bdev(dev_t);
+struct super_block *sget_fc(struct fs_context *fc,
+			    int (*test)(struct super_block *, struct fs_context *),
+			    int (*set)(struct super_block *, struct fs_context *));
 struct super_block *sget_userns(struct file_system_type *type,
 			int (*test)(struct super_block *,void *),
 			int (*set)(struct super_block *,void *),
@@ -2272,8 +2266,7 @@ mount_pseudo(struct file_system_type *fs_type, char *name,
 
 extern int register_filesystem(struct file_system_type *);
 extern int unregister_filesystem(struct file_system_type *);
-extern struct vfsmount *kern_mount_data(struct file_system_type *, void *data);
-#define kern_mount(type) kern_mount_data(type, NULL)
+extern struct vfsmount *kern_mount(struct file_system_type *);
 extern void kern_unmount(struct vfsmount *mnt);
 extern int may_umount_tree(struct vfsmount *);
 extern int may_umount(struct vfsmount *);

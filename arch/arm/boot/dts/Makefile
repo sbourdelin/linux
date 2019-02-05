@@ -79,6 +79,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
 	bcm2835-rpi-a-plus.dtb \
 	bcm2835-rpi-cm1-io1.dtb \
 	bcm2836-rpi-2-b.dtb \
+	bcm2837-rpi-3-a-plus.dtb \
 	bcm2837-rpi-3-b.dtb \
 	bcm2837-rpi-3-b-plus.dtb \
 	bcm2837-rpi-cm3-io3.dtb \
@@ -445,6 +446,9 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 	imx6dl-wandboard.dtb \
 	imx6dl-wandboard-revb1.dtb \
 	imx6dl-wandboard-revd1.dtb \
+	imx6dl-yapp4-draco.dtb \
+	imx6dl-yapp4-hydra.dtb \
+	imx6dl-yapp4-ursa.dtb \
 	imx6q-apalis-eval.dtb \
 	imx6q-apalis-ixora.dtb \
 	imx6q-apalis-ixora-v1.1.dtb \
@@ -561,6 +565,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
 	imx6ul-opos6uldev.dtb \
 	imx6ul-pico-hobbit.dtb \
 	imx6ul-pico-pi.dtb \
+	imx6ul-phytec-phyboard-segin-full.dtb \
 	imx6ul-tx6ul-0010.dtb \
 	imx6ul-tx6ul-0011.dtb \
 	imx6ul-tx6ul-mainboard.dtb \
@@ -700,6 +705,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += \
 	omap3-thunder.dtb \
 	omap3-zoom3.dtb
 dtb-$(CONFIG_SOC_TI81XX) += \
+	am3874-iceboard.dtb \
 	dm8148-evm.dtb \
 	dm8148-t410.dtb \
 	dm8168-evm.dtb \
@@ -843,6 +849,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
 	r7s72100-genmai.dtb \
 	r7s72100-gr-peach.dtb \
 	r7s72100-rskrza1.dtb \
+	r7s9210-rza2mevb.dtb \
 	r8a73a4-ape6evm.dtb \
 	r8a7740-armadillo800eva.dtb \
 	r8a7743-iwg20d-q7.dtb \
@@ -868,6 +875,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
 	r9a06g032-rzn1d400-db.dtb \
 	sh73a0-kzm9g.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+	rv1108-elgin-r1.dtb \
 	rv1108-evb.dtb \
 	rk3036-evb.dtb \
 	rk3036-kylin.dtb \

@@ -319,7 +319,6 @@ pte_t ptep_modify_prot_start(struct vm_area_struct *vma, unsigned long addr,
 	}
 	return old;
 }
-EXPORT_SYMBOL(ptep_modify_prot_start);
 
 void ptep_modify_prot_commit(struct vm_area_struct *vma, unsigned long addr,
 			     pte_t *ptep, pte_t old_pte, pte_t pte)
@@ -339,7 +338,6 @@ void ptep_modify_prot_commit(struct vm_area_struct *vma, unsigned long addr,
 	}
 	preempt_enable();
 }
-EXPORT_SYMBOL(ptep_modify_prot_commit);
 
 static inline void pmdp_idte_local(struct mm_struct *mm,
 				   unsigned long addr, pmd_t *pmdp)

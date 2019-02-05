@@ -461,6 +461,11 @@
 			possible to determine what the correct size should be.
 			This option provides an override for these situations.
 
+	carrier_timeout=
+			[NET] Specifies amount of time (in seconds) that
+			the kernel should wait for a network carrier. By default
+			it waits 120 seconds.
+
 	ca_keys=	[KEYS] This parameter identifies a specific key(s) on
 			the system trusted keyring to be used for certificate
 			trust validation.
@@ -1696,12 +1701,11 @@
 			By default, super page will be supported if Intel IOMMU
 			has the capability. With this option, super page will
 			not be supported.
-		sm_off [Default Off]
-			By default, scalable mode will be supported if the
+		sm_on [Default Off]
+			By default, scalable mode will be disabled even if the
 			hardware advertises that it has support for the scalable
 			mode translation. With this option set, scalable mode
-			will not be used even on hardware which claims to support
-			it.
+			will be used on hardware which claims to support it.
 		tboot_noforce [Default Off]
 			Do not force the Intel IOMMU enabled under tboot.
 			By default, tboot will force Intel IOMMU on, which
@@ -2321,6 +2325,10 @@
 			Format: <io>,<irq>,<dma>
 
 	lsm.debug	[SECURITY] Enable LSM initialization debugging output.
+
+	lsm=lsm1,...,lsmN
+			[SECURITY] Choose order of LSM initialization. This
+			overrides CONFIG_LSM.
 
 	machvec=	[IA-64] Force the use of a particular machine-vector
 			(machvec) in a generic kernel.
@@ -3657,19 +3665,6 @@
 			latencies, which will choose a value aligned
 			with the appropriate hardware boundaries.
 
-	rcutree.jiffies_till_sched_qs= [KNL]
-			Set required age in jiffies for a
-			given grace period before RCU starts
-			soliciting quiescent-state help from
-			rcu_note_context_switch().  If not specified, the
-			kernel will calculate a value based on the most
-			recent settings of rcutree.jiffies_till_first_fqs
-			and rcutree.jiffies_till_next_fqs.
-			This calculated value may be viewed in
-			rcutree.jiffies_to_sched_qs.  Any attempt to
-			set rcutree.jiffies_to_sched_qs will be
-			cheerfully overwritten.
-
 	rcutree.jiffies_till_first_fqs= [KNL]
 			Set delay from grace-period initialization to
 			first attempt to force quiescent states.
@@ -3680,6 +3675,20 @@
 			Set delay between subsequent attempts to force
 			quiescent states.  Units are jiffies, minimum
 			value is one, and maximum value is HZ.
+
+	rcutree.jiffies_till_sched_qs= [KNL]
+			Set required age in jiffies for a
+			given grace period before RCU starts
+			soliciting quiescent-state help from
+			rcu_note_context_switch() and cond_resched().
+			If not specified, the kernel will calculate
+			a value based on the most recent settings
+			of rcutree.jiffies_till_first_fqs
+			and rcutree.jiffies_till_next_fqs.
+			This calculated value may be viewed in
+			rcutree.jiffies_to_sched_qs.  Any attempt to set
+			rcutree.jiffies_to_sched_qs will be cheerfully
+			overwritten.
 
 	rcutree.kthread_prio= 	 [KNL,BOOT]
 			Set the SCHED_FIFO priority of the RCU per-CPU
@@ -3723,6 +3732,11 @@
 			it should at force-quiescent-state time.
 			This wake_up() will be accompanied by a
 			WARN_ONCE() splat and an ftrace_dump().
+
+	rcutree.sysrq_rcu= [KNL]
+			Commandeer a sysrq key to dump out Tree RCU's
+			rcu_node tree with an eye towards determining
+			why a new grace period has not yet started.
 
 	rcuperf.gp_async= [KNL]
 			Measure performance of asynchronous
@@ -5045,6 +5059,14 @@
 			see Documentation/watchdog/watchdog-parameters.txt
 			or other driver-specific files in the
 			Documentation/watchdog/ directory.
+
+	watchdog_thresh=
+			[KNL]
+			Set the hard lockup detector stall duration
+			threshold in seconds. The soft lockup detector
+			threshold is set to twice the value. A value of 0
+			disables both lockup detectors. Default is 10
+			seconds.
 
 	workqueue.watchdog_thresh=
 			If CONFIG_WQ_WATCHDOG is configured, workqueue can

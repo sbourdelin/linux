@@ -321,12 +321,8 @@ static int __init fail_futex_debugfs(void)
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
-	if (!debugfs_create_bool("ignore-private", mode, dir,
-				 &fail_futex.ignore_private)) {
-		debugfs_remove_recursive(dir);
-		return -ENOMEM;
-	}
-
+	debugfs_create_bool("ignore-private", mode, dir,
+			    &fail_futex.ignore_private);
 	return 0;
 }
 
@@ -3815,7 +3811,7 @@ err_unlock:
 #endif /* CONFIG_COMPAT */
 
 #ifdef CONFIG_COMPAT_32BIT_TIME
-COMPAT_SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
+SYSCALL_DEFINE6(futex_time32, u32 __user *, uaddr, int, op, u32, val,
 		struct old_timespec32 __user *, utime, u32 __user *, uaddr2,
 		u32, val3)
 {

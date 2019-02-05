@@ -291,7 +291,8 @@ static void smc_copy_sock_settings(struct sock *nsk, struct sock *osk,
 			     (1UL << SOCK_RXQ_OVFL) | \
 			     (1UL << SOCK_WIFI_STATUS) | \
 			     (1UL << SOCK_NOFCS) | \
-			     (1UL << SOCK_FILTER_LOCKED))
+			     (1UL << SOCK_FILTER_LOCKED) | \
+			     (1UL << SOCK_TSTAMP_NEW))
 /* copy only relevant settings and flags of SOL_SOCKET level from smc to
  * clc socket (since smc is not called for these options from net/core)
  */
@@ -1505,6 +1506,11 @@ static int smc_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 
 	smc = smc_sk(sk);
 	lock_sock(sk);
+	if (sk->sk_state == SMC_CLOSED && (sk->sk_shutdown & RCV_SHUTDOWN)) {
+		/* socket was connected before, no more data to read */
+		rc = 0;
+		goto out;
+	}
 	if ((sk->sk_state == SMC_INIT) ||
 	    (sk->sk_state == SMC_LISTEN) ||
 	    (sk->sk_state == SMC_CLOSED))
@@ -1840,7 +1846,11 @@ static ssize_t smc_splice_read(struct socket *sock, loff_t *ppos,
 
 	smc = smc_sk(sk);
 	lock_sock(sk);
-
+	if (sk->sk_state == SMC_CLOSED && (sk->sk_shutdown & RCV_SHUTDOWN)) {
+		/* socket was connected before, no more data to read */
+		rc = 0;
+		goto out;
+	}
 	if (sk->sk_state == SMC_INIT ||
 	    sk->sk_state == SMC_LISTEN ||
 	    sk->sk_state == SMC_CLOSED)

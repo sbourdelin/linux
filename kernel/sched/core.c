@@ -421,7 +421,7 @@ void wake_q_add(struct wake_q_head *head, struct task_struct *task)
 	 * state, even in the failed case, an explicit smp_mb() must be used.
 	 */
 	smp_mb__before_atomic();
-	if (cmpxchg_relaxed(&node->next, NULL, WAKE_Q_TAIL))
+	if (unlikely(cmpxchg_relaxed(&node->next, NULL, WAKE_Q_TAIL)))
 		return;
 
 	get_task_struct(task);
@@ -5268,9 +5268,8 @@ SYSCALL_DEFINE2(sched_rr_get_interval, pid_t, pid,
 }
 
 #ifdef CONFIG_COMPAT_32BIT_TIME
-COMPAT_SYSCALL_DEFINE2(sched_rr_get_interval,
-		       compat_pid_t, pid,
-		       struct old_timespec32 __user *, interval)
+SYSCALL_DEFINE2(sched_rr_get_interval_time32, pid_t, pid,
+		struct old_timespec32 __user *, interval)
 {
 	struct timespec64 t;
 	int retval = sched_rr_get_interval(pid, &t);
@@ -5870,14 +5869,11 @@ void __init sched_init_smp(void)
 	/*
 	 * There's no userspace yet to cause hotplug operations; hence all the
 	 * CPU masks are stable and all blatant races in the below code cannot
-	 * happen. The hotplug lock is nevertheless taken to satisfy lockdep,
-	 * but there won't be any contention on it.
+	 * happen.
 	 */
-	cpus_read_lock();
 	mutex_lock(&sched_domains_mutex);
 	sched_init_domains(cpu_active_mask);
 	mutex_unlock(&sched_domains_mutex);
-	cpus_read_unlock();
 
 	/* Move init over to a non-isolated CPU */
 	if (set_cpus_allowed_ptr(current, housekeeping_cpumask(HK_FLAG_DOMAIN)) < 0)

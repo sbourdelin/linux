@@ -861,7 +861,7 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 		if ((pmcsr & PCI_PM_CTRL_STATE_MASK) == PCI_D3hot
 		 && !(pmcsr & PCI_PM_CTRL_NO_SOFT_RESET))
 			need_restore = true;
-		/* Fall-through: force to D0 */
+		/* Fall-through - force to D0 */
 	default:
 		pmcsr = 0;
 		break;
@@ -2260,7 +2260,7 @@ static pci_power_t pci_target_state(struct pci_dev *dev, bool wakeup)
 		case PCI_D2:
 			if (pci_no_d1d2(dev))
 				break;
-			/* else: fall through */
+			/* else, fall through */
 		default:
 			target_state = state;
 		}
@@ -6034,19 +6034,18 @@ static ssize_t pci_get_resource_alignment_param(char *buf, size_t size)
 	return count;
 }
 
-static ssize_t pci_resource_alignment_show(struct bus_type *bus, char *buf)
+static ssize_t resource_alignment_show(struct bus_type *bus, char *buf)
 {
 	return pci_get_resource_alignment_param(buf, PAGE_SIZE);
 }
 
-static ssize_t pci_resource_alignment_store(struct bus_type *bus,
+static ssize_t resource_alignment_store(struct bus_type *bus,
 					const char *buf, size_t count)
 {
 	return pci_set_resource_alignment_param(buf, count);
 }
 
-static BUS_ATTR(resource_alignment, 0644, pci_resource_alignment_show,
-					pci_resource_alignment_store);
+static BUS_ATTR_RW(resource_alignment);
 
 static int __init pci_resource_alignment_sysfs_init(void)
 {

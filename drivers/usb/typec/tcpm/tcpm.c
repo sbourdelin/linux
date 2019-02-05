@@ -2297,7 +2297,8 @@ static unsigned int tcpm_pd_select_pps_apdo(struct tcpm_port *port)
 					      pdo_pps_apdo_max_voltage(snk));
 		port->pps_data.max_curr = min_pps_apdo_current(src, snk);
 		port->pps_data.out_volt = min(port->pps_data.max_volt,
-					      port->pps_data.out_volt);
+					      max(port->pps_data.min_volt,
+						  port->pps_data.out_volt));
 		port->pps_data.op_curr = min(port->pps_data.max_curr,
 					     port->pps_data.op_curr);
 	}
@@ -4810,12 +4811,12 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 
 	err = devm_tcpm_psy_register(port);
 	if (err)
-		goto out_destroy_wq;
+		goto out_role_sw_put;
 
 	port->typec_port = typec_register_port(port->dev, &port->typec_caps);
 	if (IS_ERR(port->typec_port)) {
 		err = PTR_ERR(port->typec_port);
-		goto out_destroy_wq;
+		goto out_role_sw_put;
 	}
 
 	if (tcpc->config && tcpc->config->alt_modes) {
@@ -4848,8 +4849,10 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 	tcpm_log(port, "%s: registered", dev_name(dev));
 	return port;
 
-out_destroy_wq:
+out_role_sw_put:
 	usb_role_switch_put(port->role_sw);
+out_destroy_wq:
+	tcpm_debugfs_exit(port);
 	destroy_workqueue(port->wq);
 	return ERR_PTR(err);
 }
