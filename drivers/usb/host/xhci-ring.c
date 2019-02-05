@@ -3272,7 +3272,14 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			field |= TRB_IOC;
 			more_trbs_coming = false;
 			td->last_trb = ring->enqueue;
+
+			if (xhci_urb_suitable_for_idt(urb)) {
+				memcpy(&send_addr, urb->transfer_buffer,
+				       trb_buff_len);
+				field |= TRB_IDT;
+			}
 		}
+
 
 		/* Only set interrupt on short packet for IN endpoints */
 		if (usb_urb_dir_in(urb))
@@ -3411,6 +3418,12 @@ int xhci_queue_ctrl_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 	if (urb->transfer_buffer_length > 0) {
 		u32 length_field, remainder;
 
+		if (xhci_urb_suitable_for_idt(urb)) {
+			memcpy(&urb->transfer_dma, urb->transfer_buffer,
+			       urb->transfer_buffer_length);
+			field |= TRB_IDT;
+		}
+
 		remainder = xhci_td_remainder(xhci, 0,
 				urb->transfer_buffer_length,
 				urb->transfer_buffer_length,
@@ -3420,6 +3433,7 @@ int xhci_queue_ctrl_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 				TRB_INTR_TARGET(0);
 		if (setup->bRequestType & USB_DIR_IN)
 			field |= TRB_DIR_IN;
+
 		queue_trb(xhci, ep_ring, true,
 				lower_32_bits(urb->transfer_dma),
 				upper_32_bits(urb->transfer_dma),
@@ -3709,6 +3723,12 @@ static int xhci_queue_isoc_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			trb_buff_len = TRB_BUFF_LEN_UP_TO_BOUNDARY(addr);
 			if (trb_buff_len > td_remain_len)
 				trb_buff_len = td_remain_len;
+
+			if (xhci_urb_suitable_for_idt(urb)) {
+				memcpy(&addr, urb->transfer_buffer,
+				       trb_buff_len);
+				field |= TRB_IDT;
+			}
 
 			/* Set the TRB length, TD size, & interrupter fields. */
 			remainder = xhci_td_remainder(xhci, running_total,
