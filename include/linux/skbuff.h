@@ -4343,5 +4343,7 @@ static inline __wsum lco_csum(struct sk_buff *skb)
 	return csum_partial(l4_hdr, csum_start - l4_hdr, partial);
 }
 
+struct net *skb_net(const struct sk_buff *skb);
+
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

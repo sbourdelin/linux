@@ -5585,6 +5585,16 @@ void skb_condense(struct sk_buff *skb)
 	skb->truesize = SKB_TRUESIZE(skb_end_offset(skb));
 }
 
+struct net *skb_net(const struct sk_buff *skb)
+{
+	if (skb->dev)
+		return dev_net(skb->dev);
+	else if (skb->sk)
+		return sock_net(skb->sk);
+	return NULL;
+}
+EXPORT_SYMBOL(skb_net);
+
 #ifdef CONFIG_SKB_EXTENSIONS
 static void *skb_ext_get_ptr(struct skb_ext *ext, enum skb_ext_id id)
 {
