@@ -451,6 +451,8 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 		return ret;
 	}
 
+	dev_pm_opp_of_register_em(policy->cpus);
+
 	cpumask_copy(policy->cpus, &info->cpus);
 	policy->freq_table = freq_table;
 	policy->driver_data = info;
