@@ -880,8 +880,11 @@ void mesh_path_tbl_expire(struct ieee80211_sub_if_data *sdata,
 
 void mesh_path_expire(struct ieee80211_sub_if_data *sdata)
 {
+	/* we do other walks inside softirq, so need to disable them here */
+	local_bh_disable();
 	mesh_path_tbl_expire(sdata, sdata->u.mesh.mesh_paths);
 	mesh_path_tbl_expire(sdata, sdata->u.mesh.mpp_paths);
+	local_bh_enable();
 }
 
 void mesh_pathtbl_unregister(struct ieee80211_sub_if_data *sdata)
