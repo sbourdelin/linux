@@ -108,4 +108,19 @@ ssize_t simple_xattr_list(struct inode *inode, struct simple_xattrs *xattrs, cha
 void simple_xattr_list_add(struct simple_xattrs *xattrs,
 			   struct simple_xattr *new_xattr);
 
+static inline int simple_xattrs_empty(struct simple_xattrs *xattrs)
+{
+	return list_empty(&xattrs->head);
+}
+
+/**
+ * Move the xattr list from @src to @dst, leaving @src empty.
+ */
+static inline void simple_xattrs_move(struct simple_xattrs *dst,
+				      struct simple_xattrs *src)
+{
+	simple_xattrs_free(dst);
+	list_replace_init(&src->head, &dst->head);
+}
+
 #endif	/* _LINUX_XATTR_H */
