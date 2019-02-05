@@ -98,6 +98,8 @@ static const struct rockchip_vpu_codec_ops rk3399_vpu_codec_ops[] = {
 	[RK_VPU_MODE_JPEG_ENC] = {
 		.run = rk3399_vpu_jpeg_enc_run,
 		.reset = rk3399_vpu_enc_reset,
+		.start = rockchip_vpu_jpeg_enc_start,
+		.stop = rockchip_vpu_jpeg_enc_stop,
 	},
 };
 

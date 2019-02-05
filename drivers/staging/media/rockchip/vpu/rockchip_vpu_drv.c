@@ -64,10 +64,16 @@ static void rockchip_vpu_job_finish(struct rockchip_vpu_dev *vpu,
 	avail_size = vb2_plane_size(&dst->vb2_buf, 0) -
 		     ctx->vpu_dst_fmt->header_size;
 	if (bytesused <= avail_size) {
-		if (ctx->bounce_buf) {
+		/*
+		 * This works while JPEG is the only encoder this driver
+		 * supports. We will have to abstract this step, or get
+		 * rid of the bounce buffer before we can support
+		 * encoding other codecs.
+		 */
+		if (ctx->jpeg_enc_ctx.bounce_buffer.cpu) {
 			memcpy(vb2_plane_vaddr(&dst->vb2_buf, 0) +
 			       ctx->vpu_dst_fmt->header_size,
-			       ctx->bounce_buf, bytesused);
+			       ctx->jpeg_enc_ctx.bounce_buffer.cpu, bytesused);
 		}
 		dst->vb2_buf.planes[0].bytesused =
 			ctx->vpu_dst_fmt->header_size + bytesused;
