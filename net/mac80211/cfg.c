@@ -3889,6 +3889,110 @@ ieee80211_abort_pmsr(struct wiphy *wiphy, struct wireless_dev *dev,
 	return drv_abort_pmsr(local, sdata, request);
 }
 
+void sta_mon_rssi_config_free(struct sta_info *sta)
+{
+	if (sta->rssi_config) {
+		kfree_rcu(sta->rssi_config, rcu_head);
+		sta->rssi_config = NULL;
+	}
+}
+
+void ieee80211_update_rssi_config(struct sta_info *sta)
+{
+	s32 last;
+	u32 hyst;
+	int i, n;
+
+	if (!sta->rssi_config || sta->rssi_config->fixed_thold)
+		return;
+
+	if (!sta->rssi_config->last_value)
+		sta->rssi_config->last_value =
+			-ewma_signal_read(&sta->rx_stats_avg.signal);
+
+	last = sta->rssi_config->last_value;
+	hyst = sta->rssi_config->hyst;
+	n = sta->rssi_config->n_thresholds;
+
+	for (i = 0; i < n; i++)
+		if (last < sta->rssi_config->thresholds[i])
+			break;
+
+	sta->rssi_config->low =
+		i > 0 ? (sta->rssi_config->thresholds[i - 1] - hyst) : S32_MIN;
+	sta->rssi_config->high =
+		i < n ? (sta->rssi_config->thresholds[i] + hyst - 1) : S32_MAX;
+}
+
+static int
+ieee80211_set_sta_mon_rssi_config(struct wiphy *wiphy,
+				  struct net_device *dev,
+				  const u8 *mac_addr,
+				  const struct cfg80211_sta_mon *sta_mon_cfg)
+{
+	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_local *local = sdata->local;
+	struct sta_mon_rssi_config *rssi_config;
+	struct sta_info *sta;
+	int ret = 0;
+
+	mutex_lock(&local->sta_mtx);
+	rcu_read_lock();
+
+	if (mac_addr) {
+		sta = sta_info_get_bss(sdata, mac_addr);
+		if (!sta) {
+			ret = -ENOENT;
+			goto out;
+		}
+
+		if (sta_mon_cfg->fixed_thold &&
+		    sta_mon_cfg->n_rssi_tholds > 2) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		rssi_config = kzalloc(sizeof(*rssi_config) +
+				      sta_mon_cfg->n_rssi_tholds * sizeof(s32),
+				      GFP_KERNEL);
+		if (!rssi_config) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		rssi_config->hyst = sta_mon_cfg->rssi_hyst;
+		if (sta_mon_cfg->fixed_thold) {
+			sta_mon_rssi_config_free(sta);
+			if (sta_mon_cfg->n_rssi_tholds == 1) {
+				rssi_config->low = sta_mon_cfg->rssi_tholds[0];
+				rssi_config->high = sta_mon_cfg->rssi_tholds[0];
+			} else {
+				rssi_config->low = sta_mon_cfg->rssi_tholds[0];
+				rssi_config->high = sta_mon_cfg->rssi_tholds[1];
+			}
+			rssi_config->fixed_thold = sta_mon_cfg->fixed_thold;
+			rssi_config->hyst = sta_mon_cfg->rssi_hyst;
+			rssi_config->n_thresholds = sta_mon_cfg->n_rssi_tholds;
+			sta->rssi_config = rssi_config;
+		} else {
+			sta_mon_rssi_config_free(sta);
+			rssi_config->n_thresholds = sta_mon_cfg->n_rssi_tholds;
+			memcpy(rssi_config->thresholds,
+			       sta_mon_cfg->rssi_tholds,
+			       rssi_config->n_thresholds * sizeof(s32));
+			rssi_config->hyst = sta_mon_cfg->rssi_hyst;
+			sta->rssi_config = rssi_config;
+			/* Calculate low and high RSSI thresholds */
+			ieee80211_update_rssi_config(sta);
+		}
+	}
+
+out:
+	rcu_read_unlock();
+	mutex_unlock(&local->sta_mtx);
+	return ret;
+}
+
 const struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
 	.del_virtual_intf = ieee80211_del_iface,
@@ -3986,4 +4090,5 @@ const struct cfg80211_ops mac80211_config_ops = {
 	.get_ftm_responder_stats = ieee80211_get_ftm_responder_stats,
 	.start_pmsr = ieee80211_start_pmsr,
 	.abort_pmsr = ieee80211_abort_pmsr,
+	.set_sta_mon_rssi_config = ieee80211_set_sta_mon_rssi_config,
 };

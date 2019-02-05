@@ -1020,6 +1020,7 @@ static void __sta_info_destroy_part2(struct sta_info *sta)
 
 	rate_control_remove_sta_debugfs(sta);
 	ieee80211_sta_debugfs_remove(sta);
+	sta_mon_rssi_config_free(sta);
 
 	cleanup_single_sta(sta);
 }

@@ -427,6 +427,33 @@ struct ieee80211_sta_rx_stats {
 	u64 msdu[IEEE80211_NUM_TIDS + 1];
 };
 
+/**
+ * struct sta_mon_rssi_config - Monitor station's signal strength
+ * @rcu_head: rcu head for freeing structure
+ * @n_rssi_tholds: Number of thresholds passed by user
+ * @low: RSSI lower threshold for this station, a zero value implies
+ *	disabled
+ * @high: RSSI upper threshold for this station
+ * @hyst: RSSI hysteresis for this station
+ * @last_value: Last RSSI value for this station triggered the
+ *	RSSI cross event
+ * @fixed_thold - Indicate whether to use fixed thresholds limit or not
+ * @threholds: RSSI threshold limit passed by the user
+ * @count_rx_signal: Number of data frames used in averaging station signal.
+ *	This can be used to avoid generating less reliable station rssi cross
+ *	events that would be based only on couple of received frames
+ */
+struct sta_mon_rssi_config {
+	struct rcu_head rcu_head;
+	int n_thresholds;
+	s32 low, high;
+	u32 hyst;
+	s32 last_value;
+	u8 fixed_thold;
+	unsigned int count_rx_signal;
+	s32 thresholds[0];
+};
+
 /*
  * The bandwidth threshold below which the per-station CoDel parameters will be
  * scaled to be more lenient (to prevent starvation of slow stations). This
@@ -623,6 +650,7 @@ struct sta_info {
 
 	struct cfg80211_chan_def tdls_chandef;
 
+	struct sta_mon_rssi_config *rssi_config;
 	/* keep last! */
 	struct ieee80211_sta sta;
 };
@@ -760,6 +788,7 @@ int sta_info_destroy_addr(struct ieee80211_sub_if_data *sdata,
 			  const u8 *addr);
 int sta_info_destroy_addr_bss(struct ieee80211_sub_if_data *sdata,
 			      const u8 *addr);
+void sta_mon_rssi_config_free(struct sta_info *sta);
 
 void sta_info_recalc_tim(struct sta_info *sta);
 
@@ -792,6 +821,7 @@ u32 sta_get_expected_throughput(struct sta_info *sta);
 void ieee80211_sta_expire(struct ieee80211_sub_if_data *sdata,
 			  unsigned long exp_time);
 u8 sta_info_tx_streams(struct sta_info *sta);
+void ieee80211_update_rssi_config(struct sta_info *sta);
 
 void ieee80211_sta_ps_deliver_wakeup(struct sta_info *sta);
 void ieee80211_sta_ps_deliver_poll_response(struct sta_info *sta);
