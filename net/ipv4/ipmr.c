@@ -1298,22 +1298,12 @@ static int ipmr_mfc_add(struct net *net, struct mr_table *mrt,
 	return 0;
 }
 
-/* Close the multicast socket, and clear the vif tables etc */
-static void mroute_clean_tables(struct mr_table *mrt, bool all)
+/* Clear the vif tables */
+static void mroute_clean_cache(struct mr_table *mrt, bool all)
 {
 	struct net *net = read_pnet(&mrt->net);
-	struct mr_mfc *c, *tmp;
 	struct mfc_cache *cache;
-	LIST_HEAD(list);
-	int i;
-
-	/* Shut down all active vif entries */
-	for (i = 0; i < mrt->maxvif; i++) {
-		if (!all && (mrt->vif_table[i].flags & VIFF_STATIC))
-			continue;
-		vif_delete(mrt, i, 0, &list);
-	}
-	unregister_netdevice_many(&list);
+	struct mr_mfc *c, *tmp;
 
 	/* Wipe the cache */
 	list_for_each_entry_safe(c, tmp, &mrt->mfc_cache_list, list) {
@@ -1338,6 +1328,23 @@ static void mroute_clean_tables(struct mr_table *mrt, bool all)
 		}
 		spin_unlock_bh(&mfc_unres_lock);
 	}
+}
+
+/* Close the multicast socket, and clear the vif tables etc */
+static void mroute_clean_tables(struct mr_table *mrt, bool all)
+{
+	LIST_HEAD(list);
+	int i;
+
+	/* Shut down all active vif entries */
+	for (i = 0; i < mrt->maxvif; i++) {
+		if (!all && (mrt->vif_table[i].flags & VIFF_STATIC))
+			continue;
+		vif_delete(mrt, i, 0, &list);
+	}
+	unregister_netdevice_many(&list);
+
+	mroute_clean_cache(mrt, all);
 }
 
 /* called from ip_ra_control(), before an RCU grace period,
@@ -1481,6 +1488,13 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval,
 			ret = ipmr_mfc_add(net, mrt, &mfc,
 					   sk == rtnl_dereference(mrt->mroute_sk),
 					   parent);
+		break;
+	case MRT_DEL_MFC_ALL:
+		rtnl_lock();
+		ipmr_for_each_table(mrt, net) {
+			mroute_clean_cache(mrt, true);
+		}
+		rtnl_unlock();
 		break;
 	/* Control PIM assert. */
 	case MRT_ASSERT:
