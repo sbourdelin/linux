@@ -1,0 +1,167 @@
+Properties for an MDIO bus multiplexer controlled by a regmap
+
+This is a special case of a MDIO bus multiplexer.  A regmap device,
+like an FPGA, is used to control which child bus is connected.  The mdio-mux
+node must be a child of the device that is controlled by a regmap.
+The driver currently only supports devices with upto 32-bit registers.
+
+Required properties in addition to the generic multiplexer properties:
+
+- reg : integer, contains the offset of the register that controls the bus
+	multiplexer. it can be 32 bit number.
+
+- mux-mask : integer, contains an 32 bit mask that specifies which
+	bits in the register control the actual bus multiplexer.  The
+	'reg' property of each child mdio-mux node must be constrained by
+	this mask.
+
+Example 1:
+
+The FPGA node defines a i2c connected FPGA with a register space of 0x30 bytes.
+For the "EMI2" MDIO bus, register 0x54 (BRDCFG4) controls the mux on that bus.
+A bitmask of 0x07 means that bits 0, 1 and 2 (bit 0 is lsb) are the bits on
+BRDCFG4 that control the actual mux.
+
+i2c@2000000 {
+	compatible = "fsl,vf610-i2c";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	reg = <0x0 0x2000000 0x0 0x10000>;
+	interrupts = <0 34 0x4>; // Level high type
+	clock-names = "i2c";
+	clocks = <&clockgen 4 7>;
+	fsl-scl-gpio = <&gpio2 15 0>;
+	status = "okay";
+
+	/* The FPGA node */
+	fpga@66 {
+		compatible = "fsl,lx2160aqds-fpga", "fsl,fpga-qixis-i2c";
+		reg = <0x66>; // fpga device address on i2c bus
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		mdio-mux-2@54 {
+			mdio-parent-bus = <&emdio2>; /* MDIO bus */
+			reg = <0x54>;	    /* BRDCFG4 */
+			mux-mask = <0x07>;      /* EMI2_MDIO */
+			#address-cells=<1>;
+			#size-cells = <0>;
+
+			mdio@0 {   // Slot 1
+				reg = <0x00>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				ethernet-phy@@1 {
+					reg = <1>;
+					compatible = "ethernet-phy-id0210.7441";
+				};
+
+				ethernet-phy@@0 {
+					reg = <0>;
+					compatible = "ethernet-phy-id0210.7441";
+				};
+			};
+
+			mdio@1 {   // Slot 2
+				reg = <0x01>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+			};
+
+			mdio@2 {   // Slot 3
+				reg = <0x02>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+			};
+		};
+	};
+};
+
+/* The parent MDIO bus. */
+emdio2: mdio@0x8B97000 {
+	compatible = "fsl,fman-memac-mdio";
+	reg = <0x0 0x8B97000 0x0 0x1000>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	little-endian;
+};
+
+Example 2:
+
+The FPGA node defines a memory mapped FPGA with a register space of 0x100 bytes.
+For the "EMI1" MDIO bus, register 0x54 (BRDCFG4) controls the mux on that bus.
+A bitmask of 0xe0 means that bits 5, 6 and 7 (bit 0 is lsb) are the bits on
+BRDCFG4 that control the actual mux.
+
+ifc: ifc@1530000 {
+	compatible = "fsl,ifc", "simple-bus";
+	reg = <0x0 0x1530000 0x0 0x10000>;
+	interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+	#address-cells = <2>;
+	#size-cells = <1>;
+	/* NOR, NAND Flashes and FPGA on board */
+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
+		  0x2 0x0 0x0 0x7e800000 0x00010000
+		  0x3 0x0 0x0 0x7fb00000 0x00000100>;
+	status = "okay";
+
+	/* The FPGA node */
+	fpga: board-control@3,0 {
+		compatible = "fsl,ls1021aqds-fpga", "fsl,fpga-qixis";
+		reg = <0x3 0x0 0x0000100>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		mdio-mux-1@54 {
+			mdio-parent-bus = <&emdio1>; /* MDIO bus */
+			reg = <0x54>;	    /* BRDCFG4 */
+			mux-mask = <0xe0>;      /* EMI1_MDIO */
+			#address-cells=<1>;
+			#size-cells = <0>;
+
+			mdio@0 {   // Onboard PHYs rgmii_phy1
+				reg = <0x00>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				ethernet-phy@@1 {
+					reg = <1>;
+					compatible = "ethernet-phy-ieee802.3-c22";
+				};
+			};
+
+			mdio@20 {   // Onboard PHYs rgmii_phy2
+				reg = <0x20>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				ethernet-phy@2 {
+					reg = <0x2>;
+					compatible = "ethernet-phy-ieee802.3-c22";
+				};
+			};
+
+			mdio@40 {   // Onboard PHYs rgmii_phy3
+				reg = <0x40>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				ethernet-phy@3 {
+					reg = <0x3>;
+					compatible = "ethernet-phy-ieee802.3-c22";
+				};
+			};
+		};
+	};
+};
+
+/* The parent MDIO bus. */
+emdio1: mdio@2d24000 {
+	compatible = "gianfar";
+	device_type = "mdio";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	reg = <0x0 0x2d24000 0x0 0x4000>,
+	      <0x0 0x2d10030 0x0 0x4>;
+};
