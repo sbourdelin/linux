@@ -249,10 +249,8 @@ int bpf_prog_test_run_flow_dissector(struct bpf_prog *prog,
 	u32 repeat = kattr->test.repeat;
 	struct bpf_flow_keys flow_keys;
 	u64 time_start, time_spent = 0;
-	struct bpf_skb_data_end *cb;
+	const struct ethhdr *eth;
 	u32 retval, duration;
-	struct sk_buff *skb;
-	struct sock *sk;
 	void *data;
 	int ret;
 	u32 i;
@@ -260,35 +258,14 @@ int bpf_prog_test_run_flow_dissector(struct bpf_prog *prog,
 	if (prog->type != BPF_PROG_TYPE_FLOW_DISSECTOR)
 		return -EINVAL;
 
-	data = bpf_test_init(kattr, size, NET_SKB_PAD + NET_IP_ALIGN,
-			     SKB_DATA_ALIGN(sizeof(struct skb_shared_info)));
+	if (size < ETH_HLEN)
+		return -EINVAL;
+
+	data = bpf_test_init(kattr, size, 0, 0);
 	if (IS_ERR(data))
 		return PTR_ERR(data);
 
-	sk = kzalloc(sizeof(*sk), GFP_USER);
-	if (!sk) {
-		kfree(data);
-		return -ENOMEM;
-	}
-	sock_net_set(sk, current->nsproxy->net_ns);
-	sock_init_data(NULL, sk);
-
-	skb = build_skb(data, 0);
-	if (!skb) {
-		kfree(data);
-		kfree(sk);
-		return -ENOMEM;
-	}
-	skb->sk = sk;
-
-	skb_reserve(skb, NET_SKB_PAD + NET_IP_ALIGN);
-	__skb_put(skb, size);
-	skb->protocol = eth_type_trans(skb,
-				       current->nsproxy->net_ns->loopback_dev);
-	skb_reset_network_header(skb);
-
-	cb = (struct bpf_skb_data_end *)skb->cb;
-	cb->qdisc_cb.flow_keys = &flow_keys;
+	eth = (struct ethhdr *)data;
 
 	if (!repeat)
 		repeat = 1;
@@ -297,9 +274,15 @@ int bpf_prog_test_run_flow_dissector(struct bpf_prog *prog,
 	for (i = 0; i < repeat; i++) {
 		preempt_disable();
 		rcu_read_lock();
-		retval = __skb_flow_bpf_dissect(prog, skb,
-						&flow_keys_dissector,
-						&flow_keys);
+		retval = __flow_bpf_dissect(prog, data,
+					    eth->h_proto, ETH_HLEN,
+					    size,
+					    &flow_keys_dissector,
+					    &flow_keys);
+		if (flow_keys.nhoff >= ETH_HLEN)
+			flow_keys.nhoff -= ETH_HLEN;
+		if (flow_keys.thoff >= ETH_HLEN)
+			flow_keys.thoff -= ETH_HLEN;
 		rcu_read_unlock();
 		preempt_enable();
 
@@ -317,8 +300,7 @@ int bpf_prog_test_run_flow_dissector(struct bpf_prog *prog,
 
 	ret = bpf_test_finish(kattr, uattr, &flow_keys, sizeof(flow_keys),
 			      retval, duration);
-
-	kfree_skb(skb);
-	kfree(sk);
+	kfree(data);
 	return ret;
+
 }
