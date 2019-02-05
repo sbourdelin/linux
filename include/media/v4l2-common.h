@@ -327,6 +327,11 @@ void v4l_bound_align_image(unsigned int *width, unsigned int wmin,
 			   unsigned int hmax, unsigned int halign,
 			   unsigned int salign);
 
+void v4l2_fill_pixfmt(struct v4l2_pix_format *pixfmt, int pixelformat,
+		      int width, int height);
+void v4l2_fill_pixfmt_mp(struct v4l2_pix_format_mplane *pixfmt, int pixelformat,
+			 int width, int height);
+
 /**
  * v4l2_find_nearest_size - Find the nearest size among a discrete
  *	set of resolutions contained in an array of a driver specific struct.

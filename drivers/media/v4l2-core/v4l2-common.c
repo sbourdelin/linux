@@ -61,6 +61,7 @@
 #include <media/v4l2-common.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-fourcc.h>
 
 #include <linux/videodev2.h>
 
@@ -455,3 +456,73 @@ int v4l2_s_parm_cap(struct video_device *vdev,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(v4l2_s_parm_cap);
+
+void v4l2_fill_pixfmt_mp(struct v4l2_pix_format_mplane *pixfmt,
+			 int pixelformat, int width, int height)
+{
+	const struct v4l2_format_info *info;
+	struct v4l2_plane_pix_format *plane;
+	int i;
+
+	info = v4l2_format_info(pixelformat);
+	if (!info)
+		return;
+
+	pixfmt->width = width;
+	pixfmt->height = height;
+	pixfmt->pixelformat = pixelformat;
+
+	if (!info->multiplanar) {
+		pixfmt->num_planes = 1;
+		plane = &pixfmt->plane_fmt[0];
+		plane->bytesperline = width * info->cpp[0];
+		plane->sizeimage = 0;
+		for (i = 0; i < info->num_planes; i++) {
+			unsigned int hsub = (i == 0) ? 1 : info->hsub;
+			unsigned int vsub = (i == 0) ? 1 : info->vsub;
+
+			plane->sizeimage += info->cpp[i] *
+				DIV_ROUND_UP(width, hsub) *
+				DIV_ROUND_UP(height, vsub);
+		}
+	} else {
+		pixfmt->num_planes = info->num_planes;
+		for (i = 0; i < info->num_planes; i++) {
+			unsigned int hsub = (i == 0) ? 1 : info->hsub;
+			unsigned int vsub = (i == 0) ? 1 : info->vsub;
+
+			plane = &pixfmt->plane_fmt[i];
+			plane->bytesperline =
+				info->cpp[i] * DIV_ROUND_UP(width, hsub);
+			plane->sizeimage =
+				plane->bytesperline * DIV_ROUND_UP(height, vsub);
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(v4l2_fill_pixfmt_mp);
+
+void v4l2_fill_pixfmt(struct v4l2_pix_format *pixfmt, int pixelformat, int width, int height)
+{
+	const struct v4l2_format_info *info;
+	int i;
+
+	info = v4l2_format_info(pixelformat);
+	if (!info)
+		return;
+
+	pixfmt->width = width;
+	pixfmt->height = height;
+	pixfmt->pixelformat = pixelformat;
+	pixfmt->bytesperline = width * info->cpp[0];
+	pixfmt->sizeimage = 0;
+
+	for (i = 0; i < info->num_planes; i++) {
+		unsigned int hsub = (i == 0) ? 1 : info->hsub;
+		unsigned int vsub = (i == 0) ? 1 : info->vsub;
+
+		pixfmt->sizeimage += info->cpp[i] *
+			DIV_ROUND_UP(width, hsub) *
+			DIV_ROUND_UP(height, vsub);
+	}
+}
+EXPORT_SYMBOL_GPL(v4l2_fill_pixfmt);
