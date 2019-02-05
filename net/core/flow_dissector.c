@@ -725,6 +725,7 @@ bool __skb_flow_bpf_dissect(struct bpf_prog *prog,
 
 /**
  * __skb_flow_dissect - extract the flow_keys struct and return it
+ * @net: associated network namespace, if NULL pulled from skb
  * @skb: sk_buff to extract the flow from, can be NULL if the rest are specified
  * @flow_dissector: list of keys to dissect
  * @target_container: target structure to put dissected values into
@@ -739,7 +740,8 @@ bool __skb_flow_bpf_dissect(struct bpf_prog *prog,
  *
  * Caller must take care of zeroing target container memory.
  */
-bool __skb_flow_dissect(const struct sk_buff *skb,
+bool __skb_flow_dissect(struct net *net,
+			const struct sk_buff *skb,
 			struct flow_dissector *flow_dissector,
 			void *target_container,
 			void *data, __be16 proto, int nhoff, int hlen,
@@ -799,12 +801,11 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 
 		rcu_read_lock();
 
-		if (skb->dev)
-			attached = rcu_dereference(dev_net(skb->dev)->flow_dissector_prog);
-		else if (skb->sk)
-			attached = rcu_dereference(sock_net(skb->sk)->flow_dissector_prog);
-		else
-			WARN_ON_ONCE(1);
+		if (!net && skb)
+			net = skb_net(skb);
+		if (net)
+			attached = rcu_dereference(net->flow_dissector_prog);
+		WARN_ON_ONCE(!net);
 
 		if (attached) {
 			ret = __skb_flow_bpf_dissect(attached, skb,
@@ -1406,7 +1407,7 @@ u32 __skb_get_hash_symmetric(const struct sk_buff *skb)
 	__flow_hash_secret_init();
 
 	memset(&keys, 0, sizeof(keys));
-	__skb_flow_dissect(skb, &flow_keys_dissector_symmetric, &keys,
+	__skb_flow_dissect(NULL, skb, &flow_keys_dissector_symmetric, &keys,
 			   NULL, 0, 0, 0,
 			   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
 
@@ -1508,7 +1509,8 @@ u32 skb_get_poff(const struct sk_buff *skb)
 {
 	struct flow_keys_basic keys;
 
-	if (!skb_flow_dissect_flow_keys_basic(skb, &keys, NULL, 0, 0, 0, 0))
+	if (!skb_flow_dissect_flow_keys_basic(NULL, skb, &keys,
+					      NULL, 0, 0, 0, 0))
 		return 0;
 
 	return __skb_get_poff(skb, skb->data, &keys, skb_headlen(skb));
