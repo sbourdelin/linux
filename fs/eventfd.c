@@ -297,6 +297,7 @@ static void eventfd_show_fdinfo(struct seq_file *m, struct file *f)
 	seq_printf(m, "eventfd-count: %16llx\n",
 		   (unsigned long long)ctx->count);
 	spin_unlock_irq(&ctx->wqh.lock);
+	seq_printf(m, "eventfd-id: %p\n", ctx);
 }
 #endif
 
