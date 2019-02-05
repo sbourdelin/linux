@@ -3075,6 +3075,20 @@ struct cfg80211_pmsr_request {
 };
 
 /**
+ * struct cfg80211_sta_mon - Configure station monitor parameters
+ * @rssi_tholds - array of RSSI thresholds for the station
+ * @rssi_hyst - RSSI hysterisis
+ * @n_rssi_tholds - Number of RSSI thresholds
+ * @fixed_thold - Fixed thresholds limit used for the station
+ */
+struct cfg80211_sta_mon {
+	s32 *rssi_tholds;
+	u32 rssi_hyst;
+	int n_rssi_tholds;
+	u8 fixed_thold;
+};
+
+/**
  * struct cfg80211_ops - backend description for wireless configuration
  *
  * This struct is registered by fullmac card drivers and/or wireless stacks
@@ -3411,6 +3425,12 @@ struct cfg80211_pmsr_request {
  *	Statistics should be cumulative, currently no way to reset is provided.
  * @start_pmsr: start peer measurement (e.g. FTM)
  * @abort_pmsr: abort peer measurement
+ *
+ * @set_sta_mon_rssi_config: Configure  RSSI threshold for a station.
+ *     After configuration, the driver should (soon) send an event indicating
+ *     the current level of a station is above/below the configured threshold;
+ *     this may need some care when the configuration is changed
+ *     (without first being disabled.)
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -3725,6 +3745,9 @@ struct cfg80211_ops {
 			      struct cfg80211_pmsr_request *request);
 	void	(*abort_pmsr)(struct wiphy *wiphy, struct wireless_dev *wdev,
 			      struct cfg80211_pmsr_request *request);
+	int	(*set_sta_mon_rssi_config)(struct wiphy *wiphy,
+				struct net_device *dev, const u8 *addr,
+				const struct cfg80211_sta_mon *sta_mon_cfg);
 };
 
 /*
@@ -6320,6 +6343,22 @@ void cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
  */
 bool cfg80211_rx_control_port(struct net_device *dev,
 			      struct sk_buff *skb, bool unencrypted);
+
+/**
+ * cfg80211_sta_mon_rssi_notify - Station's rssi out of range event
+ * @dev: network device
+ * @peer: Station's mac address
+ * @rssi_event: the triggered RSSI event
+ * @rssi_level: new RSSI level value or 0 if not available
+ * @gfp: context flags
+ *
+ * This function is called when a configured rssi threshold reached event
+ * occurs for a station.
+ */
+void
+cfg80211_sta_mon_rssi_notify(struct net_device *dev, const u8 *peer,
+			     enum nl80211_cqm_rssi_threshold_event rssi_event,
+			     s32 rssi_level, gfp_t gfp);
 
 /**
  * cfg80211_cqm_rssi_notify - connection quality monitoring rssi event

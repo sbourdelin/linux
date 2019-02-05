@@ -292,6 +292,17 @@ nl80211_pmsr_attr_policy[NL80211_PMSR_ATTR_MAX + 1] = {
 		NLA_POLICY_NESTED_ARRAY(nl80211_psmr_peer_attr_policy),
 };
 
+static const struct nla_policy
+nl80211_attr_cqm_policy[NL80211_ATTR_CQM_MAX + 1] = {
+	[NL80211_ATTR_CQM_RSSI_THOLD] = { .type = NLA_BINARY },
+	[NL80211_ATTR_CQM_RSSI_HYST] = { .type = NLA_U32 },
+	[NL80211_ATTR_CQM_RSSI_THRESHOLD_EVENT] = { .type = NLA_U32 },
+	[NL80211_ATTR_CQM_TXE_RATE] = { .type = NLA_U32 },
+	[NL80211_ATTR_CQM_TXE_PKTS] = { .type = NLA_U32 },
+	[NL80211_ATTR_CQM_TXE_INTVL] = { .type = NLA_U32 },
+	[NL80211_ATTR_CQM_RSSI_LEVEL] = { .type = NLA_S32 },
+};
+
 const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_WIPHY] = { .type = NLA_U32 },
 	[NL80211_ATTR_WIPHY_NAME] = { .type = NLA_NUL_STRING,
@@ -402,7 +413,10 @@ const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_PS_STATE] = NLA_POLICY_RANGE(NLA_U32,
 						   NL80211_PS_DISABLED,
 						   NL80211_PS_ENABLED),
-	[NL80211_ATTR_CQM] = { .type = NLA_NESTED, },
+	[NL80211_ATTR_CQM] = {
+		.type = NLA_NESTED,
+		.validation_data = nl80211_attr_cqm_policy,
+	 },
 	[NL80211_ATTR_LOCAL_STATE_CHANGE] = { .type = NLA_FLAG },
 	[NL80211_ATTR_AP_ISOLATE] = { .type = NLA_U8 },
 	[NL80211_ATTR_WIPHY_TX_POWER_SETTING] = { .type = NLA_U32 },
@@ -553,6 +567,7 @@ const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_PEER_MEASUREMENTS] =
 		NLA_POLICY_NESTED(nl80211_pmsr_attr_policy),
 	[NL80211_ATTR_AIRTIME_WEIGHT] = NLA_POLICY_MIN(NLA_U16, 1),
+	[NL80211_ATTR_STA_MON_FIXED_THOLD] = { .type = NLA_U8 },
 };
 
 /* policy for the key attributes */
@@ -10382,17 +10397,6 @@ static int nl80211_get_power_save(struct sk_buff *skb, struct genl_info *info)
 	return err;
 }
 
-static const struct nla_policy
-nl80211_attr_cqm_policy[NL80211_ATTR_CQM_MAX + 1] = {
-	[NL80211_ATTR_CQM_RSSI_THOLD] = { .type = NLA_BINARY },
-	[NL80211_ATTR_CQM_RSSI_HYST] = { .type = NLA_U32 },
-	[NL80211_ATTR_CQM_RSSI_THRESHOLD_EVENT] = { .type = NLA_U32 },
-	[NL80211_ATTR_CQM_TXE_RATE] = { .type = NLA_U32 },
-	[NL80211_ATTR_CQM_TXE_PKTS] = { .type = NLA_U32 },
-	[NL80211_ATTR_CQM_TXE_INTVL] = { .type = NLA_U32 },
-	[NL80211_ATTR_CQM_RSSI_LEVEL] = { .type = NLA_S32 },
-};
-
 static int nl80211_set_cqm_txe(struct genl_info *info,
 			       u32 rate, u32 pkts, u32 intvl)
 {
@@ -10473,6 +10477,21 @@ static int cfg80211_cqm_rssi_update(struct cfg80211_registered_device *rdev,
 	return rdev_set_cqm_rssi_range_config(rdev, dev, low, high);
 }
 
+static int nl80211_validate_rssi_tholds(const s32 *thresholds, int n_tholds)
+{
+	int i;
+	s32 prev = S32_MIN;
+
+	/* Check all values negative and sorted */
+	for (i = 0; i < n_tholds; i++) {
+		if (thresholds[i] > 0 || thresholds[i] <= prev)
+			return -EINVAL;
+
+		prev = thresholds[i];
+	}
+	return 0;
+}
+
 static int nl80211_set_cqm_rssi(struct genl_info *info,
 				const s32 *thresholds, int n_thresholds,
 				u32 hysteresis)
@@ -10480,16 +10499,11 @@ static int nl80211_set_cqm_rssi(struct genl_info *info,
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
 	struct net_device *dev = info->user_ptr[1];
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
-	int i, err;
-	s32 prev = S32_MIN;
+	int err;
 
-	/* Check all values negative and sorted */
-	for (i = 0; i < n_thresholds; i++) {
-		if (thresholds[i] > 0 || thresholds[i] <= prev)
-			return -EINVAL;
-
-		prev = thresholds[i];
-	}
+	err = nl80211_validate_rssi_tholds(thresholds, n_thresholds);
+	if (err)
+		return err;
 
 	if (wdev->iftype != NL80211_IFTYPE_STATION &&
 	    wdev->iftype != NL80211_IFTYPE_P2P_CLIENT)
@@ -10552,7 +10566,7 @@ static int nl80211_set_cqm(struct sk_buff *skb, struct genl_info *info)
 		return -EINVAL;
 
 	err = nla_parse_nested(attrs, NL80211_ATTR_CQM_MAX, cqm,
-			       nl80211_attr_cqm_policy, info->extack);
+			       NULL, NULL);
 	if (err)
 		return err;
 
@@ -13253,6 +13267,63 @@ nla_put_failure:
 	return -ENOBUFS;
 }
 
+static int nl80211_set_sta_mon(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct nlattr *attrs[NL80211_ATTR_CQM_MAX + 1];
+	struct cfg80211_sta_mon sta_mon_config = {};
+	struct nlattr *sta_mon;
+	u8 *addr = NULL;
+	int err;
+
+	if (dev->ieee80211_ptr->iftype != NL80211_IFTYPE_AP &&
+	    dev->ieee80211_ptr->iftype != NL80211_IFTYPE_P2P_GO)
+		return -ENOTSUPP;
+
+	sta_mon = info->attrs[NL80211_ATTR_CQM];
+	if (!sta_mon || !info->attrs[NL80211_ATTR_MAC])
+		return -EINVAL;
+
+	err = nla_parse_nested(attrs, NL80211_ATTR_CQM_MAX, sta_mon,
+			       NULL, NULL);
+	if (err)
+		return err;
+
+	addr = nla_data(info->attrs[NL80211_ATTR_MAC]);
+	sta_mon_config.fixed_thold =
+		!!nla_get_u8(info->attrs[NL80211_ATTR_STA_MON_FIXED_THOLD]);
+
+	if (attrs[NL80211_ATTR_CQM_RSSI_THOLD] &&
+	    attrs[NL80211_ATTR_CQM_RSSI_HYST]) {
+		int len = nla_len(attrs[NL80211_ATTR_CQM_RSSI_THOLD]);
+
+		sta_mon_config.rssi_tholds =
+			nla_data(attrs[NL80211_ATTR_CQM_RSSI_THOLD]);
+		sta_mon_config.rssi_hyst =
+			nla_get_u32(attrs[NL80211_ATTR_CQM_RSSI_HYST]);
+
+		if (!rdev->ops->set_sta_mon_rssi_config ||
+		    !wiphy_ext_feature_isset(&rdev->wiphy,
+				     NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG))
+			return -EOPNOTSUPP;
+
+		if (len % 4)
+			return -EINVAL;
+
+		sta_mon_config.n_rssi_tholds = len / 4;
+		err = nl80211_validate_rssi_tholds(sta_mon_config.rssi_tholds,
+						   sta_mon_config.n_rssi_tholds);
+		if (err)
+			return err;
+
+		return rdev_set_sta_mon_rssi_config(rdev, dev, addr,
+						    &sta_mon_config);
+	}
+
+	return -EINVAL;
+}
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -14182,6 +14253,14 @@ static const struct genl_ops nl80211_ops[] = {
 	{
 		.cmd = NL80211_CMD_NOTIFY_RADAR,
 		.doit = nl80211_notify_radar_detection,
+		.policy = nl80211_policy,
+		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_SET_STA_MON,
+		.doit = nl80211_set_sta_mon,
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -15381,7 +15460,8 @@ bool cfg80211_rx_control_port(struct net_device *dev,
 EXPORT_SYMBOL(cfg80211_rx_control_port);
 
 static struct sk_buff *cfg80211_prepare_cqm(struct net_device *dev,
-					    const char *mac, gfp_t gfp)
+					    const char *mac, gfp_t gfp,
+					    enum nl80211_commands cmd)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
@@ -15393,7 +15473,7 @@ static struct sk_buff *cfg80211_prepare_cqm(struct net_device *dev,
 
 	cb = (void **)msg->cb;
 
-	cb[0] = nl80211hdr_put(msg, 0, 0, 0, NL80211_CMD_NOTIFY_CQM);
+	cb[0] = nl80211hdr_put(msg, 0, 0, 0, cmd);
 	if (!cb[0]) {
 		nlmsg_free(msg);
 		return NULL;
@@ -15455,7 +15535,7 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
 			rssi_level = wdev->cqm_config->last_rssi_event_value;
 	}
 
-	msg = cfg80211_prepare_cqm(dev, NULL, gfp);
+	msg = cfg80211_prepare_cqm(dev, NULL, gfp, NL80211_CMD_NOTIFY_CQM);
 	if (!msg)
 		return;
 
@@ -15476,13 +15556,48 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
 }
 EXPORT_SYMBOL(cfg80211_cqm_rssi_notify);
 
+void
+cfg80211_sta_mon_rssi_notify(struct net_device *dev, const u8 *peer,
+			     enum nl80211_cqm_rssi_threshold_event rssi_event,
+			     s32 rssi_level, gfp_t gfp)
+{
+	struct sk_buff *msg;
+
+	trace_cfg80211_sta_mon_rssi_notify(dev, peer, rssi_event, rssi_level);
+	if (WARN_ON(!peer))
+		return;
+
+	if (WARN_ON(rssi_event != NL80211_CQM_RSSI_THRESHOLD_EVENT_LOW &&
+		    rssi_event != NL80211_CQM_RSSI_THRESHOLD_EVENT_HIGH))
+		return;
+
+	msg = cfg80211_prepare_cqm(dev, peer, gfp, NL80211_CMD_NOTIFY_STA_MON);
+	if (!msg)
+		return;
+
+	if (nla_put_u32(msg, NL80211_ATTR_CQM_RSSI_THRESHOLD_EVENT,
+			rssi_event))
+		goto nla_put_failure;
+
+	if (rssi_level && nla_put_s32(msg, NL80211_ATTR_CQM_RSSI_LEVEL,
+				      rssi_level))
+		goto nla_put_failure;
+
+	cfg80211_send_cqm(msg, gfp);
+	return;
+
+ nla_put_failure:
+	nlmsg_free(msg);
+}
+EXPORT_SYMBOL(cfg80211_sta_mon_rssi_notify);
+
 void cfg80211_cqm_txe_notify(struct net_device *dev,
 			     const u8 *peer, u32 num_packets,
 			     u32 rate, u32 intvl, gfp_t gfp)
 {
 	struct sk_buff *msg;
 
-	msg = cfg80211_prepare_cqm(dev, peer, gfp);
+	msg = cfg80211_prepare_cqm(dev, peer, gfp, NL80211_CMD_NOTIFY_CQM);
 	if (!msg)
 		return;
 
@@ -15510,7 +15625,7 @@ void cfg80211_cqm_pktloss_notify(struct net_device *dev,
 
 	trace_cfg80211_cqm_pktloss_notify(dev, peer, num_packets);
 
-	msg = cfg80211_prepare_cqm(dev, peer, gfp);
+	msg = cfg80211_prepare_cqm(dev, peer, gfp, NL80211_CMD_NOTIFY_CQM);
 	if (!msg)
 		return;
 
@@ -15529,7 +15644,7 @@ void cfg80211_cqm_beacon_loss_notify(struct net_device *dev, gfp_t gfp)
 {
 	struct sk_buff *msg;
 
-	msg = cfg80211_prepare_cqm(dev, NULL, gfp);
+	msg = cfg80211_prepare_cqm(dev, NULL, gfp, NL80211_CMD_NOTIFY_CQM);
 	if (!msg)
 		return;
 

@@ -1272,4 +1272,17 @@ rdev_abort_pmsr(struct cfg80211_registered_device *rdev,
 	trace_rdev_return_void(&rdev->wiphy);
 }
 
+static inline int
+rdev_set_sta_mon_rssi_config(struct cfg80211_registered_device *rdev,
+			     struct net_device *dev, const u8 *addr,
+			     const struct cfg80211_sta_mon *sta_mon_config)
+{
+	int ret = -EOPNOTSUPP;
+
+	ret = rdev->ops->set_sta_mon_rssi_config(&rdev->wiphy, dev,
+						 addr, sta_mon_config);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
 #endif /* __CFG80211_RDEV_OPS */

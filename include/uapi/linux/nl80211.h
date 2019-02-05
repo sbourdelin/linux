@@ -1065,6 +1065,12 @@
  *	indicated by %NL80211_ATTR_WIPHY_FREQ and other attributes
  *	determining the width and type.
  *
+ * @NL80211_CMD_SET_STA_MON: This command is used to configure station's
+ *	connection monitoring notification trigger levels. This uses nested
+ *	attribute %NL80211_ATTR_CQM with %NL80211_ATTR_CQM_* sub-attributes.
+ * @NL80211_CMD_NOTIFY_STA_MON: This is used as an event to notify
+ *	the user space that a trigger level was reached for a station.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1284,6 +1290,9 @@ enum nl80211_commands {
 	NL80211_CMD_PEER_MEASUREMENT_COMPLETE,
 
 	NL80211_CMD_NOTIFY_RADAR,
+
+	NL80211_CMD_SET_STA_MON,
+	NL80211_CMD_NOTIFY_STA_MON,
 
 	/* add new commands above here */
 
@@ -2308,6 +2317,12 @@ enum nl80211_commands {
  * @NL80211_ATTR_AIRTIME_WEIGHT: Station's weight when scheduled by the airtime
  *	scheduler.
  *
+ * @NL80211_ATTR_STA_MON_FIXED_THOLD: This u8 attribute is used with
+ *	%NL80211_CMD_SET_STA_MON to indicate driver that the monitoring
+ *	threshold is fixed(not modifying the low and high threshold upon
+ *	crossing the threshold) or moving(modifying low and high threshold
+ *	upon crossing the threshold) thresholds.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2758,6 +2773,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_PEER_MEASUREMENTS,
 
 	NL80211_ATTR_AIRTIME_WEIGHT,
+
+	NL80211_ATTR_STA_MON_FIXED_THOLD,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -5343,6 +5360,9 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_AP_PMKSA_CACHING: Driver/device supports PMKSA caching
  *	(set/del PMKSA operations) in AP mode.
  *
+ * @NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG: Driver supports monitoring
+ *	station's RSSI threshold value should adveritise this flag.
+ *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
  */
@@ -5384,6 +5404,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_ENABLE_FTM_RESPONDER,
 	NL80211_EXT_FEATURE_AIRTIME_FAIRNESS,
 	NL80211_EXT_FEATURE_AP_PMKSA_CACHING,
+	NL80211_EXT_FEATURE_STA_MON_RSSI_CONFIG,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
