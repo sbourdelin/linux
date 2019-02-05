@@ -185,7 +185,13 @@ static int ath_set_bdaddr(struct hci_dev *hdev, const bdaddr_t *bdaddr)
 
 static int ath_setup(struct hci_uart *hu)
 {
+	struct tty_struct *tty = hu->tty;
+
 	BT_DBG("hu %p", hu);
+
+	/* tty driver should support operations to set RTS */
+	if (!tty->driver->ops->tiocmget || !tty->driver->ops->tiocmset)
+		return -ENODEV;
 
 	hu->hdev->set_bdaddr = ath_set_bdaddr;
 
