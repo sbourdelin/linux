@@ -1227,6 +1227,11 @@ bool __skb_flow_bpf_dissect(struct bpf_prog *prog,
 			    const struct sk_buff *skb,
 			    struct flow_dissector *flow_dissector,
 			    struct bpf_flow_keys *flow_keys);
+bool __flow_bpf_dissect(struct bpf_prog *prog,
+			void *data, __be16 proto,
+			int nhoff, int hlen,
+			struct flow_dissector *flow_dissector,
+			struct bpf_flow_keys *flow_keys);
 bool __skb_flow_dissect(struct net *net,
 			const struct sk_buff *skb,
 			struct flow_dissector *flow_dissector,
