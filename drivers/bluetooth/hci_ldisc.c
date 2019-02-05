@@ -314,6 +314,10 @@ void hci_uart_set_flow_control(struct hci_uart *hu, bool enable)
 		return;
 	}
 
+	/* tiocmget() and tiocmset() operations are optional */
+	if (!tty->driver->ops->tiocmget || !tty->driver->ops->tiocmset)
+		return;
+
 	if (enable) {
 		/* Disable hardware flow control */
 		ktermios = tty->termios;
