@@ -22,6 +22,7 @@
 enum ieee80211_regd_source {
 	REGD_SOURCE_INTERNAL_DB,
 	REGD_SOURCE_CRDA,
+	REGD_SOURCE_CACHED,
 };
 
 extern const struct ieee80211_regdomain __rcu *cfg80211_regdomain;
