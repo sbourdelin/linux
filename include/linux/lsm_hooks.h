@@ -429,6 +429,21 @@
  *	to abort the copy up. Note that the caller is responsible for reading
  *	and writing the xattrs as this hook is merely a filter.
  *
+ * Security hooks for kernfs node operations
+ *
+ * @kernfs_init_security
+ *	Initialize the security context of a newlycreated kernfs node based
+ *	on its own and its parent's attributes. The security context (or other
+ *	LSM metadata) should be stored in @secattr as extended attributes.
+ *	The hook MAY NOT add/modify attributes in @dir_secattr; it should be
+ *	treated as a read-only list of attributes.
+ *
+ *	@qstr contains the last path component of the new node.
+ *	@dir_iattr contains the inode attributes of the parent node.
+ *	@dir_secattr is the list of security xattrs of the parent node.
+ *	@iattr contains the inode attributes of the new node.
+ *	@secattr is the list of security xattrs of the new node.
+ *
  * Security hooks for file operations
  *
  * @file_permission:
@@ -1558,6 +1573,12 @@ union security_list_options {
 	int (*inode_copy_up)(struct dentry *src, struct cred **new);
 	int (*inode_copy_up_xattr)(const char *name);
 
+	int (*kernfs_init_security)(const struct qstr *qstr,
+				    const struct iattr *dir_iattr,
+				    struct simple_xattrs *dir_secattr,
+				    const struct iattr *iattr,
+				    struct simple_xattrs *secattr);
+
 	int (*file_permission)(struct file *file, int mask);
 	int (*file_alloc_security)(struct file *file);
 	void (*file_free_security)(struct file *file);
@@ -1858,6 +1879,7 @@ struct security_hook_heads {
 	struct hlist_head inode_getsecid;
 	struct hlist_head inode_copy_up;
 	struct hlist_head inode_copy_up_xattr;
+	struct hlist_head kernfs_init_security;
 	struct hlist_head file_permission;
 	struct hlist_head file_alloc_security;
 	struct hlist_head file_free_security;

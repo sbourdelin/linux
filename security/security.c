@@ -892,6 +892,16 @@ int security_inode_copy_up_xattr(const char *name)
 }
 EXPORT_SYMBOL(security_inode_copy_up_xattr);
 
+int security_kernfs_init_security(const struct qstr *qstr,
+				  const struct iattr *dir_iattr,
+				  struct simple_xattrs *dir_secattr,
+				  const struct iattr *iattr,
+				  struct simple_xattrs *secattr)
+{
+	return call_int_hook(kernfs_init_security, 0, qstr, dir_iattr,
+			     dir_secattr, iattr, secattr);
+}
+
 int security_file_permission(struct file *file, int mask)
 {
 	int ret;
