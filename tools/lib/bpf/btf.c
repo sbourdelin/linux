@@ -437,6 +437,16 @@ int btf__fd(const struct btf *btf)
 	return btf->fd;
 }
 
+__u32 btf__get_raw_data_size(const struct btf *btf)
+{
+	return btf->data_size;
+}
+
+void btf__get_raw_data(const struct btf *btf, char *data)
+{
+	memcpy(data, btf->data, btf->data_size);
+}
+
 void btf__get_strings(const struct btf *btf, const char **strings,
 		      __u32 *str_len)
 {
