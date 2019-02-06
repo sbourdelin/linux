@@ -1077,6 +1077,9 @@ static int prrn_enabled;
 static void reset_topology_timer(void);
 static int topology_timer_secs = 1;
 static int topology_inited;
+static int topology_update_in_progress;
+static int topology_changed;
+static unsigned long topology_scans;
 
 /*
  * Change polling interval for associativity changes.
@@ -1297,9 +1300,9 @@ static int update_lookup_table(void *data)
  * Update the node maps and sysfs entries for each cpu whose home node
  * has changed. Returns 1 when the topology has changed, and 0 otherwise.
  *
- * cpus_locked says whether we already hold cpu_hotplug_lock.
+ * readd_cpus: Also readd any CPUs that have changed affinity
  */
-int numa_update_cpu_topology(bool cpus_locked)
+static int numa_update_cpu_topology(bool readd_cpus)
 {
 	unsigned int cpu, sibling, changed = 0;
 	struct topology_update_data *updates, *ud;
@@ -1307,7 +1310,8 @@ int numa_update_cpu_topology(bool cpus_locked)
 	struct device *dev;
 	int weight, new_nid, i = 0;
 
-	if (!prrn_enabled && !vphn_enabled && topology_inited)
+	if ((!prrn_enabled && !vphn_enabled && topology_inited) ||
+		topology_update_in_progress)
 		return 0;
 
 	weight = cpumask_weight(&cpu_associativity_changes_mask);
@@ -1317,6 +1321,8 @@ int numa_update_cpu_topology(bool cpus_locked)
 	updates = kcalloc(weight, sizeof(*updates), GFP_KERNEL);
 	if (!updates)
 		return 0;
+
+	topology_update_in_progress = 1;
 
 	cpumask_clear(&updated_cpus);
 
@@ -1339,15 +1345,20 @@ int numa_update_cpu_topology(bool cpus_locked)
 
 		new_nid = find_and_online_cpu_nid(cpu);
 
-		if (new_nid == numa_cpu_lookup_table[cpu]) {
+		if ((new_nid == numa_cpu_lookup_table[cpu]) ||
+			!cpu_present(cpu)) {
 			cpumask_andnot(&cpu_associativity_changes_mask,
 					&cpu_associativity_changes_mask,
 					cpu_sibling_mask(cpu));
-			dbg("Assoc chg gives same node %d for cpu%d\n",
+			if (cpu_present(cpu))
+				dbg("Assoc chg gives same node %d for cpu%d\n",
 					new_nid, cpu);
 			cpu = cpu_last_thread_sibling(cpu);
 			continue;
 		}
+
+		if (readd_cpus)
+			dlpar_cpu_readd(cpu);
 
 		for_each_cpu(sibling, cpu_sibling_mask(cpu)) {
 			ud = &updates[i++];
@@ -1390,23 +1401,15 @@ int numa_update_cpu_topology(bool cpus_locked)
 	if (!cpumask_weight(&updated_cpus))
 		goto out;
 
-	if (cpus_locked)
-		stop_machine_cpuslocked(update_cpu_topology, &updates[0],
-					&updated_cpus);
-	else
-		stop_machine(update_cpu_topology, &updates[0], &updated_cpus);
+	stop_machine(update_cpu_topology, &updates[0], &updated_cpus);
 
 	/*
 	 * Update the numa-cpu lookup table with the new mappings, even for
 	 * offline CPUs. It is best to perform this update from the stop-
 	 * machine context.
 	 */
-	if (cpus_locked)
-		stop_machine_cpuslocked(update_lookup_table, &updates[0],
-					cpumask_of(raw_smp_processor_id()));
-	else
-		stop_machine(update_lookup_table, &updates[0],
-			     cpumask_of(raw_smp_processor_id()));
+	stop_machine(update_lookup_table, &updates[0],
+		     cpumask_of(raw_smp_processor_id()));
 
 	for (ud = &updates[0]; ud; ud = ud->next) {
 		unregister_cpu_under_node(ud->cpu, ud->old_nid);
@@ -1420,35 +1423,53 @@ int numa_update_cpu_topology(bool cpus_locked)
 	}
 
 out:
+	topology_changed = changed;
+	topology_update_in_progress = 0;
 	kfree(updates);
 	return changed;
 }
 
 int arch_update_cpu_topology(void)
 {
-	return numa_update_cpu_topology(true);
+	int changed = topology_changed;
+
+	topology_changed = 0;
+	return changed;
 }
 
 static void topology_work_fn(struct work_struct *work)
 {
-	rebuild_sched_domains();
+	lock_device_hotplug();
+	if (numa_update_cpu_topology(true))
+		rebuild_sched_domains();
+	unlock_device_hotplug();
 }
 static DECLARE_WORK(topology_work, topology_work_fn);
 
-static void topology_schedule_update(void)
+void topology_schedule_update(void)
 {
-	schedule_work(&topology_work);
+	if (!topology_update_in_progress)
+		schedule_work(&topology_work);
 }
 
 static void topology_timer_fn(struct timer_list *unused)
 {
+	bool sdo = false;
+
+	if (topology_scans < 1)
+		bitmap_fill(cpumask_bits(&cpu_associativity_changes_mask),
+			    nr_cpumask_bits);
+
 	if (prrn_enabled && cpumask_weight(&cpu_associativity_changes_mask))
-		topology_schedule_update();
-	else if (vphn_enabled) {
+		sdo =  true;
+	if (vphn_enabled) {
 		if (update_cpu_associativity_changes_mask() > 0)
-			topology_schedule_update();
+			sdo =  true;
 		reset_topology_timer();
 	}
+	if (sdo)
+		topology_schedule_update();
+	topology_scans++;
 }
 static struct timer_list topology_timer;
 
@@ -1560,7 +1581,7 @@ void __init shared_proc_topology_init(void)
 	if (lppaca_shared_proc(get_lppaca())) {
 		bitmap_fill(cpumask_bits(&cpu_associativity_changes_mask),
 			    nr_cpumask_bits);
-		numa_update_cpu_topology(false);
+		topology_schedule_update();
 	}
 }
 
