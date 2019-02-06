@@ -231,12 +231,10 @@ struct i915_gpu_error {
 	/**
 	 * flags: Control various stages of the GPU reset
 	 *
-	 * #I915_RESET_BACKOFF - When we start a reset, we want to stop any
-	 * other users acquiring the struct_mutex. To do this we set the
-	 * #I915_RESET_BACKOFF bit in the error flags when we detect a reset
-	 * and then check for that bit before acquiring the struct_mutex (in
-	 * i915_mutex_lock_interruptible()?). I915_RESET_BACKOFF serves a
-	 * secondary role in preventing two concurrent global reset attempts.
+	 * #I915_RESET_BACKOFF - When we start a global reset, we need to
+	 * serialise with any other users attempting to do the same, and
+	 * any global resources that may be clobber by the reset (such as
+	 * FENCE registers).
 	 *
 	 * #I915_RESET_ENGINE[num_engines] - Since the driver doesn't need to
 	 * acquire the struct_mutex to reset an engine, we need an explicit
@@ -271,6 +269,8 @@ struct i915_gpu_error {
 	 * that wait for dev_priv->mm.wedged to settle.
 	 */
 	wait_queue_head_t reset_queue;
+
+	struct srcu_struct reset_backoff_srcu;
 
 	struct i915_gpu_restart *restart;
 };
