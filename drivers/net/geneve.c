@@ -1512,6 +1512,10 @@ static void geneve_link_config(struct net_device *dev,
 	}
 #if IS_ENABLED(CONFIG_IPV6)
 	case AF_INET6: {
+		struct inet6_dev *idev = in6_dev_get(dev);
+		if (!idev)
+			break;
+
 		struct rt6_info *rt = rt6_lookup(geneve->net,
 						 &info->key.u.ipv6.dst, NULL, 0,
 						 NULL, 0);
@@ -1519,6 +1523,8 @@ static void geneve_link_config(struct net_device *dev,
 		if (rt && rt->dst.dev)
 			ldev_mtu = rt->dst.dev->mtu - GENEVE_IPV6_HLEN;
 		ip6_rt_put(rt);
+
+		in6_dev_put(idev);
 		break;
 	}
 #endif
