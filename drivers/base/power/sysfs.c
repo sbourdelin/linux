@@ -653,6 +653,10 @@ int dpm_sysfs_add(struct device *dev)
 {
 	int rc;
 
+	/* No need to create pm sysfs if explicitly disabled */
+	if (device_pm_not_required(dev))
+		return 0;
+
 	rc = sysfs_create_group(&dev->kobj, &pm_attr_group);
 	if (rc)
 		return rc;
