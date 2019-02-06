@@ -142,9 +142,16 @@ igt_spinner_create_request(struct igt_spinner *spin,
 	*batch++ = upper_32_bits(vma->node.start);
 	*batch++ = MI_BATCH_BUFFER_END; /* not reached */
 
-	i915_gem_chipset_flush(spin->i915);
+	if (engine->emit_init_breadcrumb &&
+	    rq->timeline->has_initial_breadcrumb) {
+		err = engine->emit_init_breadcrumb(rq);
+		if (err)
+			goto cancel_rq;
+	}
 
 	err = engine->emit_bb_start(rq, vma->node.start, PAGE_SIZE, 0);
+
+	i915_gem_chipset_flush(spin->i915);
 
 cancel_rq:
 	if (err) {
