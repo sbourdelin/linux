@@ -44,6 +44,7 @@
  * Added Gerd Knorrs v4l1 enhancements (Justin Schoeman)
  */
 
+#include <linux/ctype.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -455,3 +456,156 @@ int v4l2_s_parm_cap(struct video_device *vdev,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(v4l2_s_parm_cap);
+
+static char printable_char(int c)
+{
+	return isascii(c) && isprint(c) ? c : '?';
+}
+
+const char *v4l2_get_fourcc_name(uint32_t format)
+{
+	static char buf[8];
+
+	snprintf(buf, 8,
+		 "%c%c%c%c%s",
+		 printable_char(format & 0xff),
+		 printable_char((format >> 8) & 0xff),
+		 printable_char((format >> 16) & 0xff),
+		 printable_char((format >> 24) & 0x7f),
+		 (format & BIT(31)) ? "-BE" : "");
+
+	return buf;
+}
+EXPORT_SYMBOL(v4l2_get_fourcc_name);
+
+const struct v4l2_format_info *v4l2_format_info(u32 format)
+{
+	static const struct v4l2_format_info formats[] = {
+		/* RGB formats */
+		{ .format = V4L2_PIX_FMT_BGR24,		.num_planes = 1, .bpp = { 3, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_RGB24,		.num_planes = 1, .bpp = { 3, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_HSV24,		.num_planes = 1, .bpp = { 3, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_BGR32,		.num_planes = 1, .bpp = { 4, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_XBGR32,	.num_planes = 1, .bpp = { 4, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_RGB32,		.num_planes = 1, .bpp = { 4, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_XRGB32,	.num_planes = 1, .bpp = { 4, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_HSV32,		.num_planes = 1, .bpp = { 4, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_ARGB32,	.num_planes = 1, .bpp = { 4, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_ABGR32,	.num_planes = 1, .bpp = { 4, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_GREY,		.num_planes = 1, .bpp = { 1, 0, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+
+		/* YUV formats */
+		{ .format = V4L2_PIX_FMT_YUYV,		.num_planes = 1, .bpp = { 2, 0, 0, 0 }, .hdiv = 2, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_YVYU,		.num_planes = 1, .bpp = { 2, 0, 0, 0 }, .hdiv = 2, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_UYVY,		.num_planes = 1, .bpp = { 2, 0, 0, 0 }, .hdiv = 2, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_VYUY,		.num_planes = 1, .bpp = { 2, 0, 0, 0 }, .hdiv = 2, .vdiv = 1 },
+
+		{ .format = V4L2_PIX_FMT_NV12,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 2 },
+		{ .format = V4L2_PIX_FMT_NV21,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 2 },
+		{ .format = V4L2_PIX_FMT_NV16,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_NV61,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_NV24,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_NV42,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 1, .vdiv = 1 },
+
+		{ .format = V4L2_PIX_FMT_YUV410,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 4, .vdiv = 4 },
+		{ .format = V4L2_PIX_FMT_YVU410,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 4, .vdiv = 4 },
+		{ .format = V4L2_PIX_FMT_YUV411P,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 4, .vdiv = 1 },
+		{ .format = V4L2_PIX_FMT_YUV420,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 2, .vdiv = 2 },
+		{ .format = V4L2_PIX_FMT_YVU420,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 2, .vdiv = 2 },
+		{ .format = V4L2_PIX_FMT_YUV422P,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 2, .vdiv = 1 },
+
+		/* Non-contiguous, aka multiplanar formats */
+		{ .format = V4L2_PIX_FMT_YUV420M,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 2, .vdiv = 2, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_YVU420M,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 2, .vdiv = 2, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_YUV422M,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 2, .vdiv = 1, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_YVU422M,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 2, .vdiv = 1, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_YUV444M,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 1, .vdiv = 1, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_YVU444M,	.num_planes = 3, .bpp = { 1, 1, 1, 0 }, .hdiv = 1, .vdiv = 1, .non_contiguous = 1 },
+
+		{ .format = V4L2_PIX_FMT_NV12M,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 2, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_NV21M,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 2, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_NV16M,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 1, .non_contiguous = 1 },
+		{ .format = V4L2_PIX_FMT_NV61M,		.num_planes = 2, .bpp = { 1, 2, 0, 0 }, .hdiv = 2, .vdiv = 1, .non_contiguous = 1 },
+	};
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(formats); ++i)
+		if (formats[i].format == format)
+			return &formats[i];
+	return NULL;
+}
+EXPORT_SYMBOL(v4l2_format_info);
+
+int v4l2_fill_pixfmt_mp(struct v4l2_pix_format_mplane *pixfmt,
+			 int pixelformat, int width, int height)
+{
+	const struct v4l2_format_info *info;
+	struct v4l2_plane_pix_format *plane;
+	int i;
+
+	info = v4l2_format_info(pixelformat);
+	if (!info)
+		return -EINVAL;
+
+	pixfmt->width = width;
+	pixfmt->height = height;
+	pixfmt->pixelformat = pixelformat;
+
+	if (!info->non_contiguous) {
+		pixfmt->num_planes = 1;
+		plane = &pixfmt->plane_fmt[0];
+		plane->bytesperline = width * info->bpp[0];
+		plane->sizeimage = 0;
+		for (i = 0; i < info->num_planes; i++) {
+			unsigned int hdiv = (i == 0) ? 1 : info->hdiv;
+			unsigned int vdiv = (i == 0) ? 1 : info->vdiv;
+
+			plane->sizeimage += info->bpp[i] *
+				DIV_ROUND_UP(width, hdiv) *
+				DIV_ROUND_UP(height, vdiv);
+		}
+	} else {
+		pixfmt->num_planes = info->num_planes;
+		for (i = 0; i < info->num_planes; i++) {
+			unsigned int hdiv = (i == 0) ? 1 : info->hdiv;
+			unsigned int vdiv = (i == 0) ? 1 : info->vdiv;
+
+			plane = &pixfmt->plane_fmt[i];
+			plane->bytesperline =
+				info->bpp[i] * DIV_ROUND_UP(width, hdiv);
+			plane->sizeimage =
+				plane->bytesperline * DIV_ROUND_UP(height, vdiv);
+		}
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(v4l2_fill_pixfmt_mp);
+
+int v4l2_fill_pixfmt(struct v4l2_pix_format *pixfmt, int pixelformat, int width, int height)
+{
+	const struct v4l2_format_info *info;
+	int i;
+
+	info = v4l2_format_info(pixelformat);
+	if (!info)
+		return -EINVAL;
+	if (info->non_contiguous)
+		return -EINVAL;
+
+	pixfmt->width = width;
+	pixfmt->height = height;
+	pixfmt->pixelformat = pixelformat;
+	pixfmt->bytesperline = width * info->bpp[0];
+	pixfmt->sizeimage = 0;
+
+	for (i = 0; i < info->num_planes; i++) {
+		unsigned int hdiv = (i == 0) ? 1 : info->hdiv;
+		unsigned int vdiv = (i == 0) ? 1 : info->vdiv;
+
+		pixfmt->sizeimage += info->bpp[i] *
+			DIV_ROUND_UP(width, hdiv) *
+			DIV_ROUND_UP(height, vdiv);
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(v4l2_fill_pixfmt);
