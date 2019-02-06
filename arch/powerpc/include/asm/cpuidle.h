@@ -77,6 +77,7 @@ struct stop_sprs {
 	u64 mmcr1;
 	u64 mmcr2;
 	u64 mmcra;
+	u64 iamr;
 };
 
 #define PNV_IDLE_NAME_LEN    16
