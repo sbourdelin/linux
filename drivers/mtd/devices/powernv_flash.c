@@ -1,17 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
+
 /*
  * OPAL PNOR flash MTD abstraction
  *
  * Copyright IBM 2015
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/kernel.h>
@@ -261,6 +253,14 @@ static int powernv_flash_probe(struct platform_device *pdev)
 	 * The current flash that skiboot exposes is one contiguous flash chip
 	 * with an ffs partition at the start, it should prove easier for users
 	 * to deal with partitions or not as they see fit
+	 *
+	 * When developing the skiboot MTD driver an experiment with FFS
+	 * parsing in the kernel, and exposing a seperate /dev/mtdX for each
+	 * partition (eg BOOTKERNEL, PAYLOAD, NVRAM, etc), was done.
+	 *
+	 * We didn't go with that as it meant users couldn't do a full flash
+	 * re-write, as this can cause a partition to change size, and there
+	 * wasn't a way to tell the MTD layer that a device has shrunk/grown.
 	 */
 	return mtd_device_register(&data->mtd, NULL, 0);
 }
