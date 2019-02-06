@@ -240,6 +240,22 @@ static int fence_update(struct drm_i915_fence_reg *fence,
 		i915_vma_flush_writes(old);
 	}
 
+	/*
+	 * We only need to update the register itself if the device is awake.
+	 * If the device is currently powered down, we will defer the write
+	 * to the runtime resume, see i915_gem_restore_fences().
+	 *
+	 * This only works for removing the fence register, on acquisition
+	 * the caller must hold the rpm wakeref. The fence register must
+	 * be cleared before we can use any other fences to ensure that
+	 * the new fences do not overlap the elided clears, confusing HW.
+	 */
+	wakeref = intel_runtime_pm_get_if_in_use(fence->i915);
+	if (!wakeref) {
+		GEM_BUG_ON(vma);
+		return 0;
+	}
+
 	if (fence->vma && fence->vma != vma) {
 		/* Ensure that all userspace CPU access is completed before
 		 * stealing the fence.
@@ -253,15 +269,7 @@ static int fence_update(struct drm_i915_fence_reg *fence,
 		list_move(&fence->link, &fence->i915->mm.fence_list);
 	}
 
-	/* We only need to update the register itself if the device is awake.
-	 * If the device is currently powered down, we will defer the write
-	 * to the runtime resume, see i915_gem_restore_fences().
-	 */
-	wakeref = intel_runtime_pm_get_if_in_use(fence->i915);
-	if (wakeref) {
-		fence_write(fence, vma);
-		intel_runtime_pm_put(fence->i915, wakeref);
-	}
+	fence_write(fence, vma);
 
 	if (vma) {
 		if (fence->vma != vma) {
@@ -272,6 +280,7 @@ static int fence_update(struct drm_i915_fence_reg *fence,
 		list_move_tail(&fence->link, &fence->i915->mm.fence_list);
 	}
 
+	intel_runtime_pm_put(fence->i915, wakeref);
 	return 0;
 }
 
