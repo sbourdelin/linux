@@ -493,6 +493,7 @@ static int ipip6_err(struct sk_buff *skb, u32 info)
 	const int type = icmp_hdr(skb)->type;
 	const int code = icmp_hdr(skb)->code;
 	unsigned int data_len = 0;
+	struct inet6_dev *idev;
 	struct ip_tunnel *t;
 	int sifindex;
 	int err;
@@ -546,8 +547,13 @@ static int ipip6_err(struct sk_buff *skb, u32 info)
 	}
 
 	err = 0;
-	if (!ip6_err_gen_icmpv6_unreach(skb, iph->ihl * 4, type, data_len))
+
+	idev = in6_dev_get(skb->dev);
+	if (idev &&
+	    !ip6_err_gen_icmpv6_unreach(skb, iph->ihl * 4, type, data_len)) {
+		in6_dev_put(idev);
 		goto out;
+	}
 
 	if (t->parms.iph.daddr == 0)
 		goto out;
