@@ -1554,7 +1554,7 @@ void mq_clear_sbinfo(struct ipc_namespace *ns)
 
 void mq_put_mnt(struct ipc_namespace *ns)
 {
-	kern_unmount(ns->mq_mnt);
+	kern_unmount_async(ns->mq_mnt);
 }
 
 static int __init init_mqueue_fs(void)

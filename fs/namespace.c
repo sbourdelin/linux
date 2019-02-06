@@ -3323,6 +3323,47 @@ void kern_unmount(struct vfsmount *mnt)
 }
 EXPORT_SYMBOL(kern_unmount);
 
+struct async_unmount_cb {
+	struct vfsmount *mnt;
+	struct work_struct work;
+	struct rcu_head rcu_head;
+};
+
+static void kern_unmount_work(struct work_struct *work)
+{
+	struct async_unmount_cb *cb = container_of(work,
+			struct async_unmount_cb, work);
+
+	mntput(cb->mnt);
+	kfree(cb);
+}
+
+static void kern_unmount_rcu_cb(struct rcu_head *rcu_head)
+{
+	struct async_unmount_cb *cb = container_of(rcu_head,
+			struct async_unmount_cb, rcu_head);
+
+	INIT_WORK(&cb->work, kern_unmount_work);
+	schedule_work(&cb->work);
+
+}
+
+void kern_unmount_async(struct vfsmount *mnt)
+{
+	/* release long term mount so mount point can be released */
+	if (!IS_ERR_OR_NULL(mnt)) {
+		struct async_unmount_cb *cb = kmalloc(sizeof(*cb), GFP_KERNEL);
+
+		if (cb) {
+			real_mount(mnt)->mnt_ns = NULL;
+			cb->mnt = mnt;
+			call_rcu(&cb->rcu_head, kern_unmount_rcu_cb);
+		} else {
+			kern_unmount(mnt);
+		}
+	}
+}
+
 bool our_mnt(struct vfsmount *mnt)
 {
 	return check_mnt(real_mount(mnt));
