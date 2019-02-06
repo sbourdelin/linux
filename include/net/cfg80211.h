@@ -2846,6 +2846,8 @@ struct cfg80211_pmk_conf {
  *	the real status code for failures. Used only for the authentication
  *	response command interface (user space to driver).
  * @pmkid: The identifier to refer a PMKSA.
+ * @pmk_len: Length of PMK if present.
+ * @pmk: Derived PMK
  */
 struct cfg80211_external_auth_params {
 	enum nl80211_external_auth_action action;
@@ -2854,6 +2856,8 @@ struct cfg80211_external_auth_params {
 	unsigned int key_mgmt_suite;
 	u16 status;
 	const u8 *pmkid;
+	int pmk_len;
+	const u8 *pmk;
 };
 
 /**
