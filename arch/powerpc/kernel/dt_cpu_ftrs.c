@@ -658,7 +658,7 @@ static void __init cpufeatures_setup_start(u32 isa)
 
 static bool __init cpufeatures_process_feature(struct dt_cpu_feature *f)
 {
-	const struct dt_cpu_feature_match *m;
+	const struct dt_cpu_feature_match *m = NULL;
 	bool known = false;
 	int i;
 
