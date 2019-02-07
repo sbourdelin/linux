@@ -1250,6 +1250,20 @@ struct cfg80211_tid_stats {
 #define IEEE80211_MAX_CHAINS	4
 
 /**
+ * struct mc_bc_stats - per STA multicast/broadcast data packets
+ * @mc_pkts: number of multicast packets
+ * @mc_bytes: number of bytes of multicast
+ * @bc_pkts: number of broadcast packets
+ * @bc_bytes: number of bytes of broadcast
+ */
+struct mc_bc_stats {
+	u64 mc_pkts;
+	u64 mc_bytes;
+	u64 bc_pkts;
+	u64 bc_bytes;
+};
+
+/**
  * struct station_info - station information
  *
  * Station information filled by driver for get_station() and dump_station.
@@ -1311,6 +1325,7 @@ struct cfg80211_tid_stats {
  *	an FCS error. This counter should be incremented only when TA of the
  *	received packet with an FCS error matches the peer MAC address.
  * @airtime_link_metric: mesh airtime link metric.
+ * @mc_bc_stat: per STA rx mcast/bcast count stats.
  */
 struct station_info {
 	u64 filled;
@@ -1364,6 +1379,8 @@ struct station_info {
 	u32 fcs_err_count;
 
 	u32 airtime_link_metric;
+
+	struct mc_bc_stats mc_bc_stat;
 };
 
 #if IS_ENABLED(CONFIG_CFG80211)

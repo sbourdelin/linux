@@ -479,6 +479,7 @@ struct ieee80211_sta_rx_stats {
  * @fast_rx: RX fastpath information
  * @tdls_chandef: a TDLS peer can have a wider chandef that is compatible to
  *	the BSS one.
+ * @mc_bc_stat: per STA rx mcast/bcast count stats.
  * @tx_stats: TX statistics
  * @rx_stats: RX statistics
  * @pcpu_rx_stats: per-CPU RX statistics, assigned only if the driver needs
@@ -584,6 +585,8 @@ struct sta_info {
 	u8 reserved_tid;
 
 	struct cfg80211_chan_def tdls_chandef;
+
+	struct mc_bc_stats mc_bc_stat;
 
 	/* keep last! */
 	struct ieee80211_sta sta;
@@ -748,6 +751,9 @@ void sta_set_rate_info_tx(struct sta_info *sta,
 			  struct rate_info *rinfo);
 void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo,
 		   bool tidstats);
+
+void sta_get_rx_multicast_broadcast_info(struct sta_info *sta,
+					 struct mc_bc_stats *stats);
 
 u32 sta_get_expected_throughput(struct sta_info *sta);
 
