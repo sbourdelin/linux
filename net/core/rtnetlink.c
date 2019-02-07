@@ -3312,8 +3312,10 @@ static int rtnl_getlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 			return PTR_ERR(tgt_net);
 	}
 
-	if (tb[IFLA_IFNAME])
+	if (tb[IFLA_IFNAME]) {
 		nla_strlcpy(ifname, tb[IFLA_IFNAME], IFNAMSIZ);
+		*strchrnul(ifname, ':') = '\0';
+	}
 
 	if (tb[IFLA_EXT_MASK])
 		ext_filter_mask = nla_get_u32(tb[IFLA_EXT_MASK]);
