@@ -214,10 +214,15 @@ int bpf_load_program_xattr(const struct bpf_load_program_attr *load_attr,
 {
 	void *finfo = NULL, *linfo = NULL;
 	union bpf_attr attr;
+	__u32 log_level;
 	__u32 name_len;
 	int fd;
 
 	if (!load_attr)
+		return -EINVAL;
+
+	log_level = load_attr->log_level;
+	if (log_level > 2)
 		return -EINVAL;
 
 	name_len = load_attr->name ? strlen(load_attr->name) : 0;
@@ -292,7 +297,7 @@ int bpf_load_program_xattr(const struct bpf_load_program_attr *load_attr,
 	/* Try again with log */
 	attr.log_buf = ptr_to_u64(log_buf);
 	attr.log_size = log_buf_sz;
-	attr.log_level = 1;
+	attr.log_level = (log_level == 2) ? log_level : 1;
 	log_buf[0] = 0;
 	fd = sys_bpf_prog_load(&attr, sizeof(attr));
 done:
