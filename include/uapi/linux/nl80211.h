@@ -3125,6 +3125,7 @@ enum nl80211_sta_bss_param {
  *	might not be fully accurate.
  * @NL80211_STA_INFO_CONNECTED_TO_GATE: set to true if STA has a path to a
  *	mesh gate (u8, 0 or 1)
+ * @NL80211_STA_INFO_AIRTIME_LINK_METRIC: airtime link metric for mesh station
  * @__NL80211_STA_INFO_AFTER_LAST: internal
  * @NL80211_STA_INFO_MAX: highest possible station info attribute
  */
@@ -3168,6 +3169,7 @@ enum nl80211_sta_info {
 	NL80211_STA_INFO_RX_MPDUS,
 	NL80211_STA_INFO_FCS_ERROR_COUNT,
 	NL80211_STA_INFO_CONNECTED_TO_GATE,
+	NL80211_STA_INFO_AIRTIME_LINK_METRIC,
 
 	/* keep last */
 	__NL80211_STA_INFO_AFTER_LAST,
