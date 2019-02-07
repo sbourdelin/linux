@@ -29,10 +29,12 @@
 struct private_data {
 	struct opp_table *opp_table;
 	struct device *cpu_dev;
-	const char *reg_name;
+	struct clk *clk;
 	struct regulator *reg;
 	bool have_static_opps;
 };
+
+static struct private_data *priv_data;
 
 static struct freq_attr *cpufreq_dt_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
@@ -94,7 +96,7 @@ node_put:
 	return name;
 }
 
-static int resources_available(void)
+static int get_cpu_resources(struct private_data *priv, unsigned int cpu)
 {
 	struct device *cpu_dev;
 	struct regulator *cpu_reg;
@@ -102,9 +104,9 @@ static int resources_available(void)
 	int ret = 0;
 	const char *name;
 
-	cpu_dev = get_cpu_device(0);
+	cpu_dev = get_cpu_device(cpu);
 	if (!cpu_dev) {
-		pr_err("failed to get cpu0 device\n");
+		pr_err("failed to get cpu%d device\n", cpu);
 		return -ENODEV;
 	}
 
@@ -123,12 +125,10 @@ static int resources_available(void)
 		return ret;
 	}
 
-	clk_put(cpu_clk);
-
 	name = find_supply_name(cpu_dev);
 	/* Platform doesn't require regulator */
 	if (!name)
-		return 0;
+		goto no_regulator;
 
 	cpu_reg = regulator_get_optional(cpu_dev, name);
 	ret = PTR_ERR_OR_ZERO(cpu_reg);
@@ -138,48 +138,42 @@ static int resources_available(void)
 		 * not yet registered, we should try defering probe.
 		 */
 		if (ret == -EPROBE_DEFER)
-			dev_dbg(cpu_dev, "cpu0 regulator not ready, retry\n");
+			dev_dbg(cpu_dev, "regulator not ready, retry\n");
 		else
-			dev_dbg(cpu_dev, "no regulator for cpu0: %d\n", ret);
-
-		return ret;
+			dev_dbg(cpu_dev, "no regulator for cpu: %d\n", ret);
+		goto free;
 	}
-
-	regulator_put(cpu_reg);
+no_regulator:
+	priv->cpu_dev = cpu_dev;
+	priv->clk = cpu_clk;
+	priv->reg = cpu_reg;
 	return 0;
+free:
+	clk_put(cpu_clk);
+	return ret;
+}
+
+static void put_cpu_resources(struct private_data *priv)
+{
+	clk_put(priv->clk);
+	regulator_put(priv->reg);
 }
 
 static int cpufreq_init(struct cpufreq_policy *policy)
 {
 	struct cpufreq_frequency_table *freq_table;
 	struct opp_table *opp_table = NULL;
-	struct private_data *priv;
-	struct regulator *reg;
-	struct device *cpu_dev;
-	struct clk *cpu_clk;
+	struct private_data *priv = &priv_data[policy->cpu];
+	struct device *cpu_dev = priv->cpu_dev;
 	unsigned int transition_latency;
 	bool fallback = false;
-	const char *name;
 	int ret;
-
-	cpu_dev = get_cpu_device(policy->cpu);
-	if (!cpu_dev) {
-		pr_err("failed to get cpu%d device\n", policy->cpu);
-		return -ENODEV;
-	}
-
-	cpu_clk = clk_get(cpu_dev, NULL);
-	if (IS_ERR(cpu_clk)) {
-		ret = PTR_ERR(cpu_clk);
-		dev_err(cpu_dev, "%s: failed to get clk: %d\n", __func__, ret);
-		return ret;
-	}
 
 	/* Get OPP-sharing information from "operating-points-v2" bindings */
 	ret = dev_pm_opp_of_get_sharing_cpus(cpu_dev, policy->cpus);
 	if (ret) {
 		if (ret != -ENOENT)
-			goto out_put_clk;
+			return ret;
 
 		/*
 		 * operating-points-v2 not supported, fallback to old method of
@@ -190,35 +184,18 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 			fallback = true;
 	}
 
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv) {
-		ret = -ENOMEM;
-		goto out_put_clk;
-	}
-
 	/*
 	 * OPP layer will be taking care of regulators.
 	 */
-	name = find_supply_name(cpu_dev);
-	if (name) {
-		reg = regulator_get_optional(cpu_dev, name);
-		ret = PTR_ERR_OR_ZERO(reg);
-		if (ret) {
-			dev_err(cpu_dev, "Failed to get regulator for cpu%d: %d\n",
-				policy->cpu, ret);
-			goto out_free_priv;
-		}
-		priv->reg = reg;
+	if (priv->reg) {
 		opp_table = dev_pm_opp_set_regulators(cpu_dev, &priv->reg, 1);
 		if (IS_ERR(opp_table)) {
 			ret = PTR_ERR(opp_table);
-			dev_err(cpu_dev, "Failed to set regulator for cpu%d: %d\n",
-				policy->cpu, ret);
-			goto out_put_regulator;
+			dev_err(cpu_dev, "Failed to set regulator for cpu: %d\n",
+				ret);
+			return ret;
 		}
 	}
-
-	priv->reg_name = name;
 	priv->opp_table = opp_table;
 
 	/*
@@ -264,11 +241,9 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 		goto out_free_opp;
 	}
 
-	priv->cpu_dev = cpu_dev;
 	policy->driver_data = priv;
-	policy->clk = cpu_clk;
+	policy->clk = priv->clk;
 	policy->freq_table = freq_table;
-
 	policy->suspend_freq = dev_pm_opp_get_suspend_opp_freq(cpu_dev) / 1000;
 
 	/* Support turbo/boost mode */
@@ -294,16 +269,8 @@ out_free_cpufreq_table:
 out_free_opp:
 	if (priv->have_static_opps)
 		dev_pm_opp_of_cpumask_remove_table(policy->cpus);
-out_put_opp_regulator:
-	if (name)
-		dev_pm_opp_put_regulators(opp_table);
-out_put_regulator:
 	if (priv->reg)
-		regulator_put(priv->reg);
-out_free_priv:
-	kfree(priv);
-out_put_clk:
-	clk_put(cpu_clk);
+		dev_pm_opp_put_regulators(opp_table);
 
 	return ret;
 }
@@ -315,13 +282,8 @@ static int cpufreq_exit(struct cpufreq_policy *policy)
 	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
 	if (priv->have_static_opps)
 		dev_pm_opp_of_cpumask_remove_table(policy->related_cpus);
-	if (priv->reg_name)
-		dev_pm_opp_put_regulators(priv->opp_table);
 	if (priv->reg)
-		regulator_put(priv->reg);
-
-	clk_put(policy->clk);
-	kfree(priv);
+		dev_pm_opp_put_regulators(priv->opp_table);
 
 	return 0;
 }
@@ -342,18 +304,21 @@ static struct cpufreq_driver dt_cpufreq_driver = {
 static int dt_cpufreq_probe(struct platform_device *pdev)
 {
 	struct cpufreq_dt_platform_data *data = dev_get_platdata(&pdev->dev);
-	int ret;
+	int i, ret;
 
-	/*
-	 * All per-cluster (CPUs sharing clock/voltages) initialization is done
-	 * from ->init(). In probe(), we just need to make sure that clk and
-	 * regulators are available. Else defer probe and retry.
-	 *
-	 * FIXME: Is checking this only for CPU0 sufficient ?
-	 */
-	ret = resources_available();
-	if (ret)
-		return ret;
+	priv_data = devm_kcalloc(&pdev->dev, num_possible_cpus(),
+				 sizeof(*priv_data), GFP_KERNEL);
+	if (!priv_data)
+		return -ENOMEM;
+
+	for (i = 0; i < num_possible_cpus(); i++) {
+		ret = get_cpu_resources(&priv_data[i], i);
+		if (ret) {
+			while (i-- > 0)
+				put_cpu_resources(&priv_data[i]);
+			return ret;
+		}
+	}
 
 	if (data) {
 		if (data->have_governor_per_policy)
@@ -373,7 +338,12 @@ static int dt_cpufreq_probe(struct platform_device *pdev)
 
 static int dt_cpufreq_remove(struct platform_device *pdev)
 {
+	int i;
+
 	cpufreq_unregister_driver(&dt_cpufreq_driver);
+	for (i = 0; i < num_possible_cpus(); i++)
+		put_cpu_resources(&priv_data[i]);
+
 	return 0;
 }
 
