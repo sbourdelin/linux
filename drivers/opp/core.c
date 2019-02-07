@@ -1467,11 +1467,10 @@ static void _free_set_opp_data(struct opp_table *opp_table)
  * This must be called before any OPPs are initialized for the device.
  */
 struct opp_table *dev_pm_opp_set_regulators(struct device *dev,
-					    const char * const names[],
+					    struct regulator **regulators,
 					    unsigned int count)
 {
 	struct opp_table *opp_table;
-	struct regulator *reg;
 	int ret, i;
 
 	opp_table = dev_pm_opp_get_opp_table(dev);
@@ -1488,41 +1487,14 @@ struct opp_table *dev_pm_opp_set_regulators(struct device *dev,
 	if (opp_table->regulators)
 		return opp_table;
 
-	opp_table->regulators = kmalloc_array(count,
-					      sizeof(*opp_table->regulators),
-					      GFP_KERNEL);
-	if (!opp_table->regulators) {
-		ret = -ENOMEM;
-		goto err;
-	}
-
-	for (i = 0; i < count; i++) {
-		reg = regulator_get_optional(dev, names[i]);
-		if (IS_ERR(reg)) {
-			ret = PTR_ERR(reg);
-			if (ret != -EPROBE_DEFER)
-				dev_err(dev, "%s: no regulator (%s) found: %d\n",
-					__func__, names[i], ret);
-			goto free_regulators;
-		}
-
-		opp_table->regulators[i] = reg;
-	}
-
+	opp_table->regulators = regulators;
 	opp_table->regulator_count = count;
 
 	/* Allocate block only once to pass to set_opp() routines */
 	ret = _allocate_set_opp_data(opp_table);
-	if (ret)
-		goto free_regulators;
+	if (ret == 0)
+		return opp_table;
 
-	return opp_table;
-
-free_regulators:
-	while (i != 0)
-		regulator_put(opp_table->regulators[--i]);
-
-	kfree(opp_table->regulators);
 	opp_table->regulators = NULL;
 	opp_table->regulator_count = -1;
 err:
@@ -1546,12 +1518,8 @@ void dev_pm_opp_put_regulators(struct opp_table *opp_table)
 	/* Make sure there are no concurrent readers while updating opp_table */
 	WARN_ON(!list_empty(&opp_table->opp_list));
 
-	for (i = opp_table->regulator_count - 1; i >= 0; i--)
-		regulator_put(opp_table->regulators[i]);
-
 	_free_set_opp_data(opp_table);
 
-	kfree(opp_table->regulators);
 	opp_table->regulators = NULL;
 	opp_table->regulator_count = -1;
 

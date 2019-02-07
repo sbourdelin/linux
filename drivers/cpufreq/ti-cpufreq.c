@@ -23,6 +23,7 @@
 #include <linux/of_platform.h>
 #include <linux/pm_opp.h>
 #include <linux/regmap.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 
 #define REVISION_MASK				0xF
@@ -213,13 +214,43 @@ static const struct of_device_id *ti_cpufreq_match_node(void)
 	return match;
 }
 
+#define TI_MULTIREGULATOR_COUNT 2
+static struct regulator *multi_regulators[TI_MULTIREGULATOR_COUNT];
+
+static int ti_setup_multi_regulators(struct device *cpu_dev)
+{
+	struct opp_table *ti_opp_table;
+	int ret = 0;
+
+	multi_regulators[0] = regulator_get(cpu_dev, "vdd");
+	if (IS_ERR(multi_regulators[0]))
+		return PTR_ERR(multi_regulators[0]);
+	multi_regulators[1] = regulator_get(cpu_dev, "vbb");
+	if (IS_ERR(multi_regulators[1])) {
+		ret = PTR_ERR(multi_regulators[1]);
+		goto free0;
+	}
+
+	ti_opp_table = dev_pm_opp_set_regulators(cpu_dev, multi_regulators,
+						 TI_MULTIREGULATOR_COUNT);
+	if (IS_ERR(ti_opp_table)) {
+		ret = PTR_ERR(ti_opp_table);
+		goto free1;
+	}
+	return 0;
+free1:
+	regulator_put(multi_regulators[1]);
+free0:
+	regulator_put(multi_regulators[0]);
+	return ret;
+}
+
 static int ti_cpufreq_probe(struct platform_device *pdev)
 {
 	u32 version[VERSION_COUNT];
 	const struct of_device_id *match;
 	struct opp_table *ti_opp_table;
 	struct ti_cpufreq_data *opp_data;
-	const char * const reg_names[] = {"vdd", "vbb"};
 	int ret;
 
 	match = dev_get_platdata(&pdev->dev);
@@ -273,14 +304,10 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
 	}
 
 	opp_data->opp_table = ti_opp_table;
-
 	if (opp_data->soc_data->multi_regulator) {
-		ti_opp_table = dev_pm_opp_set_regulators(opp_data->cpu_dev,
-							 reg_names,
-							 ARRAY_SIZE(reg_names));
-		if (IS_ERR(ti_opp_table)) {
+		ret = ti_setup_multi_regulators(opp_data->cpu_dev);
+		if (ret) {
 			dev_pm_opp_put_supported_hw(opp_data->opp_table);
-			ret =  PTR_ERR(ti_opp_table);
 			goto fail_put_node;
 		}
 	}
@@ -316,6 +343,7 @@ static struct platform_driver ti_cpufreq_driver = {
 	.driver = {
 		.name = "ti-cpufreq",
 	},
+	.suppress_bind_attrs = true,
 };
 builtin_platform_driver(ti_cpufreq_driver);
 

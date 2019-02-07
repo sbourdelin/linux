@@ -30,6 +30,7 @@ struct private_data {
 	struct opp_table *opp_table;
 	struct device *cpu_dev;
 	const char *reg_name;
+	struct regulator *reg;
 	bool have_static_opps;
 };
 
@@ -153,6 +154,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 	struct cpufreq_frequency_table *freq_table;
 	struct opp_table *opp_table = NULL;
 	struct private_data *priv;
+	struct regulator *reg;
 	struct device *cpu_dev;
 	struct clk *cpu_clk;
 	unsigned int transition_latency;
@@ -188,25 +190,32 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 			fallback = true;
 	}
 
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	if (!priv) {
+		ret = -ENOMEM;
+		goto out_put_clk;
+	}
+
 	/*
-	 * OPP layer will be taking care of regulators now, but it needs to know
-	 * the name of the regulator first.
+	 * OPP layer will be taking care of regulators.
 	 */
 	name = find_supply_name(cpu_dev);
 	if (name) {
-		opp_table = dev_pm_opp_set_regulators(cpu_dev, &name, 1);
+		reg = regulator_get_optional(cpu_dev, name);
+		ret = PTR_ERR_OR_ZERO(reg);
+		if (ret) {
+			dev_err(cpu_dev, "Failed to get regulator for cpu%d: %d\n",
+				policy->cpu, ret);
+			goto out_free_priv;
+		}
+		priv->reg = reg;
+		opp_table = dev_pm_opp_set_regulators(cpu_dev, &priv->reg, 1);
 		if (IS_ERR(opp_table)) {
 			ret = PTR_ERR(opp_table);
 			dev_err(cpu_dev, "Failed to set regulator for cpu%d: %d\n",
 				policy->cpu, ret);
-			goto out_put_clk;
+			goto out_put_regulator;
 		}
-	}
-
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv) {
-		ret = -ENOMEM;
-		goto out_put_regulator;
 	}
 
 	priv->reg_name = name;
@@ -285,10 +294,14 @@ out_free_cpufreq_table:
 out_free_opp:
 	if (priv->have_static_opps)
 		dev_pm_opp_of_cpumask_remove_table(policy->cpus);
-	kfree(priv);
-out_put_regulator:
+out_put_opp_regulator:
 	if (name)
 		dev_pm_opp_put_regulators(opp_table);
+out_put_regulator:
+	if (priv->reg)
+		regulator_put(priv->reg);
+out_free_priv:
+	kfree(priv);
 out_put_clk:
 	clk_put(cpu_clk);
 
@@ -304,6 +317,8 @@ static int cpufreq_exit(struct cpufreq_policy *policy)
 		dev_pm_opp_of_cpumask_remove_table(policy->related_cpus);
 	if (priv->reg_name)
 		dev_pm_opp_put_regulators(priv->opp_table);
+	if (priv->reg)
+		regulator_put(priv->reg);
 
 	clk_put(policy->clk);
 	kfree(priv);
