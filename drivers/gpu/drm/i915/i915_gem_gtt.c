@@ -2754,7 +2754,7 @@ int i915_gem_init_ggtt(struct drm_i915_private *dev_priv)
 	/* And finally clear the reserved guard page */
 	ggtt->vm.clear_range(&ggtt->vm, ggtt->vm.total - PAGE_SIZE, PAGE_SIZE);
 
-	if (INTEL_PPGTT(dev_priv) == INTEL_PPGTT_ALIASING) {
+	if (INTEL_GEN(dev_priv) == 6) {
 		ret = i915_gem_init_aliasing_ppgtt(dev_priv);
 		if (ret)
 			goto err;
