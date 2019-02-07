@@ -2454,7 +2454,7 @@ static inline unsigned int i915_sg_segment_size(void)
 	(INTEL_PPGTT(dev_priv) != INTEL_PPGTT_NONE)
 #define HAS_FULL_PPGTT(dev_priv) \
 	(INTEL_PPGTT(dev_priv) >= INTEL_PPGTT_FULL)
-#define HAS_FULL_48BIT_PPGTT(dev_priv)	\
+#define HAS_4LVL_PPGTT(dev_priv)	\
 	(INTEL_PPGTT(dev_priv) >= INTEL_PPGTT_FULL_4LVL)
 
 #define HAS_PAGE_SIZES(dev_priv, sizes) ({ \

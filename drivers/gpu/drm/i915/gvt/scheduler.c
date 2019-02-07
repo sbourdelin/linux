@@ -1084,7 +1084,7 @@ i915_context_ppgtt_root_restore(struct intel_vgpu_submission *s)
 	struct i915_hw_ppgtt *i915_ppgtt = s->shadow_ctx->ppgtt;
 	int i;
 
-	if (i915_vm_is_48bit(&i915_ppgtt->vm))
+	if (i915_vm_is_4lvl(&i915_ppgtt->vm))
 		px_dma(&i915_ppgtt->pml4) = s->i915_context_pml4;
 	else {
 		for (i = 0; i < GEN8_3LVL_PDPES; i++)
@@ -1137,7 +1137,7 @@ i915_context_ppgtt_root_save(struct intel_vgpu_submission *s)
 	struct i915_hw_ppgtt *i915_ppgtt = s->shadow_ctx->ppgtt;
 	int i;
 
-	if (i915_vm_is_48bit(&i915_ppgtt->vm))
+	if (i915_vm_is_4lvl(&i915_ppgtt->vm))
 		s->i915_context_pml4 = px_dma(&i915_ppgtt->pml4);
 	else {
 		for (i = 0; i < GEN8_3LVL_PDPES; i++)

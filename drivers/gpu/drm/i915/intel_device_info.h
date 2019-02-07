@@ -192,6 +192,9 @@ struct intel_device_info {
 		u32 degamma_lut_tests;
 		u32 gamma_lut_tests;
 	} color;
+
+	/* Full PPGTT address range size */
+	int ppgtt_bits;
 };
 
 struct intel_runtime_info {
