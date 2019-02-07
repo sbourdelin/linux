@@ -274,5 +274,30 @@
 				};
 			};
 		};
+
+		mcde@a0350000 {
+			status = "okay";
+
+			dsi@a0351000 {
+				port {
+					dsi0_out: endpoint {
+						remote-endpoint = <&panel_in>;
+					};
+				};
+
+				panel: display {
+					compatible = "samsung,s6d16d0";
+					reg = <0>;
+					vdd1-supply = <&ab8500_ldo_aux1_reg>;
+					reset-gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
+
+					port {
+						panel_in: endpoint {
+							remote-endpoint = <&dsi0_out>;
+						};
+					};
+				};
+			};
+		};
 	};
 };

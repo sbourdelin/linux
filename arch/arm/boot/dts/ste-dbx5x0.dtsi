@@ -1197,12 +1197,11 @@
 		};
 
 		mcde@a0350000 {
-			compatible = "stericsson,mcde";
-			reg = <0xa0350000 0x1000>, /* MCDE */
-			      <0xa0351000 0x1000>, /* DSI link 1 */
-			      <0xa0352000 0x1000>, /* DSI link 2 */
-			      <0xa0353000 0x1000>; /* DSI link 3 */
+			compatible = "ste,mcde";
+			reg = <0xa0350000 0x1000>;
 			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+			epod-supply = <&db8500_b2r2_mcde_reg>;
+			vana-supply = <&ab8500_ldo_ana_reg>;
 			clocks = <&prcmu_clk PRCMU_MCDECLK>, /* Main MCDE clock */
 				 <&prcmu_clk PRCMU_LCDCLK>, /* LCD clock */
 				 <&prcmu_clk PRCMU_PLLDSI>, /* HDMI clock */
@@ -1211,6 +1210,33 @@
 				 <&prcmu_clk PRCMU_DSI0ESCCLK>, /* TVout clock 0 */
 				 <&prcmu_clk PRCMU_DSI1ESCCLK>, /* TVout clock 1 */
 				 <&prcmu_clk PRCMU_DSI2ESCCLK>; /* TVout clock 2 */
+			clock-names = "mcde", "lcd", "hdmi", "dsi0", "dsi1", "dsi0es", "dsi1es", "dsi2es";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			status = "disabled";
+
+			dsi0: dsi@a0351000 {
+				compatible = "ste,mcde-dsi";
+				reg = <0xa0351000 0x1000>;
+				vana-supply = <&ab8500_ldo_ana_reg>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+			dsi1: dsi@a0352000 {
+				compatible = "ste,mcde-dsi";
+				reg = <0xa0352000 0x1000>;
+				vana-supply = <&ab8500_ldo_ana_reg>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+			dsi2: dsi@a0353000 {
+				compatible = "ste,mcde-dsi";
+				reg = <0xa0353000 0x1000>;
+				vana-supply = <&ab8500_ldo_ana_reg>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
 		};
 
 		cryp@a03cb000 {
