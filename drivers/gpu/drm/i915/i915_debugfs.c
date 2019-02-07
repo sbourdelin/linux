@@ -3353,17 +3353,16 @@ static void drrs_status_per_crtc(struct seq_file *m,
 					drrs->busy_frontbuffer_bits);
 
 		seq_puts(m, "\n\t\t");
-		if (drrs->refresh_rate_type == DRRS_HIGH_RR) {
+		if (drrs->current_refresh_rate == DRRS_HIGH_RR) {
 			seq_puts(m, "DRRS_State: DRRS_HIGH_RR\n");
 			vrefresh = panel->fixed_mode->vrefresh;
-		} else if (drrs->refresh_rate_type == DRRS_LOW_RR) {
+		} else if (drrs->current_refresh_rate == DRRS_LOW_RR) {
 			seq_puts(m, "DRRS_State: DRRS_LOW_RR\n");
 			vrefresh = panel->downclock_mode->vrefresh;
 		} else {
 			seq_printf(m, "DRRS_State: Unknown(%d)\n",
-						drrs->refresh_rate_type);
-			mutex_unlock(&drrs->mutex);
-			return;
+				   drrs->current_refresh_rate);
+			vrefresh = -1;
 		}
 		seq_printf(m, "\t\tVrefresh: %d", vrefresh);
 

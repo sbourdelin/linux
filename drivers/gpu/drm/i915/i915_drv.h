@@ -492,7 +492,7 @@ struct i915_drrs {
 	struct delayed_work work;
 	struct intel_dp *dp;
 	unsigned busy_frontbuffer_bits;
-	enum drrs_refresh_rate_type refresh_rate_type;
+	enum drrs_refresh_rate_type current_refresh_rate;
 	enum drrs_support_type type;
 };
 
