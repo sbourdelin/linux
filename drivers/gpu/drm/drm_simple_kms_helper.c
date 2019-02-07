@@ -266,7 +266,7 @@ int drm_simple_display_pipe_init(struct drm_device *dev,
 			const uint64_t *format_modifiers,
 			struct drm_connector *connector)
 {
-	struct drm_encoder *encoder = &pipe->encoder;
+	struct drm_encoder *encoder;
 	struct drm_plane *plane = &pipe->plane;
 	struct drm_crtc *crtc = &pipe->crtc;
 	int ret;
@@ -289,10 +289,23 @@ int drm_simple_display_pipe_init(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-	encoder->possible_crtcs = drm_crtc_mask(crtc);
-	ret = drm_encoder_init(dev, encoder, &drm_simple_kms_encoder_funcs,
-			       DRM_MODE_ENCODER_NONE, NULL);
-	if (ret || !connector)
+	/* Other encoder already attached to the connector */
+	if (connector->encoder_ids[0] != 0) {
+		encoder = drm_encoder_find(connector->dev, NULL,
+					   connector->encoder_ids[0]);
+		encoder->possible_crtcs = drm_crtc_mask(crtc);
+		DRM_INFO("an encoder is already attached to the connector\n");
+	} else {
+		encoder = &pipe->encoder;
+		encoder->possible_crtcs = drm_crtc_mask(crtc);
+		ret = drm_encoder_init(dev, encoder,
+				       &drm_simple_kms_encoder_funcs,
+				       DRM_MODE_ENCODER_NONE, NULL);
+		if (ret)
+			return ret;
+	}
+
+	if (!connector)
 		return ret;
 
 	return drm_connector_attach_encoder(connector, encoder);
