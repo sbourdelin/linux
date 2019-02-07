@@ -2104,6 +2104,37 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 	return 0;
 }
 
+static void
+intel_dp_drrs_compute_config(struct intel_dp *intel_dp,
+			     struct intel_crtc_state *pipe_config)
+{
+	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+	bool constant_n = drm_dp_has_quirk(&intel_dp->desc,
+					   DP_DPCD_QUIRK_CONSTANT_N);
+
+	/*
+	 * DRRS and PSR can't be enable together, so giving preference to PSR
+	 * as it allows more power-savings by complete shutting down display,
+	 * so to guarantee this intel_dp_drrs_compute_config() must be called
+	 * after intel_psr_compute_config().
+	 */
+	if (pipe_config->has_psr)
+		return;
+
+	if (dev_priv->drrs.type != SEAMLESS_DRRS_SUPPORT)
+		return;
+
+	if (!intel_connector->panel.downclock_mode)
+		return;
+
+	pipe_config->has_drrs = true;
+	intel_link_compute_m_n(pipe_config->pipe_bpp, pipe_config->lane_count,
+			       intel_connector->panel.downclock_mode->clock,
+			       pipe_config->port_clock, &pipe_config->dp_m2_n2,
+			       constant_n);
+}
+
 int
 intel_dp_compute_config(struct intel_encoder *encoder,
 			struct intel_crtc_state *pipe_config,
@@ -2129,7 +2160,6 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	if (lspcon->active)
 		lspcon_ycbcr420_config(&intel_connector->base, pipe_config);
 
-	pipe_config->has_drrs = false;
 	if (IS_G4X(dev_priv) || port == PORT_A)
 		pipe_config->has_audio = false;
 	else if (intel_conn_state->force_audio == HDMI_AUDIO_AUTO)
@@ -2202,21 +2232,11 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 				       &pipe_config->dp_m_n,
 				       constant_n);
 
-	if (intel_connector->panel.downclock_mode != NULL &&
-		dev_priv->drrs.type == SEAMLESS_DRRS_SUPPORT) {
-			pipe_config->has_drrs = true;
-			intel_link_compute_m_n(pipe_config->pipe_bpp,
-					       pipe_config->lane_count,
-					       intel_connector->panel.downclock_mode->clock,
-					       pipe_config->port_clock,
-					       &pipe_config->dp_m2_n2,
-					       constant_n);
-	}
-
 	if (!HAS_DDI(dev_priv))
 		intel_dp_set_clock(encoder, pipe_config);
 
 	intel_psr_compute_config(intel_dp, pipe_config);
+	intel_dp_drrs_compute_config(intel_dp, pipe_config);
 
 	return 0;
 }
@@ -6452,10 +6472,7 @@ void intel_edp_drrs_enable(struct intel_dp *intel_dp,
 		return;
 	}
 
-	if (dev_priv->psr.enabled) {
-		DRM_DEBUG_KMS("PSR enabled. Not enabling DRRS.\n");
-		return;
-	}
+	WARN_ON(dev_priv->psr.enabled || crtc_state->has_psr);
 
 	mutex_lock(&dev_priv->drrs.mutex);
 	if (dev_priv->drrs.dp) {
