@@ -215,20 +215,29 @@ _GLOBAL_TOC(memcmp)
 	beq	.Lzero
 
 .Lcmp_rest_lt8bytes:
-	/* Here we have only less than 8 bytes to compare with. at least s1
-	 * Address is aligned with 8 bytes.
-	 * The next double words are load and shift right with appropriate
-	 * bits.
+	/*
+	 * Here we have less than 8 bytes left to compare with. We mustn't read
+	 * past the end of either source or dest.
 	 */
-	subfic  r6,r5,8
-	slwi	r6,r6,3
-	LD	rA,0,r3
-	LD	rB,0,r4
-	srd	rA,rA,r6
-	srd	rB,rB,r6
-	cmpld	cr0,rA,rB
+
+	/* If we have less than 4 bytes, just do byte at a time */
+	cmpdi   cr1, r5, 4
+	blt	cr1, .Lshort
+
+	/* Compare 4 bytes */
+	LW	rA,0,r3
+	LW	rB,0,r4
+	cmplw	cr0,rA,rB
 	bne	cr0,.LcmpAB_lightweight
-	b	.Lzero
+
+	/* If we had exactly 4 bytes left, we're done now */
+	beq	cr1, .Lzero
+
+	/* Otherwise do what ever's left a byte at a time */
+	subi	r5, r5, 4
+	addi	r3, r3, 4
+	addi	r4, r4, 4
+	b	.Lshort
 
 .Lnon_zero:
 	mr	r3,rC
