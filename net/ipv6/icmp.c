@@ -455,8 +455,7 @@ static void icmp6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info,
 	 */
 	addr_type = ipv6_addr_type(&hdr->daddr);
 
-	if (ipv6_chk_addr(net, &hdr->daddr, skb->dev, 0) ||
-	    ipv6_chk_acast_addr_src(net, skb->dev, &hdr->daddr))
+	if (!force_saddr)
 		saddr = &hdr->daddr;
 
 	/*
