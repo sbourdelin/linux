@@ -114,28 +114,11 @@ static void ksz9477_port_cfg32(struct ksz_device *dev, int port, int offset,
 	data; \
 })
 
-static int ksz9477_wait_vlan_ctrl_ready(struct ksz_device *dev, u32 waiton,
-					int timeout)
-{
-	u8 data;
-
-	do {
-		ksz_read8(dev, REG_SW_VLAN_CTRL, &data);
-		if (!(data & waiton))
-			break;
-		usleep_range(1, 10);
-	} while (timeout-- > 0);
-
-	if (timeout <= 0)
-		return -ETIMEDOUT;
-
-	return 0;
-}
-
 static int ksz9477_get_vlan_table(struct ksz_device *dev, u16 vid,
 				  u32 *vlan_table)
 {
 	int ret;
+	u8 data;
 
 	mutex_lock(&dev->vlan_mutex);
 
@@ -143,7 +126,8 @@ static int ksz9477_get_vlan_table(struct ksz_device *dev, u16 vid,
 	ksz_write8(dev, REG_SW_VLAN_CTRL, VLAN_READ | VLAN_START);
 
 	/* wait to be cleared */
-	ret = ksz9477_wait_vlan_ctrl_ready(dev, VLAN_START, 1000);
+	ret = readx_poll_timeout(read8_op, REG_SW_VLAN_CTRL, data,
+				 !(data & VLAN_START), 10, 1000);
 	if (ret < 0) {
 		dev_dbg(dev->dev, "Failed to read vlan table\n");
 		goto exit;
@@ -165,6 +149,7 @@ static int ksz9477_set_vlan_table(struct ksz_device *dev, u16 vid,
 				  u32 *vlan_table)
 {
 	int ret;
+	u8 data;
 
 	mutex_lock(&dev->vlan_mutex);
 
@@ -176,7 +161,8 @@ static int ksz9477_set_vlan_table(struct ksz_device *dev, u16 vid,
 	ksz_write8(dev, REG_SW_VLAN_CTRL, VLAN_START | VLAN_WRITE);
 
 	/* wait to be cleared */
-	ret = ksz9477_wait_vlan_ctrl_ready(dev, VLAN_START, 1000);
+	ret = readx_poll_timeout(read8_op, REG_SW_VLAN_CTRL, data,
+				 !(data & VLAN_START), 10, 1000);
 	if (ret < 0) {
 		dev_dbg(dev->dev, "Failed to write vlan table\n");
 		goto exit;
@@ -209,42 +195,6 @@ static void ksz9477_write_table(struct ksz_device *dev, u32 *table)
 	ksz_write32(dev, REG_SW_ALU_VAL_B, table[1]);
 	ksz_write32(dev, REG_SW_ALU_VAL_C, table[2]);
 	ksz_write32(dev, REG_SW_ALU_VAL_D, table[3]);
-}
-
-static int ksz9477_wait_alu_ready(struct ksz_device *dev, u32 waiton,
-				  int timeout)
-{
-	u32 data;
-
-	do {
-		ksz_read32(dev, REG_SW_ALU_CTRL__4, &data);
-		if (!(data & waiton))
-			break;
-		usleep_range(1, 10);
-	} while (timeout-- > 0);
-
-	if (timeout <= 0)
-		return -ETIMEDOUT;
-
-	return 0;
-}
-
-static int ksz9477_wait_alu_sta_ready(struct ksz_device *dev, u32 waiton,
-				      int timeout)
-{
-	u32 data;
-
-	do {
-		ksz_read32(dev, REG_SW_ALU_STAT_CTRL__4, &data);
-		if (!(data & waiton))
-			break;
-		usleep_range(1, 10);
-	} while (timeout-- > 0);
-
-	if (timeout <= 0)
-		return -ETIMEDOUT;
-
-	return 0;
 }
 
 static int ksz9477_reset_switch(struct ksz_device *dev)
@@ -649,7 +599,8 @@ static int ksz9477_port_fdb_add(struct dsa_switch *ds, int port,
 	ksz_write32(dev, REG_SW_ALU_CTRL__4, ALU_READ | ALU_START);
 
 	/* wait to be finished */
-	ret = ksz9477_wait_alu_ready(dev, ALU_START, 1000);
+	ret = readx_poll_timeout(read32_op, REG_SW_ALU_CTRL__4, data,
+				 !(data & ALU_START), 10, 1000);
 	if (ret < 0) {
 		dev_dbg(dev->dev, "Failed to read ALU\n");
 		goto exit;
@@ -673,7 +624,8 @@ static int ksz9477_port_fdb_add(struct dsa_switch *ds, int port,
 	ksz_write32(dev, REG_SW_ALU_CTRL__4, ALU_WRITE | ALU_START);
 
 	/* wait to be finished */
-	ret = ksz9477_wait_alu_ready(dev, ALU_START, 1000);
+	ret = readx_poll_timeout(read32_op, REG_SW_ALU_CTRL__4, data,
+				 !(data & ALU_START), 10, 1000);
 	if (ret < 0)
 		dev_dbg(dev->dev, "Failed to write ALU\n");
 
@@ -706,7 +658,8 @@ static int ksz9477_port_fdb_del(struct dsa_switch *ds, int port,
 	ksz_write32(dev, REG_SW_ALU_CTRL__4, ALU_READ | ALU_START);
 
 	/* wait to be finished */
-	ret = ksz9477_wait_alu_ready(dev, ALU_START, 1000);
+	ret = readx_poll_timeout(read32_op, REG_SW_ALU_CTRL__4, data,
+				 !(data & ALU_START), 10, 1000);
 	if (ret < 0) {
 		dev_dbg(dev->dev, "Failed to read ALU\n");
 		goto exit;
@@ -740,7 +693,8 @@ static int ksz9477_port_fdb_del(struct dsa_switch *ds, int port,
 	ksz_write32(dev, REG_SW_ALU_CTRL__4, ALU_WRITE | ALU_START);
 
 	/* wait to be finished */
-	ret = ksz9477_wait_alu_ready(dev, ALU_START, 1000);
+	ret = readx_poll_timeout(read32_op, REG_SW_ALU_CTRL__4, data,
+				 !(data & ALU_START), 10, 1000);
 	if (ret < 0)
 		dev_dbg(dev->dev, "Failed to write ALU\n");
 
@@ -832,6 +786,7 @@ static void ksz9477_port_mdb_add(struct dsa_switch *ds, int port,
 	u32 static_table[4];
 	u32 data;
 	int index;
+	int ret;
 	u32 mac_hi, mac_lo;
 
 	mac_hi = ((mdb->addr[0] << 8) | mdb->addr[1]);
@@ -847,7 +802,10 @@ static void ksz9477_port_mdb_add(struct dsa_switch *ds, int port,
 		ksz_write32(dev, REG_SW_ALU_STAT_CTRL__4, data);
 
 		/* wait to be finished */
-		if (ksz9477_wait_alu_sta_ready(dev, ALU_STAT_START, 1000) < 0) {
+		ret = readx_poll_timeout(read32_op, REG_SW_ALU_STAT_CTRL__4,
+					 data, !(data & ALU_STAT_START),
+					 10, 1000);
+		if (ret < 0) {
 			dev_dbg(dev->dev, "Failed to read ALU STATIC\n");
 			goto exit;
 		}
@@ -888,7 +846,9 @@ static void ksz9477_port_mdb_add(struct dsa_switch *ds, int port,
 	ksz_write32(dev, REG_SW_ALU_STAT_CTRL__4, data);
 
 	/* wait to be finished */
-	if (ksz9477_wait_alu_sta_ready(dev, ALU_STAT_START, 1000) < 0)
+	ret = readx_poll_timeout(read32_op, REG_SW_ALU_STAT_CTRL__4, data,
+				 !(data & ALU_STAT_START), 10, 1000);
+	if (ret < 0)
 		dev_dbg(dev->dev, "Failed to read ALU STATIC\n");
 
 exit:
@@ -918,7 +878,9 @@ static int ksz9477_port_mdb_del(struct dsa_switch *ds, int port,
 		ksz_write32(dev, REG_SW_ALU_STAT_CTRL__4, data);
 
 		/* wait to be finished */
-		ret = ksz9477_wait_alu_sta_ready(dev, ALU_STAT_START, 1000);
+		ret = readx_poll_timeout(read32_op, REG_SW_ALU_STAT_CTRL__4,
+					 data, !(data & ALU_STAT_START),
+					 10, 1000);
 		if (ret < 0) {
 			dev_dbg(dev->dev, "Failed to read ALU STATIC\n");
 			goto exit;
@@ -960,7 +922,8 @@ static int ksz9477_port_mdb_del(struct dsa_switch *ds, int port,
 	ksz_write32(dev, REG_SW_ALU_STAT_CTRL__4, data);
 
 	/* wait to be finished */
-	ret = ksz9477_wait_alu_sta_ready(dev, ALU_STAT_START, 1000);
+	ret = readx_poll_timeout(read32_op, REG_SW_ALU_STAT_CTRL__4, data,
+				 !(data & ALU_STAT_START), 10, 1000);
 	if (ret < 0)
 		dev_dbg(dev->dev, "Failed to read ALU STATIC\n");
 
