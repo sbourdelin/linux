@@ -887,6 +887,16 @@ struct dev_links_info {
 };
 
 /**
+ * struct dev_idr - Device group and entry ID allocator.
+ * @grp_idr: group ID allocator
+ * @entry_idr: entry ID allocator
+ */
+struct dev_idr {
+	struct idr *grp_idr;
+	struct idr *entry_idr;
+};
+
+/**
  * struct device - The basic device structure
  * @parent:	The device's "parent" device, the device to which it is attached.
  * 		In most cases, a parent device is some sort of bus or host
@@ -1051,6 +1061,10 @@ struct device {
     defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU_ALL)
 	bool			dma_coherent:1;
 #endif
+	/* For dynamic MSI-X allocation */
+	struct msi_desc		*first_desc;	/* 1st MSI-X desc of the latest allocated group */
+	struct dev_idr		*msix_dev_idr;	/* entry/group allocator */
+	bool			one_shot;	/* dynamic or oneshot MSI-X allocation */
 };
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)

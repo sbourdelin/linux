@@ -459,6 +459,8 @@ struct pci_dev {
 	char		*driver_override; /* Driver name to force a match */
 
 	unsigned long	priv_flags;	/* Private flags for the PCI driver */
+	unsigned int	num_msix;	/* Number of MSI-X vectors supported */
+	void __iomem	*base;		/* Base address of MSI-X table */
 };
 
 static inline struct pci_dev *pci_physfn(struct pci_dev *dev)

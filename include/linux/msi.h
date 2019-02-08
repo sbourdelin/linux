@@ -118,11 +118,18 @@ struct msi_desc {
 	list_for_each_entry((desc), dev_to_msi_list((dev)), list)
 #define for_each_msi_entry_safe(desc, tmp, dev)	\
 	list_for_each_entry_safe((desc), (tmp), dev_to_msi_list((dev)), list)
+/* Iterate through MSI entries from a given entry */
+#define for_each_msi_entry_from(desc, dev)                             \
+	desc = (*dev).first_desc;                                       \
+	list_for_each_entry_from((desc), dev_to_msi_list((dev)), list)  \
 
 #ifdef CONFIG_PCI_MSI
 #define first_pci_msi_entry(pdev)	first_msi_entry(&(pdev)->dev)
 #define for_each_pci_msi_entry(desc, pdev)	\
 	for_each_msi_entry((desc), &(pdev)->dev)
+/* Iterate through PCI-MSI entries from a given entry */
+#define for_each_pci_msi_entry_from(desc, pdev)        \
+	for_each_msi_entry_from((desc), &(pdev)->dev)
 
 struct pci_dev *msi_desc_to_pci_dev(struct msi_desc *desc);
 void *msi_desc_to_pci_sysdata(struct msi_desc *desc);
