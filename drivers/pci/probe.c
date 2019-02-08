@@ -2188,6 +2188,25 @@ struct pci_dev *pci_alloc_dev(struct pci_bus *bus)
 	if (!dev)
 		return NULL;
 
+	/* For dynamic MSI-x */
+	dev->dev.msix_dev_idr = kzalloc(sizeof(struct dev_idr), GFP_KERNEL);
+	if (!dev->dev.msix_dev_idr)
+		return NULL;
+
+	dev->dev.msix_dev_idr->grp_idr = kzalloc(sizeof(struct idr),
+								GFP_KERNEL);
+	if (!dev->dev.msix_dev_idr->grp_idr)
+		return NULL;
+
+	dev->dev.msix_dev_idr->entry_idr = kzalloc(sizeof(struct idr),
+								GFP_KERNEL);
+	if (!dev->dev.msix_dev_idr->entry_idr)
+		return NULL;
+
+	/* Initialise the IDR structures */
+	idr_init(dev->dev.msix_dev_idr->grp_idr);
+	idr_init(dev->dev.msix_dev_idr->entry_idr);
+
 	INIT_LIST_HEAD(&dev->bus_list);
 	dev->dev.type = &pci_dev_type;
 	dev->bus = pci_bus_get(bus);

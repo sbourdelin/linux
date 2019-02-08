@@ -102,7 +102,7 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 	if (type == PCI_CAP_ID_MSI && nvec > 1)
 		return 1;
 
-	for_each_pci_msi_entry(entry, dev) {
+	for_each_pci_msi_entry_from(entry, dev) {
 		ret = arch_setup_msi_irq(dev, entry);
 		if (ret < 0)
 			return ret;
@@ -468,7 +468,7 @@ static int populate_msi_sysfs(struct pci_dev *pdev)
 	int i;
 
 	/* Determine how many msi entries we have */
-	for_each_pci_msi_entry(entry, pdev)
+	for_each_pci_msi_entry_from(entry, pdev)
 		num_msi += entry->nvec_used;
 	if (!num_msi)
 		return 0;
@@ -477,7 +477,7 @@ static int populate_msi_sysfs(struct pci_dev *pdev)
 	msi_attrs = kcalloc(num_msi + 1, sizeof(void *), GFP_KERNEL);
 	if (!msi_attrs)
 		return -ENOMEM;
-	for_each_pci_msi_entry(entry, pdev) {
+	for_each_pci_msi_entry_from(entry, pdev) {
 		for (i = 0; i < entry->nvec_used; i++) {
 			msi_dev_attr = kzalloc(sizeof(*msi_dev_attr), GFP_KERNEL);
 			if (!msi_dev_attr)
@@ -506,7 +506,11 @@ static int populate_msi_sysfs(struct pci_dev *pdev)
 		goto error_irq_group;
 	msi_irq_groups[0] = msi_irq_group;
 
-	ret = sysfs_create_groups(&pdev->dev.kobj, msi_irq_groups);
+	if (!pdev->msix_enabled)
+		ret = sysfs_create_group(&pdev->dev.kobj, msi_irq_group);
+	else
+		ret = sysfs_merge_group(&pdev->dev.kobj, msi_irq_group);
+
 	if (ret)
 		goto error_irq_groups;
 	pdev->msi_irq_groups = msi_irq_groups;
@@ -574,7 +578,7 @@ static int msi_verify_entries(struct pci_dev *dev)
 {
 	struct msi_desc *entry;
 
-	for_each_pci_msi_entry(entry, dev) {
+	for_each_pci_msi_entry_from(entry, dev) {
 		if (!dev->no_64bit_msi || !entry->msg.address_hi)
 			continue;
 		pci_err(dev, "Device has broken 64-bit MSI but arch"
@@ -614,6 +618,9 @@ static int msi_capability_init(struct pci_dev *dev, int nvec,
 	msi_mask_irq(entry, mask, mask);
 
 	list_add_tail(&entry->list, dev_to_msi_list(&dev->dev));
+
+	 dev->dev.first_desc = list_last_entry
+                        (dev_to_msi_list(&dev->dev), struct msi_desc, list);
 
 	/* Configure MSI capability structure */
 	ret = pci_msi_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSI);
@@ -700,6 +707,17 @@ static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
 		entry->mask_base		= base;
 
 		list_add_tail(&entry->list, dev_to_msi_list(&dev->dev));
+
+		/*
+		 * Save the pointer to the first msi_desc entry of every
+		 * MSI-X group. This pointer is used by other functions
+		 * as the starting point to iterate through each of the
+		 * entries in that particular group.
+		 */
+		if (!i)
+			dev->dev.first_desc = list_last_entry
+			(dev_to_msi_list(&dev->dev), struct msi_desc, list);
+
 		if (masks)
 			curmsk++;
 	}
@@ -715,7 +733,7 @@ static void msix_program_entries(struct pci_dev *dev,
 	struct msi_desc *entry;
 	int i = 0;
 
-	for_each_pci_msi_entry(entry, dev) {
+	for_each_pci_msi_entry_from(entry, dev) {
 		if (entries)
 			entries[i++].vector = entry->irq;
 		entry->masked = readl(pci_msix_desc_addr(entry) +
@@ -740,18 +758,20 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 {
 	int ret;
 	u16 control;
-	void __iomem *base;
 
 	/* Ensure MSI-X is disabled while it is set up */
 	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 
 	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &control);
-	/* Request & Map MSI-X table region */
-	base = msix_map_region(dev, msix_table_size(control));
-	if (!base)
-		return -ENOMEM;
 
-	ret = msix_setup_entries(dev, base, entries, nvec, affd);
+	/* Request & Map MSI-X table region */
+	if (!dev->msix_enabled) {
+		dev->base = msix_map_region(dev, msix_table_size(control));
+		if (!dev->base)
+			return -ENOMEM;
+	}
+
+	ret = msix_setup_entries(dev, dev->base, entries, nvec, affd);
 	if (ret)
 		return ret;
 
@@ -784,6 +804,7 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_MASKALL, 0);
 
 	pcibios_free_irq(dev);
+
 	return 0;
 
 out_avail:
@@ -795,7 +816,7 @@ out_avail:
 		struct msi_desc *entry;
 		int avail = 0;
 
-		for_each_pci_msi_entry(entry, dev) {
+		for_each_pci_msi_entry_from(entry, dev) {
 			if (entry->irq != 0)
 				avail++;
 		}
@@ -932,7 +953,8 @@ int pci_msix_vec_count(struct pci_dev *dev)
 EXPORT_SYMBOL(pci_msix_vec_count);
 
 static int __pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries,
-			     int nvec, const struct irq_affinity *affd)
+			     int nvec, const struct irq_affinity *affd,
+			     bool one_shot)
 {
 	int nr_entries;
 	int i, j;
@@ -1086,7 +1108,8 @@ EXPORT_SYMBOL(pci_enable_msi);
 
 static int __pci_enable_msix_range(struct pci_dev *dev,
 				   struct msix_entry *entries, int minvec,
-				   int maxvec, const struct irq_affinity *affd)
+				   int maxvec, const struct irq_affinity *affd,
+				   bool one_shot)
 {
 	int rc, nvec = maxvec;
 
@@ -1100,7 +1123,7 @@ static int __pci_enable_msix_range(struct pci_dev *dev,
 	if (affd && affd->nr_sets && minvec != maxvec)
 		return -EINVAL;
 
-	if (WARN_ON_ONCE(dev->msix_enabled))
+	if (one_shot && WARN_ON_ONCE(dev->msix_enabled))
 		return -EINVAL;
 
 	for (;;) {
@@ -1110,7 +1133,7 @@ static int __pci_enable_msix_range(struct pci_dev *dev,
 				return -ENOSPC;
 		}
 
-		rc = __pci_enable_msix(dev, entries, nvec, affd);
+		rc = __pci_enable_msix(dev, entries, nvec, affd, one_shot);
 		if (rc == 0)
 			return nvec;
 
@@ -1141,7 +1164,8 @@ static int __pci_enable_msix_range(struct pci_dev *dev,
 int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
 		int minvec, int maxvec)
 {
-	return __pci_enable_msix_range(dev, entries, minvec, maxvec, NULL);
+	return __pci_enable_msix_range(dev, entries, minvec, maxvec, NULL,
+									false);
 }
 EXPORT_SYMBOL(pci_enable_msix_range);
 
@@ -1167,9 +1191,45 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 				   unsigned int max_vecs, unsigned int flags,
 				   const struct irq_affinity *affd)
 {
+	int *group = NULL;
+
+	dev->dev.one_shot = true;
+
+	return pci_alloc_irq_vectors_affinity_dyn(dev, min_vecs, max_vecs,
+					flags, NULL, group, dev->dev.one_shot);
+}
+EXPORT_SYMBOL(pci_alloc_irq_vectors_affinity);
+
+/**
+ * pci_alloc_irq_vectors_affinity_dyn - allocate multiple IRQs for a device
+ * dynamically. Can be called multiple times.
+ * @dev:		PCI device to operate on
+ * @min_vecs:		minimum number of vectors required (must be >= 1)
+ * @max_vecs:		maximum (desired) number of vectors
+ * @flags:		flags or quirks for the allocation
+ * @affd:		optional description of the affinity requirements
+ * @group_id:		group ID assigned to vectors allocated
+ *
+ * Allocate up to @max_vecs interrupt vectors for @dev, using MSI-X. Return
+ * the number of vectors allocated (which might be smaller than @max_vecs)
+ * if successful, or a negative error code on error. If less than @min_vecs
+ * interrupt vectors are available for @dev the function will fail with -ENOSPC.
+ * Assign a unique group ID to the set of vectors being allocated.
+ *
+ * To get the Linux IRQ number used for a vector that can be passed to
+ * request_irq() use the pci_irq_vector() helper.
+ */
+int pci_alloc_irq_vectors_affinity_dyn(struct pci_dev *dev,
+				      unsigned int min_vecs,
+				      unsigned int max_vecs,
+				      unsigned int flags,
+				      const struct irq_affinity *affd,
+				      int *group_id, bool one_shot)
+{
 	static const struct irq_affinity msi_default_affd;
-	int msix_vecs = -ENOSPC;
+	int msix_vecs = -ENOSPC, i, *group = NULL;
 	int msi_vecs = -ENOSPC;
+	struct msix_entry *entries = NULL;
 
 	if (flags & PCI_IRQ_AFFINITY) {
 		if (!affd)
@@ -1180,15 +1240,53 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 	}
 
 	if (flags & PCI_IRQ_MSIX) {
-		msix_vecs = __pci_enable_msix_range(dev, NULL, min_vecs,
-						    max_vecs, affd);
+		if (!one_shot) {
+			entries = kcalloc(max_vecs, sizeof(struct msix_entry),
+								GFP_KERNEL);
+			if (entries == NULL)
+				return -ENOMEM;
+
+			group = kcalloc(max_vecs, sizeof(int), GFP_KERNEL);
+			if (group == NULL)
+				return -ENOMEM;
+
+			if (!dev->msix_enabled)
+				dev->num_msix = pci_msix_vec_count(dev);
+
+			/* Assign a unique group ID */
+			*group = idr_alloc(dev->dev.msix_dev_idr->grp_idr, NULL,
+						0, dev->num_msix, GFP_KERNEL);
+			if (*group < 0) {
+				if (*group == -ENOSPC)
+					pci_err(dev, "No free group IDs\n");
+				return *group;
+			}
+			*group_id = *group;
+
+			for (i = 0; i < max_vecs; i++) {
+				/* tag every entry with a group ID */
+				entries[i].entry = idr_alloc(
+					dev->dev.msix_dev_idr->entry_idr,
+					group, 0, dev->num_msix, GFP_KERNEL);
+				if (entries[i].entry < 0) {
+					if (entries[i].entry == -ENOSPC)
+						pci_err(dev, "No free IDs\n");
+					return entries[i].entry;
+				}
+			}
+		}
+
+		msix_vecs = __pci_enable_msix_range(dev, entries, min_vecs, max_vecs,
+								affd, one_shot);
+
+		kfree(entries);
+
 		if (msix_vecs > 0)
 			return msix_vecs;
 	}
 
 	if (flags & PCI_IRQ_MSI) {
-		msi_vecs = __pci_enable_msi_range(dev, min_vecs, max_vecs,
-						  affd);
+		msi_vecs = __pci_enable_msi_range(dev, min_vecs, max_vecs, affd);
 		if (msi_vecs > 0)
 			return msi_vecs;
 	}
@@ -1201,11 +1299,14 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 		}
 	}
 
+	if (flags & (PCI_IRQ_MSI | PCI_IRQ_LEGACY))
+		return -EINVAL;
+
 	if (msix_vecs == -ENOSPC)
 		return -ENOSPC;
 	return msi_vecs;
 }
-EXPORT_SYMBOL(pci_alloc_irq_vectors_affinity);
+EXPORT_SYMBOL(pci_alloc_irq_vectors_affinity_dyn);
 
 /**
  * pci_free_irq_vectors - free previously allocated IRQs for a device
@@ -1253,6 +1354,45 @@ int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
 	return dev->irq + nr;
 }
 EXPORT_SYMBOL(pci_irq_vector);
+
+/**
+ * pci_irq_vector_group - return the IRQ number of a device vector associated
+ * with a group
+ * @dev: PCI device to operate on
+ * @nr: device-relative interrupt vector index (0-based).
+ * @group: group from which IRQ number should be returned
+ */
+int pci_irq_vector_group(struct pci_dev *dev, unsigned int nr,
+						unsigned int group_id)
+{
+	if (dev->msix_enabled) {
+		struct msi_desc *entry;
+		int *group, i = 0, grp_present = 0;
+
+		for_each_pci_msi_entry(entry, dev) {
+			group = idr_find(dev->dev.msix_dev_idr->entry_idr,
+						entry->msi_attrib.entry_nr);
+			if (*group == group_id) {
+				grp_present = 1;
+				if (i == nr)
+					return entry->irq;
+				i++;
+			}
+		}
+
+		if (!grp_present) {
+			pci_err(dev, "Group %d not present\n", group_id);
+			return -EINVAL;
+		}
+
+		pci_err(dev, "Interrupt vector index %d does not exist in "
+						"group %d\n", nr, group_id);
+	}
+
+	pci_err(dev, "MSI-X not enabled\n");
+	return -EINVAL;
+}
+EXPORT_SYMBOL(pci_irq_vector_group);
 
 /**
  * pci_irq_get_affinity - return the affinity of a particular msi vector

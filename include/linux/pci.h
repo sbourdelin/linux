@@ -1396,9 +1396,16 @@ static inline int pci_enable_msix_exact(struct pci_dev *dev,
 int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 				   unsigned int max_vecs, unsigned int flags,
 				   const struct irq_affinity *affd);
+int pci_alloc_irq_vectors_affinity_dyn(struct pci_dev *dev,
+				   unsigned int min_vecs, unsigned int max_vecs,
+				   unsigned int flags,
+				   const struct irq_affinity *affd,
+				   int *group_id, bool one_shot);
 
 void pci_free_irq_vectors(struct pci_dev *dev);
 int pci_irq_vector(struct pci_dev *dev, unsigned int nr);
+int pci_irq_vector_group(struct pci_dev *dev, unsigned int nr,
+						unsigned int group_id);
 const struct cpumask *pci_irq_get_affinity(struct pci_dev *pdev, int vec);
 int pci_irq_get_node(struct pci_dev *pdev, int vec);
 
@@ -1428,6 +1435,17 @@ pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 	return -ENOSPC;
 }
 
+static inline int
+pci_alloc_irq_vectors_affinity_dyn(struct pci_dev *dev, unsigned int min_vecs,
+				   unsigned int max_vecs, unsigned int flags,
+				   const struct irq_affinity *aff_desc,
+				   int *group_id, bool one_shot)
+{
+	if ((flags & PCI_IRQ_LEGACY) && min_vecs == 1 && dev->irq)
+		return 1;
+	return -ENOSPC;
+}
+
 static inline void pci_free_irq_vectors(struct pci_dev *dev)
 {
 }
@@ -1438,6 +1456,15 @@ static inline int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
 		return -EINVAL;
 	return dev->irq;
 }
+
+static inline int pci_irq_vector_group(struct pci_dev *dev, unsigned int nr,
+							unsigned int group)
+{
+	if (WARN_ON_ONCE(nr > 0))
+		return -EINVAL;
+	return dev->irq;
+}
+
 static inline const struct cpumask *pci_irq_get_affinity(struct pci_dev *pdev,
 		int vec)
 {
@@ -1456,6 +1483,15 @@ pci_alloc_irq_vectors(struct pci_dev *dev, unsigned int min_vecs,
 {
 	return pci_alloc_irq_vectors_affinity(dev, min_vecs, max_vecs, flags,
 					      NULL);
+}
+
+static inline int
+pci_alloc_irq_vectors_dyn(struct pci_dev *dev, unsigned int min_vecs,
+			  unsigned int max_vecs, unsigned int flags,
+			  int *group_id)
+{
+	return pci_alloc_irq_vectors_affinity_dyn(dev, min_vecs, max_vecs,
+					  flags, NULL, group_id, false);
 }
 
 /**
