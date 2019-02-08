@@ -4,6 +4,8 @@
 #ifndef I40E_TXRX_COMMON_
 #define I40E_TXRX_COMMON_
 
+#include <linux/bpf_trace.h>
+
 void i40e_fd_handle_status(struct i40e_ring *rx_ring,
 			   union i40e_rx_desc *rx_desc, u8 prog_id);
 int i40e_xmit_xdp_tx_ring(struct xdp_buff *xdp, struct i40e_ring *xdp_ring);
@@ -88,4 +90,29 @@ void i40e_xsk_clean_rx_ring(struct i40e_ring *rx_ring);
 void i40e_xsk_clean_tx_ring(struct i40e_ring *tx_ring);
 bool i40e_xsk_any_rx_ring_enabled(struct i40e_vsi *vsi);
 
+static inline void i40e_xdp_do_action(u32 act, int *result,
+				      struct i40e_ring *rx_ring,
+				      struct xdp_buff *xdp,
+				      struct bpf_prog *xdp_prog)
+{
+	struct i40e_ring *xdp_ring;
+	int err;
+
+	if (act == XDP_TX) {
+		xdp_ring = rx_ring->vsi->xdp_rings[rx_ring->queue_index];
+		*result = i40e_xmit_xdp_tx_ring(xdp, xdp_ring);
+	} else if (act == XDP_REDIRECT) {
+		err = xdp_do_redirect(rx_ring->netdev, xdp, xdp_prog);
+		*result = !err ? I40E_XDP_REDIR : I40E_XDP_CONSUMED;
+	} else if (act == XDP_PASS) {
+		*result = I40E_XDP_PASS;
+	} else if (act == XDP_DROP) {
+		*result = I40E_XDP_CONSUMED;
+	} else {
+		if (act != XDP_ABORTED)
+			bpf_warn_invalid_xdp_action(act);
+		trace_xdp_exception(rx_ring->netdev, xdp_prog, act);
+		*result = I40E_XDP_CONSUMED;
+	}
+}
 #endif /* I40E_TXRX_COMMON_ */
