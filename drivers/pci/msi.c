@@ -133,6 +133,26 @@ void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
 	return default_teardown_msi_irqs(dev);
 }
 
+void default_teardown_msi_irqs_grp(struct pci_dev *dev, int group_id)
+{
+	int i, *group = NULL;
+	struct msi_desc *entry;
+
+	for_each_pci_msi_entry(entry, dev) {
+		group = idr_find(dev->dev.msix_dev_idr->entry_idr,
+						entry->msi_attrib.entry_nr);
+		if (*group == group_id && entry->irq) {
+			for (i = 0; i < entry->nvec_used; i++)
+				arch_teardown_msi_irq(entry->irq + i);
+		}
+	}
+}
+
+void __weak arch_teardown_msi_irqs_grp(struct pci_dev *dev, int group_id)
+{
+	return default_teardown_msi_irqs_grp(dev, group_id);
+}
+
 static void default_restore_msi_irq(struct pci_dev *dev, int irq)
 {
 	struct msi_desc *entry;

@@ -127,6 +127,7 @@ EXPORT_SYMBOL_GPL(x86_platform);
 struct x86_msi_ops x86_msi __ro_after_init = {
 	.setup_msi_irqs		= native_setup_msi_irqs,
 	.teardown_msi_irq	= native_teardown_msi_irq,
+	.teardown_msi_irqs_grp	= default_teardown_msi_irqs_grp,
 	.teardown_msi_irqs	= default_teardown_msi_irqs,
 	.restore_msi_irqs	= default_restore_msi_irqs,
 };
@@ -140,6 +141,11 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 void arch_teardown_msi_irqs(struct pci_dev *dev)
 {
 	x86_msi.teardown_msi_irqs(dev);
+}
+
+void arch_teardown_msi_irqs_grp(struct pci_dev *dev, int group_id)
+{
+	x86_msi.teardown_msi_irqs_grp(dev, group_id);
 }
 
 void arch_teardown_msi_irq(unsigned int irq)

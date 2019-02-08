@@ -283,6 +283,7 @@ struct pci_dev;
 struct x86_msi_ops {
 	int (*setup_msi_irqs)(struct pci_dev *dev, int nvec, int type);
 	void (*teardown_msi_irq)(unsigned int irq);
+	void (*teardown_msi_irqs_grp)(struct pci_dev *dev, int group_id);
 	void (*teardown_msi_irqs)(struct pci_dev *dev);
 	void (*restore_msi_irqs)(struct pci_dev *dev);
 };

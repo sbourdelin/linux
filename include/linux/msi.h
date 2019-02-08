@@ -182,9 +182,11 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc);
 void arch_teardown_msi_irq(unsigned int irq);
 int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
 void arch_teardown_msi_irqs(struct pci_dev *dev);
+void arch_teardown_msi_irqs_grp(struct pci_dev *dev, int group_id);
 void arch_restore_msi_irqs(struct pci_dev *dev);
 
 void default_teardown_msi_irqs(struct pci_dev *dev);
+void default_teardown_msi_irqs_grp(struct pci_dev *dev, int group_id);
 void default_restore_msi_irqs(struct pci_dev *dev);
 
 struct msi_controller {
