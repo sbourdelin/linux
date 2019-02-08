@@ -10270,6 +10270,15 @@ L:	linux-mtd@lists.infradead.org
 S:	Maintained
 F:	drivers/mtd/devices/docg3*
 
+MT9M001 CAMERA SENSOR
+M:	Sakari Ailus <sakari.ailus@linux.intel.com>
+R:	Akinobu Mita <akinobu.mita@gmail.com>
+L:	linux-media@vger.kernel.org
+T:	git git://linuxtv.org/media_tree.git
+S:	Maintained
+F:	Documentation/devicetree/bindings/media/i2c/mt9m001.txt
+F:	drivers/media/i2c/mt9m001.c
+
 MT9M032 APTINA SENSOR DRIVER
 M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 L:	linux-media@vger.kernel.org
@@ -10277,6 +10286,15 @@ T:	git git://linuxtv.org/media_tree.git
 S:	Maintained
 F:	drivers/media/i2c/mt9m032.c
 F:	include/media/i2c/mt9m032.h
+
+MT9M111 CAMERA SENSOR
+M:	Sakari Ailus <sakari.ailus@linux.intel.com>
+R:	Akinobu Mita <akinobu.mita@gmail.com>
+L:	linux-media@vger.kernel.org
+T:	git git://linuxtv.org/media_tree.git
+S:	Maintained
+F:	Documentation/devicetree/bindings/media/i2c/mt9m111.txt
+F:	drivers/media/i2c/mt9m111.c
 
 MT9P031 APTINA CAMERA SENSOR
 M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
