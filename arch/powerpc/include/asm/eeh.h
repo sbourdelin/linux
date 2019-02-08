@@ -219,7 +219,7 @@ struct eeh_ops {
 };
 
 extern int eeh_subsystem_flags;
-extern int eeh_max_freezes;
+extern uint32_t eeh_max_freezes;
 extern struct eeh_ops *eeh_ops;
 extern raw_spinlock_t confirm_error_lock;
 
