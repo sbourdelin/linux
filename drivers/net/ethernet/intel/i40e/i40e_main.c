@@ -10739,13 +10739,55 @@ err_out:
  **/
 static int i40e_reserve_msix_vectors(struct i40e_pf *pf, int vectors)
 {
-	vectors = pci_enable_msix_range(pf->pdev, pf->msix_entries,
-					I40E_MIN_MSIX, vectors);
+	int group_id, i;
+
+	/* Use the pci_alloc_vectors_dyn to allocate vectors in 2 chunks */
+	vectors = pci_alloc_irq_vectors_dyn(pf->pdev, 1, 1, PCI_IRQ_MSIX, &group_id);
+	if (vectors < 0) {
+		dev_info(&pf->pdev->dev,
+			"MSI-X vector reservation failed: %d\n", vectors);
+		vectors = 0;
+	}
+	printk("Group ID after first call: %d\n",group_id);
+	/* Use the pci_irq_vector() to obtain the vector numbers */
+	for(i = 0; i < vectors; i++)
+		printk("vec%d is %d\n",i, pci_irq_vector(pf->pdev, i));
+
+	vectors += pci_alloc_irq_vectors_dyn(pf->pdev, 1, 2, PCI_IRQ_MSIX, &group_id);
+	if (vectors < 0) {
+		dev_info(&pf->pdev->dev,
+			"MSI-X vector reservation failed: %d\n", vectors);
+		vectors = 0;
+	}
+	printk("Group ID after second call: %d\n",group_id);
+	/* Use the pci_irq_vector() to obtain the vector numbers */
+	for(i = 0; i < vectors; i++)
+		printk("vec%d is %d\n",i, pci_irq_vector(pf->pdev, i));
+
+	/* free IRQs associated with group 0 */
+	pci_free_irq_vectors_grp(pf->pdev, 0);
+	vectors -= 1;
+	printk("After freeing group 0\n");
+	for(i = 0; i < vectors; i++)
+		printk("vec%d is %d\n",i, pci_irq_vector(pf->pdev, i));
+
+	vectors += pci_alloc_irq_vectors_dyn(pf->pdev, 1, 1, PCI_IRQ_MSIX, &group_id);
 	if (vectors < 0) {
 		dev_info(&pf->pdev->dev,
 			 "MSI-X vector reservation failed: %d\n", vectors);
 		vectors = 0;
 	}
+	printk("Group ID after 3rd call: %d\n",group_id);
+	/* Use the pci_irq_vector() to obtain the vector numbers */
+	for(i = 0; i < vectors; i++)
+		printk("vec%d is %d\n",i, pci_irq_vector(pf->pdev, i));
+
+	/* i40e driver uses the deprecated pci_enable_msix_range(),
+	 * populate the msi_entries structure to be compatible with
+	 * the rest of the driver */
+	pf->msix_entries[0].vector = pci_irq_vector(pf->pdev, 0);
+	pf->msix_entries[1].vector = pci_irq_vector(pf->pdev, 1);
+	pf->msix_entries[2].vector = pci_irq_vector(pf->pdev, 2);
 
 	return vectors;
 }
@@ -14343,6 +14385,7 @@ void i40e_set_fec_in_flags(u8 fec_cfg, u32 *flags)
 static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct i40e_aq_get_phy_abilities_resp abilities;
+	struct dev_idr *idr = pdev->dev.msix_dev_idr;
 	struct i40e_pf *pf;
 	struct i40e_hw *hw;
 	static u16 pfs_found;
@@ -14395,6 +14438,9 @@ static int i40e_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	hw = &pf->hw;
 	hw->back = pf;
+
+	idr_init(idr->grp_idr);
+	idr_init(idr->entry_idr);
 
 	pf->ioremap_len = min_t(int, pci_resource_len(pdev, 0),
 				I40E_MAX_CSR_SPACE);
