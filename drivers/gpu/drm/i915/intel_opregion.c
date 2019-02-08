@@ -46,6 +46,9 @@
 #define OPREGION_ASLE_EXT_OFFSET	0x1C00
 
 #define OPREGION_SIGNATURE "IntelGraphicsMem"
+
+#define OPREGION_VERSION(major, minor) (((major) << 16) | (minor))
+
 #define MBOX_ACPI      (1<<0)
 #define MBOX_SWSCI     (1<<1)
 #define MBOX_ASLE      (1<<2)
@@ -924,6 +927,10 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 	opregion->header = base;
 	opregion->lid_state = base + ACPI_CLID;
 
+	DRM_DEBUG_DRIVER("ACPI OpRegion version %u.%u\n",
+			 opregion->header->opregion_ver >> 16,
+			 opregion->header->opregion_ver & 0xffff);
+
 	mboxes = opregion->header->mboxes;
 	if (mboxes & MBOX_ACPI) {
 		DRM_DEBUG_DRIVER("Public ACPI methods supported\n");
@@ -952,8 +959,8 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 	if (dmi_check_system(intel_no_opregion_vbt))
 		goto out;
 
-	if (opregion->header->opregion_ver >= 2 && opregion->asle &&
-	    opregion->asle->rvda && opregion->asle->rvds) {
+	if (opregion->header->opregion_ver >= OPREGION_VERSION(2, 0) &&
+	    opregion->asle && opregion->asle->rvda && opregion->asle->rvds) {
 		opregion->rvda = memremap(opregion->asle->rvda,
 					  opregion->asle->rvds,
 					  MEMREMAP_WB);
