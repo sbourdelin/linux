@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0
  * Microchip switch driver common header
  *
- * Copyright (C) 2017-2018 Microchip Technology Inc.
+ * Copyright (C) 2017-2019 Microchip Technology Inc.
  */
 
 #ifndef __KSZ_COMMON_H
@@ -13,6 +13,8 @@ void ksz_update_port_member(struct ksz_device *dev, int port);
 
 int ksz_phy_read16(struct dsa_switch *ds, int addr, int reg);
 int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val);
+void ksz_adjust_link(struct dsa_switch *ds, int port,
+		     struct phy_device *phydev);
 int ksz_sset_count(struct dsa_switch *ds, int port, int sset);
 int ksz_port_bridge_join(struct dsa_switch *ds, int port,
 			 struct net_device *br);

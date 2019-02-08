@@ -2,7 +2,7 @@
 /*
  * Microchip switch driver main logic
  *
- * Copyright (C) 2017-2018 Microchip Technology Inc.
+ * Copyright (C) 2017-2019 Microchip Technology Inc.
  */
 
 #include <linux/delay.h>
@@ -60,6 +60,22 @@ int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(ksz_phy_write16);
+
+void ksz_adjust_link(struct dsa_switch *ds, int port,
+		     struct phy_device *phydev)
+{
+	struct ksz_device *dev = ds->priv;
+	struct ksz_port *p = &dev->ports[port];
+
+	if (phydev->link) {
+		dev->live_ports |= (1 << port) & dev->on_ports;
+	} else if (p->phydev.link) {
+		p->link_just_down = 1;
+		dev->live_ports &= ~(1 << port);
+	}
+	p->phydev = *phydev;
+}
+EXPORT_SYMBOL_GPL(ksz_adjust_link);
 
 int ksz_sset_count(struct dsa_switch *ds, int port, int sset)
 {
@@ -238,6 +254,7 @@ int ksz_enable_port(struct dsa_switch *ds, int port, struct phy_device *phy)
 
 	/* setup slave port */
 	dev->dev_ops->port_setup(dev, port, false);
+	dev->dev_ops->phy_setup(dev, port, phy);
 
 	/* port_stp_state_set() will be called after to enable the port so
 	 * there is no need to do anything.

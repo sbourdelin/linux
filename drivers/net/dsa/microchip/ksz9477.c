@@ -2,7 +2,7 @@
 /*
  * Microchip KSZ9477 switch driver main logic
  *
- * Copyright (C) 2017-2018 Microchip Technology Inc.
+ * Copyright (C) 2017-2019 Microchip Technology Inc.
  */
 
 #include <linux/delay.h>
@@ -965,6 +965,19 @@ static void ksz9477_port_mirror_del(struct dsa_switch *ds, int port,
 			     PORT_MIRROR_SNIFFER, false);
 }
 
+static void ksz9477_phy_setup(struct ksz_device *dev, int port,
+			      struct phy_device *phy)
+{
+	/* ETHTOOL_LINK_MODE_Pause_BIT and ETHTOOL_LINK_MODE_Asym_Pause_BIT
+	 * can be removed to disable flow control when rate limiting is used.
+	 */
+	if (port < dev->phy_port_cnt) {
+		/* The MAC actually cannot run in 1000 half-duplex mode. */
+		phy_remove_link_mode(phy,
+				     ETHTOOL_LINK_MODE_1000baseT_Half_BIT);
+	}
+}
+
 static void ksz9477_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 {
 	u8 data8;
@@ -1151,6 +1164,7 @@ static const struct dsa_switch_ops ksz9477_switch_ops = {
 	.setup			= ksz9477_setup,
 	.phy_read		= ksz9477_phy_read16,
 	.phy_write		= ksz9477_phy_write16,
+	.adjust_link		= ksz_adjust_link,
 	.port_enable		= ksz_enable_port,
 	.port_disable		= ksz_disable_port,
 	.get_strings		= ksz9477_get_strings,
@@ -1298,6 +1312,7 @@ static const struct ksz_dev_ops ksz9477_dev_ops = {
 	.get_port_addr = ksz9477_get_port_addr,
 	.cfg_port_member = ksz9477_cfg_port_member,
 	.flush_dyn_mac_table = ksz9477_flush_dyn_mac_table,
+	.phy_setup = ksz9477_phy_setup,
 	.port_setup = ksz9477_port_setup,
 	.shutdown = ksz9477_reset_switch,
 	.detect = ksz9477_switch_detect,
