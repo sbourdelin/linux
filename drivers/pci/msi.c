@@ -481,10 +481,11 @@ static int populate_msi_sysfs(struct pci_dev *pdev)
 	struct device_attribute *msi_dev_attr;
 	struct attribute_group *msi_irq_group;
 	const struct attribute_group **msi_irq_groups;
+	struct msix_sysfs *msix_sysfs_entry;
 	struct msi_desc *entry;
 	int ret = -ENOMEM;
 	int num_msi = 0;
-	int count = 0;
+	int count = 0, *group = NULL;
 	int i;
 
 	/* Determine how many msi entries we have */
@@ -511,6 +512,10 @@ static int populate_msi_sysfs(struct pci_dev *pdev)
 				goto error_attrs;
 			msi_dev_attr->attr.mode = S_IRUGO;
 			msi_dev_attr->show = msi_mode_show;
+			if (!i)
+				group = idr_find(
+					pdev->dev.msix_dev_idr->entry_idr,
+						entry->msi_attrib.entry_nr);
 			++count;
 		}
 	}
@@ -525,6 +530,14 @@ static int populate_msi_sysfs(struct pci_dev *pdev)
 	if (!msi_irq_groups)
 		goto error_irq_group;
 	msi_irq_groups[0] = msi_irq_group;
+
+	msix_sysfs_entry = kzalloc(sizeof(*msix_sysfs_entry) * 2, GFP_KERNEL);
+	msix_sysfs_entry->msi_irq_group = msi_irq_group;
+	if (group)
+		msix_sysfs_entry->group_id = *group;
+	msix_sysfs_entry->vecs_in_grp = count;
+	INIT_LIST_HEAD(&msix_sysfs_entry->list);
+	list_add_tail(&msix_sysfs_entry->list, &pdev->msix_sysfs);
 
 	if (!pdev->msix_enabled)
 		ret = sysfs_create_group(&pdev->dev.kobj, msi_irq_group);

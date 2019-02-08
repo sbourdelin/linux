@@ -2208,6 +2208,7 @@ struct pci_dev *pci_alloc_dev(struct pci_bus *bus)
 	idr_init(dev->dev.msix_dev_idr->entry_idr);
 
 	INIT_LIST_HEAD(&dev->bus_list);
+	INIT_LIST_HEAD(&dev->msix_sysfs);
 	dev->dev.type = &pci_dev_type;
 	dev->bus = pci_bus_get(bus);
 

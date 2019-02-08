@@ -461,6 +461,7 @@ struct pci_dev {
 	unsigned long	priv_flags;	/* Private flags for the PCI driver */
 	unsigned int	num_msix;	/* Number of MSI-X vectors supported */
 	void __iomem	*base;		/* Base address of MSI-X table */
+	struct list_head        msix_sysfs; /* Manage sysfs entries for each MSI-x group */
 };
 
 static inline struct pci_dev *pci_physfn(struct pci_dev *dev)
@@ -1373,6 +1374,14 @@ int pci_set_vga_state(struct pci_dev *pdev, bool decode,
 struct msix_entry {
 	u32	vector;	/* Kernel uses to write allocated vector */
 	u16	entry;	/* Driver uses to specify entry, OS writes */
+};
+
+/* Manage sysfs entries for dynamically allocated MSI-X vectors */
+struct msix_sysfs {
+	struct	attribute_group *msi_irq_group;
+	struct	list_head list;
+	int	group_id;
+	int	vecs_in_grp;
 };
 
 #ifdef CONFIG_PCI_MSI
