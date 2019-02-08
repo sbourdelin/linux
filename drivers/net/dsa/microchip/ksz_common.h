@@ -8,6 +8,7 @@
 #define __KSZ_COMMON_H
 
 void ksz_update_port_member(struct ksz_device *dev, int port);
+void ksz_init_mib_timer(struct ksz_device *dev);
 
 /* Common DSA access functions */
 
@@ -16,6 +17,7 @@ int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val);
 void ksz_adjust_link(struct dsa_switch *ds, int port,
 		     struct phy_device *phydev);
 int ksz_sset_count(struct dsa_switch *ds, int port, int sset);
+void ksz_get_ethtool_stats(struct dsa_switch *ds, int port, uint64_t *buf);
 int ksz_port_bridge_join(struct dsa_switch *ds, int port,
 			 struct net_device *br);
 void ksz_port_bridge_leave(struct dsa_switch *ds, int port,
