@@ -53,9 +53,23 @@ static void pci_msi_teardown_msi_irqs(struct pci_dev *dev)
 	else
 		arch_teardown_msi_irqs(dev);
 }
+
+static void pci_msi_teardown_msi_irqs_grp(struct pci_dev *dev, int group_id)
+{
+	struct irq_domain *domain;
+
+	domain = dev_get_msi_domain(&dev->dev);
+
+	if (domain && irq_domain_is_hierarchy(domain))
+		msi_domain_free_irqs_grp(domain, &dev->dev, group_id);
+	else
+		arch_teardown_msi_irqs_grp(dev, group_id);
+}
+
 #else
 #define pci_msi_setup_msi_irqs		arch_setup_msi_irqs
 #define pci_msi_teardown_msi_irqs	arch_teardown_msi_irqs
+#define pci_msi_teardown_msi_irqs_grp	default_teardown_msi_irqs_grp
 #endif
 
 /* Arch hooks */
@@ -398,6 +412,65 @@ static void free_msi_irqs(struct pci_dev *dev)
 		kfree(dev->msi_irq_groups);
 		dev->msi_irq_groups = NULL;
 	}
+}
+
+char msix_sysfs_grp[] = "msi_irqs";
+
+static int free_msi_irqs_grp(struct pci_dev *dev, int group_id)
+{
+	struct list_head *msi_list = dev_to_msi_list(&dev->dev);
+	struct msi_desc *entry, *tmp;
+	struct attribute **msi_attrs;
+	struct device_attribute *dev_attr;
+	int i, *group = NULL;
+	long vec;
+	struct msix_sysfs *msix_sysfs_entry, *tmp_msix;
+	struct list_head *pci_msix = &dev->msix_sysfs;
+	int num_vec = 0;
+
+	for_each_pci_msi_entry(entry, dev) {
+		group = idr_find(dev->dev.msix_dev_idr->entry_idr,
+					entry->msi_attrib.entry_nr);
+		if (*group == group_id && entry->irq)
+			for (i = 0; i < entry->nvec_used; i++)
+				BUG_ON(irq_has_action(entry->irq + i));
+	}
+
+	pci_msi_teardown_msi_irqs_grp(dev, group_id);
+
+	list_for_each_entry_safe(entry, tmp, msi_list, list) {
+		group = idr_find(dev->dev.msix_dev_idr->entry_idr,
+						entry->msi_attrib.entry_nr);
+		if (*group == group_id) {
+			idr_remove(dev->dev.msix_dev_idr->entry_idr,
+						entry->msi_attrib.entry_nr);
+			list_del(&entry->list);
+			free_msi_entry(entry);
+		}
+	}
+
+	list_for_each_entry_safe(msix_sysfs_entry, tmp_msix, pci_msix, list) {
+		if (msix_sysfs_entry->group_id == group_id) {
+			msi_attrs = msix_sysfs_entry->msi_irq_group->attrs;
+			for (i = 0; i < msix_sysfs_entry->vecs_in_grp; i++) {
+				if (!i)
+					num_vec = msix_sysfs_entry->vecs_in_grp;
+				dev_attr = container_of(msi_attrs[i],
+						struct device_attribute, attr);
+				sysfs_remove_file_from_group(&dev->dev.kobj,
+					&dev_attr->attr, msix_sysfs_grp);
+				if (kstrtol(dev_attr->attr.name, 10, &vec))
+					return -EINVAL;
+				kfree(dev_attr->attr.name);
+				kfree(dev_attr);
+			}
+			msix_sysfs_entry->msi_irq_group = NULL;
+			list_del(&msix_sysfs_entry->list);
+			idr_remove(dev->dev.msix_dev_idr->grp_idr, group_id);
+			kfree(msix_sysfs_entry);
+		}
+	}
+	return num_vec;
 }
 
 static void pci_intx_for_msi(struct pci_dev *dev, int enable)
@@ -1055,6 +1128,47 @@ void pci_disable_msix(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pci_disable_msix);
 
+static void pci_msix_shutdown_grp(struct pci_dev *dev, int group_id)
+{
+	struct msi_desc *entry;
+	int grp_present = 0, *group = NULL;
+
+	if (pci_dev_is_disconnected(dev)) {
+		dev->msix_enabled = 0;
+		return;
+	}
+
+	/* Return the device with MSI-X masked as initial states */
+	for_each_pci_msi_entry(entry, dev) {
+		group = idr_find(dev->dev.msix_dev_idr->entry_idr,
+					entry->msi_attrib.entry_nr);
+		if (*group == group_id) {
+			/* Keep cached states to be restored */
+			__pci_msix_desc_mask_irq(entry, 1);
+			grp_present = 1;
+		}
+	}
+
+	if (!grp_present) {
+		pci_err(dev, "Group to be disabled not present\n");
+		return;
+	}
+}
+
+int pci_disable_msix_grp(struct pci_dev *dev, int group_id)
+{
+	int num_vecs;
+
+	if (!pci_msi_enable || !dev)
+		return -EINVAL;
+
+	pci_msix_shutdown_grp(dev, group_id);
+	num_vecs = free_msi_irqs_grp(dev, group_id);
+
+	return num_vecs;
+}
+EXPORT_SYMBOL(pci_disable_msix_grp);
+
 void pci_no_msi(void)
 {
 	pci_msi_enable = 0;
@@ -1353,6 +1467,21 @@ void pci_free_irq_vectors(struct pci_dev *dev)
 	pci_disable_msi(dev);
 }
 EXPORT_SYMBOL(pci_free_irq_vectors);
+
+/**
+ * pci_free_irq_vectors_grp - free previously allocated IRQs for a
+ * device associated with a group
+ * @dev:                PCI device to operate on
+ * @group:		group to be freed
+ *
+ * Undoes the allocations and enabling in pci_alloc_irq_vectors_dyn().
+ * Can be only called for MSIx vectors.
+ */
+int pci_free_irq_vectors_grp(struct pci_dev *dev, int group_id)
+{
+	return pci_disable_msix_grp(dev, group_id);
+}
+EXPORT_SYMBOL(pci_free_irq_vectors_grp);
 
 /**
  * pci_irq_vector - return Linux IRQ number of a device vector

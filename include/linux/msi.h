@@ -313,6 +313,8 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
 int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
 			  int nvec);
 void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev);
+void msi_domain_free_irqs_grp(struct irq_domain *domain, struct device *dev,
+								int group_id);
 struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain);
 
 struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,

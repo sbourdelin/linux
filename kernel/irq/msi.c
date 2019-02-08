@@ -511,6 +511,35 @@ void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
 }
 
 /**
+ * msi_domain_free_irqs_grp - Free interrupts belonging to a group from
+ * a MSI interrupt @domain associated to @dev
+ * @domain:	The domain to managing the interrupts
+ * @dev:	Pointer to device struct of the device for which the interrupt
+ *		should be freed
+ * @group_id:	The group ID to be freed
+ */
+void msi_domain_free_irqs_grp(struct irq_domain *domain, struct device *dev,
+								int group_id)
+{
+	struct msi_desc *desc;
+	int *group = NULL;
+
+	for_each_msi_entry(desc, dev) {
+		group = idr_find(dev->msix_dev_idr->entry_idr,
+						desc->msi_attrib.entry_nr);
+		/*
+		 * We might have failed to allocate an MSI early
+		 * enough that there is no IRQ associated to this
+		 * entry. If that's the case, don't do anything.
+		 */
+		if (*group == group_id) {
+			irq_domain_free_irqs(desc->irq, desc->nvec_used);
+			desc->irq = 0;
+		}
+	}
+}
+
+/**
  * msi_get_domain_info - Get the MSI interrupt domain info for @domain
  * @domain:	The interrupt domain to retrieve data from
  *

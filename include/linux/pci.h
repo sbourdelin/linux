@@ -1389,6 +1389,7 @@ int pci_msi_vec_count(struct pci_dev *dev);
 void pci_disable_msi(struct pci_dev *dev);
 int pci_msix_vec_count(struct pci_dev *dev);
 void pci_disable_msix(struct pci_dev *dev);
+int pci_disable_msix_grp(struct pci_dev *dev, int group_id);
 void pci_restore_msi_state(struct pci_dev *dev);
 int pci_msi_enabled(void);
 int pci_enable_msi(struct pci_dev *dev);
@@ -1412,6 +1413,7 @@ int pci_alloc_irq_vectors_affinity_dyn(struct pci_dev *dev,
 				   int *group_id, bool one_shot);
 
 void pci_free_irq_vectors(struct pci_dev *dev);
+int pci_free_irq_vectors_grp(struct pci_dev *dev, int group_id);
 int pci_irq_vector(struct pci_dev *dev, unsigned int nr);
 int pci_irq_vector_group(struct pci_dev *dev, unsigned int nr,
 						unsigned int group_id);
@@ -1423,6 +1425,8 @@ static inline int pci_msi_vec_count(struct pci_dev *dev) { return -ENOSYS; }
 static inline void pci_disable_msi(struct pci_dev *dev) { }
 static inline int pci_msix_vec_count(struct pci_dev *dev) { return -ENOSYS; }
 static inline void pci_disable_msix(struct pci_dev *dev) { }
+static inline int pci_disable_msix_grp(struct pci_dev *dev, int group_id)
+							{ return -ENOSYS; }
 static inline void pci_restore_msi_state(struct pci_dev *dev) { }
 static inline int pci_msi_enabled(void) { return 0; }
 static inline int pci_enable_msi(struct pci_dev *dev)
@@ -1457,6 +1461,11 @@ pci_alloc_irq_vectors_affinity_dyn(struct pci_dev *dev, unsigned int min_vecs,
 
 static inline void pci_free_irq_vectors(struct pci_dev *dev)
 {
+}
+
+static inline void pci_free_irq_vectors_grp(struct pci_dev *dev, int group_id)
+{
+	return 0;
 }
 
 static inline int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
