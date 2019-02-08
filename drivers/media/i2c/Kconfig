@@ -842,6 +842,7 @@ config VIDEO_OV9640
 config VIDEO_OV9650
 	tristate "OmniVision OV9650/OV9652 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
 	select REGMAP_SCCB
 	---help---
 	  This is a V4L2 sensor driver for the Omnivision
@@ -887,6 +888,7 @@ config VIDEO_MT9M032
 config VIDEO_MT9M111
 	tristate "mt9m111, mt9m112 and mt9m131 support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
 	select V4L2_FWNODE
 	help
 	  This driver supports MT9M111, MT9M112 and MT9M131 cameras from
@@ -996,6 +998,7 @@ config VIDEO_S5K6A3
 config VIDEO_S5K4ECGX
 	tristate "Samsung S5K4ECGX sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
 	select CRC32
 	---help---
 	  This is a V4L2 sensor driver for Samsung S5K4ECGX 5M
@@ -1004,6 +1007,7 @@ config VIDEO_S5K4ECGX
 config VIDEO_S5K5BAF
 	tristate "Samsung S5K5BAF sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
 	select V4L2_FWNODE
 	---help---
 	  This is a V4L2 sensor driver for Samsung S5K5BAF 2M
