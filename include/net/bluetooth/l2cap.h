@@ -632,6 +632,7 @@ struct l2cap_conn {
 	unsigned int		mtu;
 
 	__u32			feat_mask;
+	__u32			known_options;
 	__u8			remote_fixed_chan;
 	__u8			local_fixed_chan;
 

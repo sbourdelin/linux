@@ -3243,8 +3243,10 @@ done:
 		rfc.monitor_timeout = 0;
 		rfc.max_pdu_size    = 0;
 
-		l2cap_add_conf_opt(&ptr, L2CAP_CONF_RFC, sizeof(rfc),
-				   (unsigned long) &rfc, endptr - ptr);
+		if (chan->conn->known_options & BIT(L2CAP_CONF_RFC)) {
+			l2cap_add_conf_opt(&ptr, L2CAP_CONF_RFC, sizeof(rfc),
+					   (unsigned long)&rfc, endptr - ptr);
+		}
 		break;
 
 	case L2CAP_MODE_ERTM:
@@ -3263,8 +3265,10 @@ done:
 		rfc.txwin_size = min_t(u16, chan->tx_win,
 				       L2CAP_DEFAULT_TX_WINDOW);
 
-		l2cap_add_conf_opt(&ptr, L2CAP_CONF_RFC, sizeof(rfc),
-				   (unsigned long) &rfc, endptr - ptr);
+		if (chan->conn->known_options & BIT(L2CAP_CONF_RFC)) {
+			l2cap_add_conf_opt(&ptr, L2CAP_CONF_RFC, sizeof(rfc),
+					   (unsigned long)&rfc, endptr - ptr);
+		}
 
 		if (test_bit(FLAG_EFS_ENABLE, &chan->flags))
 			l2cap_add_opt_efs(&ptr, chan, endptr - ptr);
@@ -3295,8 +3299,10 @@ done:
 			     L2CAP_FCS_SIZE);
 		rfc.max_pdu_size = cpu_to_le16(size);
 
-		l2cap_add_conf_opt(&ptr, L2CAP_CONF_RFC, sizeof(rfc),
-				   (unsigned long) &rfc, endptr - ptr);
+		if (chan->conn->known_options & BIT(L2CAP_CONF_RFC)) {
+			l2cap_add_conf_opt(&ptr, L2CAP_CONF_RFC, sizeof(rfc),
+					   (unsigned long)&rfc, endptr - ptr);
+		}
 
 		if (test_bit(FLAG_EFS_ENABLE, &chan->flags))
 			l2cap_add_opt_efs(&ptr, chan, endptr - ptr);
@@ -3550,10 +3556,46 @@ static int l2cap_parse_conf_rsp(struct l2cap_chan *chan, void *rsp, int len,
 	void *endptr = data + size;
 	int type, olen;
 	unsigned long val;
+	const bool unknown_options = *result == L2CAP_CONF_UNKNOWN;
 	struct l2cap_conf_rfc rfc = { .mode = L2CAP_MODE_BASIC };
 	struct l2cap_conf_efs efs;
 
 	BT_DBG("chan %p, rsp %p, len %d, req %p", chan, rsp, len, data);
+
+	/* throw out any old stored conf requests */
+	*result = L2CAP_CONF_SUCCESS;
+
+	if (unknown_options) {
+		const u8 *option_type = rsp;
+
+		if (!len) {
+			/* If no list of unknown option types is
+			 * provided there's nothing for us to do
+			 */
+			return -ECONNREFUSED;
+		}
+
+		while (len--) {
+			BT_DBG("chan %p, unknown option type: %u", chan,
+			       *option_type);
+			/* "...Hints shall not be included in the
+			 * Response and shall not be the sole cause
+			 * for rejecting the Request.."
+			 */
+			if (*option_type & L2CAP_CONF_HINT)
+				return -ECONNREFUSED;
+			/* Make sure option type is one of the types
+			 * supported/used in configure requests
+			 */
+			if (*option_type < L2CAP_CONF_MTU ||
+			    *option_type > L2CAP_CONF_EWS)
+				return -ECONNREFUSED;
+
+			chan->conn->known_options &= ~BIT(*option_type++);
+		}
+
+		return l2cap_build_conf_req(chan, data, size);
+	}
 
 	while (len >= L2CAP_CONF_OPT_SIZE) {
 		len -= l2cap_get_conf_opt(&rsp, &type, &olen, &val);
@@ -4240,6 +4282,7 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn,
 		}
 		goto done;
 
+	case L2CAP_CONF_UNKNOWN:
 	case L2CAP_CONF_UNACCEPT:
 		if (chan->num_conf_rsp <= L2CAP_CONF_MAX_CONF_RSP) {
 			char req[64];
@@ -4249,8 +4292,6 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn,
 				goto done;
 			}
 
-			/* throw out any old stored conf requests */
-			result = L2CAP_CONF_SUCCESS;
 			len = l2cap_parse_conf_rsp(chan, rsp->data, len,
 						   req, sizeof(req), &result);
 			if (len < 0) {
@@ -7067,6 +7108,7 @@ static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon)
 	hcon->l2cap_data = conn;
 	conn->hcon = hci_conn_get(hcon);
 	conn->hchan = hchan;
+	conn->known_options = U32_MAX;
 
 	BT_DBG("hcon %p conn %p hchan %p", hcon, conn, hchan);
 
