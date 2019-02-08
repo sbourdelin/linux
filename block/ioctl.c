@@ -451,7 +451,8 @@ static int blkdev_roset(struct block_device *bdev, fmode_t mode,
 		return ret;
 	if (get_user(n, (int __user *)arg))
 		return -EFAULT;
-	set_device_ro(bdev, n);
+	set_device_ro(bdev, n ? DISK_POLICY_USER_WRITE_PROTECT :
+		      DISK_POLICY_WRITABLE);
 	return 0;
 }
 

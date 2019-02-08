@@ -150,6 +150,12 @@ enum {
 	DISK_EVENT_EJECT_REQUEST		= 1 << 1, /* eject requested */
 };
 
+enum {
+	DISK_POLICY_WRITABLE			= 0, /* Default */
+	DISK_POLICY_DEVICE_WRITE_PROTECT	= 1, /* Set by device driver */
+	DISK_POLICY_USER_WRITE_PROTECT		= 2, /* Set via BLKROSET */
+};
+
 struct disk_part_tbl {
 	struct rcu_head rcu_head;
 	int len;

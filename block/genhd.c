@@ -1549,11 +1549,22 @@ void set_disk_ro(struct gendisk *disk, int flag)
 	struct disk_part_iter piter;
 	struct hd_struct *part;
 
+	/*
+	 * If the user has forced disk read-only with BLKROSET, ignore
+	 * any device state change requested by the driver.
+	 */
+	if (disk->part0.policy == DISK_POLICY_USER_WRITE_PROTECT)
+		return;
 	if (disk->part0.policy != flag) {
 		set_disk_ro_uevent(disk, flag);
 		disk->part0.policy = flag;
 	}
-
+	/*
+	 * If set_disk_ro() is called from revalidate, all partitions
+	 * have already been dropped at this point and thus any
+	 * per-partition user setting lost. Each partition will
+	 * inherit part0 policy when subsequently re-added.
+	 */
 	disk_part_iter_init(&piter, disk, DISK_PITER_INCL_EMPTY);
 	while ((part = disk_part_iter_next(&piter)))
 		part->policy = flag;
