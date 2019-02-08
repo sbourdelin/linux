@@ -971,7 +971,8 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 		 * opregion 2.1+: rvda is unsigned, relative offset from
 		 * opregion base, and should never point within opregion.
 		 */
-		if (opregion->header->opregion_ver >= OPREGION_VERSION(2, 1)) {
+		if (opregion->header->opregion_ver >= OPREGION_VERSION(2, 1) ||
+		    IS_ICELAKE(dev_priv)) {
 			WARN_ON(rvda < OPREGION_SIZE);
 
 			rvda += asls;
