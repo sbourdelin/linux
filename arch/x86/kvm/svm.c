@@ -1797,7 +1797,7 @@ static struct page **sev_pin_memory(struct kvm *kvm, unsigned long uaddr,
 	if (size > PAGE_SIZE)
 		pages = vmalloc(size);
 	else
-		pages = kmalloc(size, GFP_KERNEL);
+		pages = kmalloc(size, GFP_KERNEL_ACCOUNT);
 
 	if (!pages)
 		return NULL;
@@ -1940,7 +1940,7 @@ static int avic_vm_init(struct kvm *kvm)
 		return 0;
 
 	/* Allocating physical APIC ID table (4KB) */
-	p_page = alloc_page(GFP_KERNEL);
+	p_page = alloc_page(GFP_KERNEL_ACCOUNT);
 	if (!p_page)
 		goto free_avic;
 
@@ -1948,7 +1948,7 @@ static int avic_vm_init(struct kvm *kvm)
 	clear_page(page_address(p_page));
 
 	/* Allocating logical APIC ID table (4KB) */
-	l_page = alloc_page(GFP_KERNEL);
+	l_page = alloc_page(GFP_KERNEL_ACCOUNT);
 	if (!l_page)
 		goto free_avic;
 
@@ -2119,13 +2119,14 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
 	struct page *nested_msrpm_pages;
 	int err;
 
-	svm = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+	svm = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL_ACCOUNT);
 	if (!svm) {
 		err = -ENOMEM;
 		goto out;
 	}
 
-	svm->vcpu.arch.guest_fpu = kmem_cache_zalloc(x86_fpu_cache, GFP_KERNEL);
+	svm->vcpu.arch.guest_fpu = kmem_cache_zalloc(x86_fpu_cache,
+						     GFP_KERNEL_ACCOUNT);
 	if (!svm->vcpu.arch.guest_fpu) {
 		printk(KERN_ERR "kvm: failed to allocate vcpu's fpu\n");
 		err = -ENOMEM;
@@ -2137,19 +2138,19 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
 		goto free_svm;
 
 	err = -ENOMEM;
-	page = alloc_page(GFP_KERNEL);
+	page = alloc_page(GFP_KERNEL_ACCOUNT);
 	if (!page)
 		goto uninit;
 
-	msrpm_pages = alloc_pages(GFP_KERNEL, MSRPM_ALLOC_ORDER);
+	msrpm_pages = alloc_pages(GFP_KERNEL_ACCOUNT, MSRPM_ALLOC_ORDER);
 	if (!msrpm_pages)
 		goto free_page1;
 
-	nested_msrpm_pages = alloc_pages(GFP_KERNEL, MSRPM_ALLOC_ORDER);
+	nested_msrpm_pages = alloc_pages(GFP_KERNEL_ACCOUNT, MSRPM_ALLOC_ORDER);
 	if (!nested_msrpm_pages)
 		goto free_page2;
 
-	hsave_page = alloc_page(GFP_KERNEL);
+	hsave_page = alloc_page(GFP_KERNEL_ACCOUNT);
 	if (!hsave_page)
 		goto free_page3;
 
@@ -5196,7 +5197,7 @@ static int svm_ir_list_add(struct vcpu_svm *svm, struct amd_iommu_pi_data *pi)
 	 * Allocating new amd_iommu_pi_data, which will get
 	 * add to the per-vcpu ir_list.
 	 */
-	ir = kzalloc(sizeof(struct amd_svm_iommu_ir), GFP_KERNEL);
+	ir = kzalloc(sizeof(struct amd_svm_iommu_ir), GFP_KERNEL_ACCOUNT);
 	if (!ir) {
 		ret = -ENOMEM;
 		goto out;
@@ -6309,7 +6310,7 @@ static int sev_bind_asid(struct kvm *kvm, unsigned int handle, int *error)
 	if (ret)
 		return ret;
 
-	data = kzalloc(sizeof(*data), GFP_KERNEL);
+	data = kzalloc(sizeof(*data), GFP_KERNEL_ACCOUNT);
 	if (!data)
 		return -ENOMEM;
 
