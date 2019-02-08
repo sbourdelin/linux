@@ -5237,6 +5237,13 @@ EXPORT_SYMBOL_GPL(devlink_unregister);
  */
 void devlink_free(struct devlink *devlink)
 {
+	WARN_ON(!list_empty(&devlink->port_list));
+	WARN_ON(!list_empty(&devlink->sb_list));
+	WARN_ON(!list_empty(&devlink->dpipe_table_list));
+	WARN_ON(!list_empty(&devlink->resource_list));
+	WARN_ON(!list_empty(&devlink->param_list));
+	WARN_ON(!list_empty(&devlink->region_list));
+
 	kfree(devlink);
 }
 EXPORT_SYMBOL_GPL(devlink_free);
