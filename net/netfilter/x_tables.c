@@ -1908,6 +1908,8 @@ static int __init xt_init(void)
 #ifdef CONFIG_COMPAT
 		mutex_init(&xt[i].compat_mutex);
 		xt[i].compat_tab = NULL;
+		xt[i].number = 0;
+		xt[i].cur = 0;
 #endif
 		INIT_LIST_HEAD(&xt[i].target);
 		INIT_LIST_HEAD(&xt[i].match);
