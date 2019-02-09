@@ -1635,6 +1635,75 @@ static void blkcg_scale_delay(struct blkcg_gq *blkg, u64 now)
 	}
 }
 
+/**
+ * blkcg_wb_waiters_on_bdi - check for writeback waiters on a block device
+ * @blkcg: current blkcg cgroup
+ * @bdi: block device to check
+ *
+ * Return true if any other blkcg is waiting for writeback on the target block
+ * device, false otherwise.
+ */
+bool blkcg_wb_waiters_on_bdi(struct blkcg *blkcg, struct backing_dev_info *bdi)
+{
+	struct blkcg *wait_blkcg;
+	bool ret = false;
+
+	if (unlikely(!bdi))
+		return false;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(wait_blkcg, &bdi->cgwb_waiters, cgwb_wait_node)
+		if (wait_blkcg != blkcg) {
+			ret = true;
+			break;
+		}
+	rcu_read_unlock();
+
+	return ret;
+}
+
+/**
+ * blkcg_start_wb_wait_on_bdi - add current blkcg to writeback waiters list
+ * @bdi: target block device
+ *
+ * Add current blkcg to the list of writeback waiters on target block device.
+ */
+void blkcg_start_wb_wait_on_bdi(struct backing_dev_info *bdi)
+{
+	struct blkcg *blkcg;
+
+	rcu_read_lock();
+	blkcg = css_to_blkcg(task_css(current, io_cgrp_id));
+	if (blkcg) {
+		spin_lock(&bdi->cgwb_waiters_lock);
+		list_add_rcu(&blkcg->cgwb_wait_node, &bdi->cgwb_waiters);
+		spin_unlock(&bdi->cgwb_waiters_lock);
+	}
+	rcu_read_unlock();
+}
+
+/**
+ * blkcg_stop_wb_wait_on_bdi - remove current blkcg from writeback waiters list
+ * @bdi: target block device
+ *
+ * Remove current blkcg from the list of writeback waiters on target block
+ * device.
+ */
+void blkcg_stop_wb_wait_on_bdi(struct backing_dev_info *bdi)
+{
+	struct blkcg *blkcg;
+
+	rcu_read_lock();
+	blkcg = css_to_blkcg(task_css(current, io_cgrp_id));
+	if (blkcg) {
+		spin_lock(&bdi->cgwb_waiters_lock);
+		list_del_rcu(&blkcg->cgwb_wait_node);
+		spin_unlock(&bdi->cgwb_waiters_lock);
+	}
+	rcu_read_unlock();
+	synchronize_rcu();
+}
+
 /*
  * This is called when we want to actually walk up the hierarchy and check to
  * see if we need to throttle, and then actually throttle if there is some
