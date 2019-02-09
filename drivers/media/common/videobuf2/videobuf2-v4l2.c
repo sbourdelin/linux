@@ -598,6 +598,20 @@ static const struct vb2_buf_ops v4l2_buf_ops = {
 	.copy_timestamp		= __copy_timestamp,
 };
 
+struct vb2_buffer *vb2_find_timestamp_buf(const struct vb2_queue *q,
+					  u64 timestamp,
+					  unsigned int start_idx)
+{
+	unsigned int i;
+
+	for (i = start_idx; i < q->num_buffers; i++) {
+		if (q->bufs[i]->timestamp == timestamp)
+			return q->bufs[i];
+	}
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(vb2_find_timestamp_buf);
+
 int vb2_find_timestamp(const struct vb2_queue *q, u64 timestamp,
 		       unsigned int start_idx)
 {

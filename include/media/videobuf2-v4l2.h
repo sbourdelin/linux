@@ -71,6 +71,9 @@ struct vb2_v4l2_buffer {
 int vb2_find_timestamp(const struct vb2_queue *q, u64 timestamp,
 		       unsigned int start_idx);
 
+struct vb2_buffer *vb2_find_timestamp_buf(const struct vb2_queue *q,
+					  u64 timestamp,
+					  unsigned int start_idx);
 int vb2_querybuf(struct vb2_queue *q, struct v4l2_buffer *b);
 
 /**
