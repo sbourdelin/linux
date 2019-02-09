@@ -1498,7 +1498,6 @@ static int virtnet_poll_tx(struct napi_struct *napi, int budget)
 	struct virtnet_info *vi = sq->vq->vdev->priv;
 	unsigned int index = vq2txq(sq->vq);
 	struct netdev_queue *txq;
-<<<<<<< HEAD
 
 	if (unlikely(is_xdp_raw_buffer_queue(vi, index))) {
 		/* We don't need to enable cb for XDP */
@@ -1506,15 +1505,6 @@ static int virtnet_poll_tx(struct napi_struct *napi, int budget)
 		return 0;
 	}
 
-=======
-
-	if (unlikely(is_xdp_raw_buffer_queue(vi, index))) {
-		/* We don't need to enable cb for XDP */
-		napi_complete_done(napi, 0);
-		return 0;
-	}
-
->>>>>>> linux-next/akpm-base
 	txq = netdev_get_tx_queue(vi->dev, index);
 	__netif_tx_lock(txq, raw_smp_processor_id());
 	free_old_xmit_skbs(sq, txq, true);

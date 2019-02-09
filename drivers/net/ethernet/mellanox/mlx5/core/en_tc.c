@@ -2080,17 +2080,7 @@ static int alloc_tc_pedit_action(struct mlx5e_priv *priv, int namespace,
 			goto out_err;
 	}
 
-<<<<<<< HEAD
-	if (!parse_attr->mod_hdr_actions) {
-		err = alloc_mod_hdr_actions(priv, a, namespace, parse_attr);
-		if (err)
-			goto out_err;
-	}
-
-	err = offload_pedit_fields(masks, vals, parse_attr, extack);
-=======
 	err = offload_pedit_fields(hdrs, parse_attr, extack);
->>>>>>> linux-next/akpm-base
 	if (err < 0)
 		goto out_dealloc_parsed_actions;
 
@@ -2145,11 +2135,7 @@ static bool csum_offload_supported(struct mlx5e_priv *priv,
 }
 
 static bool modify_header_match_supported(struct mlx5_flow_spec *spec,
-<<<<<<< HEAD
-					  struct tcf_exts *exts,
-=======
 					  struct flow_action *flow_action,
->>>>>>> linux-next/akpm-base
 					  u32 actions,
 					  struct netlink_ext_ack *extack)
 {
@@ -2165,14 +2151,6 @@ static bool modify_header_match_supported(struct mlx5_flow_spec *spec,
 	else
 		headers_v = MLX5_ADDR_OF(fte_match_param, spec->match_value, outer_headers);
 
-<<<<<<< HEAD
-	if (actions & MLX5_FLOW_CONTEXT_ACTION_DECAP)
-		headers_v = MLX5_ADDR_OF(fte_match_param, spec->match_value, inner_headers);
-	else
-		headers_v = MLX5_ADDR_OF(fte_match_param, spec->match_value, outer_headers);
-
-=======
->>>>>>> linux-next/akpm-base
 	ethertype = MLX5_GET(fte_match_set_lyr_2_4, headers_v, ethertype);
 
 	/* for non-IP we only re-write MACs, so we're okay */
@@ -2224,12 +2202,8 @@ static bool actions_match_supported(struct mlx5e_priv *priv,
 		return false;
 
 	if (actions & MLX5_FLOW_CONTEXT_ACTION_MOD_HDR)
-<<<<<<< HEAD
-		return modify_header_match_supported(&parse_attr->spec, exts,
-=======
 		return modify_header_match_supported(&parse_attr->spec,
 						     flow_action,
->>>>>>> linux-next/akpm-base
 						     actions, extack);
 
 	return true;
