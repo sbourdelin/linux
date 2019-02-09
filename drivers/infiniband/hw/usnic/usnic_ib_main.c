@@ -216,18 +216,17 @@ static int usnic_ib_netdevice_event(struct notifier_block *notifier,
 					unsigned long event, void *ptr)
 {
 	struct usnic_ib_dev *us_ibdev;
+	struct ib_device *ibdev;
 
 	struct net_device *netdev = netdev_notifier_info_to_dev(ptr);
 
-	mutex_lock(&usnic_ib_ibdev_list_lock);
-	list_for_each_entry(us_ibdev, &usnic_ib_ibdev_list, ib_dev_link) {
-		if (us_ibdev->netdev == netdev) {
-			usnic_ib_handle_usdev_event(us_ibdev, event);
-			break;
-		}
-	}
-	mutex_unlock(&usnic_ib_ibdev_list_lock);
+	ibdev = ib_device_get_by_netdev(netdev, RDMA_DRIVER_USNIC);
+	if (!ibdev)
+		return NOTIFY_DONE;
 
+	us_ibdev = container_of(ibdev, struct usnic_ib_dev, ib_dev);
+	usnic_ib_handle_usdev_event(us_ibdev, event);
+	ib_device_put(ibdev);
 	return NOTIFY_DONE;
 }
 
@@ -282,16 +281,15 @@ static int usnic_ib_inetaddr_event(struct notifier_block *notifier,
 	struct usnic_ib_dev *us_ibdev;
 	struct in_ifaddr *ifa = ptr;
 	struct net_device *netdev = ifa->ifa_dev->dev;
+	struct ib_device *ibdev;
 
-	mutex_lock(&usnic_ib_ibdev_list_lock);
-	list_for_each_entry(us_ibdev, &usnic_ib_ibdev_list, ib_dev_link) {
-		if (us_ibdev->netdev == netdev) {
-			usnic_ib_handle_inet_event(us_ibdev, event, ptr);
-			break;
-		}
-	}
-	mutex_unlock(&usnic_ib_ibdev_list_lock);
+	ibdev = ib_device_get_by_netdev(netdev, RDMA_DRIVER_USNIC);
+	if (!ibdev)
+		return NOTIFY_DONE;
 
+	us_ibdev = container_of(ibdev, struct usnic_ib_dev, ib_dev);
+	usnic_ib_handle_inet_event(us_ibdev, event, ptr);
+	ib_device_put(ibdev);
 	return NOTIFY_DONE;
 }
 static struct notifier_block usnic_ib_inetaddr_notifier = {
