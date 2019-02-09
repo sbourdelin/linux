@@ -342,6 +342,37 @@ static void i915_digport_work_func(struct work_struct *work)
 	}
 }
 
+static bool
+i915_hotplug_iterate(struct drm_device *dev, u32 hpd_event_bits)
+{
+	struct drm_connector_list_iter conn_iter;
+	struct drm_connector *connector;
+	bool changed = 0;
+
+	drm_connector_list_iter_begin(dev, &conn_iter);
+	drm_for_each_connector_iter(connector, &conn_iter) {
+		struct intel_connector *intel_connector;
+		struct intel_encoder *intel_encoder;
+
+		intel_connector = to_intel_connector(connector);
+		intel_encoder = intel_connector->encoder;
+
+		if (!intel_encoder)
+			continue;
+
+		if (hpd_event_bits & (1 << intel_encoder->hpd_pin)) {
+			DRM_DEBUG_KMS("Connector %s (pin %i) received hotplug event.\n",
+				      connector->name, intel_encoder->hpd_pin);
+
+			changed |= intel_encoder->hotplug(intel_encoder,
+							  intel_connector);
+		}
+	}
+	drm_connector_list_iter_end(&conn_iter);
+
+	return changed;
+}
+
 /*
  * Handle hotplug events outside the interrupt handler proper.
  */
@@ -350,11 +381,7 @@ static void i915_hotplug_work_func(struct work_struct *work)
 	struct drm_i915_private *dev_priv =
 		container_of(work, struct drm_i915_private, hotplug.hotplug_work);
 	struct drm_device *dev = &dev_priv->drm;
-	struct intel_connector *intel_connector;
-	struct intel_encoder *intel_encoder;
-	struct drm_connector *connector;
-	struct drm_connector_list_iter conn_iter;
-	bool changed = false;
+	bool changed;
 	u32 hpd_event_bits;
 
 	mutex_lock(&dev->mode_config.mutex);
@@ -370,21 +397,8 @@ static void i915_hotplug_work_func(struct work_struct *work)
 
 	spin_unlock_irq(&dev_priv->irq_lock);
 
-	drm_connector_list_iter_begin(dev, &conn_iter);
-	drm_for_each_connector_iter(connector, &conn_iter) {
-		intel_connector = to_intel_connector(connector);
-		if (!intel_connector->encoder)
-			continue;
-		intel_encoder = intel_connector->encoder;
-		if (hpd_event_bits & (1 << intel_encoder->hpd_pin)) {
-			DRM_DEBUG_KMS("Connector %s (pin %i) received hotplug event.\n",
-				      connector->name, intel_encoder->hpd_pin);
+	changed = i915_hotplug_iterate(dev, hpd_event_bits);
 
-			changed |= intel_encoder->hotplug(intel_encoder,
-							  intel_connector);
-		}
-	}
-	drm_connector_list_iter_end(&conn_iter);
 	mutex_unlock(&dev->mode_config.mutex);
 
 	if (changed)
