@@ -343,7 +343,7 @@ static void i915_digport_work_func(struct work_struct *work)
 }
 
 static bool
-i915_hotplug_iterate(struct drm_device *dev, u32 hpd_event_bits)
+i915_hotplug_iterate(struct drm_device *dev, u32 hpd_event_bits, u32 *hpd_tc_delay_wa)
 {
 	struct drm_connector_list_iter conn_iter;
 	struct drm_connector *connector;
@@ -356,16 +356,27 @@ i915_hotplug_iterate(struct drm_device *dev, u32 hpd_event_bits)
 
 		intel_connector = to_intel_connector(connector);
 		intel_encoder = intel_connector->encoder;
-
 		if (!intel_encoder)
 			continue;
 
 		if (hpd_event_bits & (1 << intel_encoder->hpd_pin)) {
+			bool ret;
+
 			DRM_DEBUG_KMS("Connector %s (pin %i) received hotplug event.\n",
 				      connector->name, intel_encoder->hpd_pin);
 
-			changed |= intel_encoder->hotplug(intel_encoder,
-							  intel_connector);
+			ret = intel_encoder->hotplug(intel_encoder,
+						     intel_connector);
+			changed |= ret;
+
+			if (hpd_tc_delay_wa && !ret &&
+			    connector->status != connector_status_connected) {
+				struct intel_digital_port *dig_port = enc_to_dig_port(&intel_encoder->base);
+
+				if (dig_port && dig_port->tc_delay_wa_needed &&
+				    !dig_port->dp.is_mst)
+					*hpd_tc_delay_wa |= (1 << intel_encoder->hpd_pin);
+			}
 		}
 	}
 	drm_connector_list_iter_end(&conn_iter);
@@ -382,7 +393,7 @@ static void i915_hotplug_work_func(struct work_struct *work)
 		container_of(work, struct drm_i915_private, hotplug.hotplug_work);
 	struct drm_device *dev = &dev_priv->drm;
 	bool changed;
-	u32 hpd_event_bits;
+	u32 hpd_event_bits, hpd_tc_delay_wa = 0;
 
 	mutex_lock(&dev->mode_config.mutex);
 	DRM_DEBUG_KMS("running encoder hotplug functions\n");
@@ -397,12 +408,28 @@ static void i915_hotplug_work_func(struct work_struct *work)
 
 	spin_unlock_irq(&dev_priv->irq_lock);
 
-	changed = i915_hotplug_iterate(dev, hpd_event_bits);
+	changed = i915_hotplug_iterate(dev, hpd_event_bits, &hpd_tc_delay_wa);
 
 	mutex_unlock(&dev->mode_config.mutex);
 
 	if (changed)
 		drm_kms_helper_hotplug_event(dev);
+
+	/*
+	 * Unpowered type-c dongles can take some time to boot and be
+	 * responsible, so here giving some type to those dongles to power up
+	 * and then probing again.
+	 */
+	if (hpd_tc_delay_wa) {
+		msleep(500);
+
+		mutex_lock(&dev->mode_config.mutex);
+		changed = i915_hotplug_iterate(dev, hpd_tc_delay_wa, NULL);
+		mutex_unlock(&dev->mode_config.mutex);
+
+		if (changed)
+			drm_kms_helper_hotplug_event(dev);
+	}
 }
 
 

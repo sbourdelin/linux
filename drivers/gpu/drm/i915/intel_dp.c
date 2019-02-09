@@ -6968,6 +6968,9 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 		I915_WRITE(PEG_BAND_GAP_DATA, (temp & ~0xf) | 0xd);
 	}
 
+	if (intel_port_is_tc(dev_priv, port) && !intel_dig_port->tc_legacy_port)
+		intel_dig_port->tc_delay_wa_needed = true;
+
 	return true;
 
 fail:

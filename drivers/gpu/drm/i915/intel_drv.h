@@ -1256,7 +1256,7 @@ struct intel_digital_port {
 	/* Used for DP and ICL+ TypeC/DP and TypeC/HDMI ports. */
 	enum aux_ch aux_ch;
 	enum intel_display_power_domain ddi_io_power_domain;
-	bool tc_legacy_port:1;
+	bool tc_legacy_port:1, tc_delay_wa_needed:1;
 	enum tc_port_type tc_type;
 
 	void (*write_infoframe)(struct intel_encoder *encoder,
