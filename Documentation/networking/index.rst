@@ -24,14 +24,19 @@ Contents:
    device_drivers/intel/i40e
    device_drivers/intel/iavf
    device_drivers/intel/ice
+   devlink-info-versions
    kapi
    z8530book
    msg_zerocopy
    failover
    net_failover
+   phy
    alias
    bridge
    snmp_counter
+   checksum-offloads
+   segmentation-offloads
+   scaling
 
 .. only::  subproject
 
