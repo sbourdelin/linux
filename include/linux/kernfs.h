@@ -25,6 +25,8 @@ struct seq_file;
 struct vm_area_struct;
 struct super_block;
 struct file_system_type;
+struct fs_context;
+
 struct poll_table_struct;
 
 struct kernfs_open_node;
