@@ -1034,11 +1034,9 @@ static void r4k_flush_cache_sigtramp(unsigned long addr)
 	struct flush_cache_sigtramp_args args;
 	int npages;
 
-	down_read(&current->mm->mmap_sem);
-
 	npages = get_user_pages_fast(addr, 1, 0, &args.page);
 	if (npages < 1)
-		goto out;
+		return;
 
 	args.mm = current->mm;
 	args.addr = addr;
@@ -1046,8 +1044,6 @@ static void r4k_flush_cache_sigtramp(unsigned long addr)
 	r4k_on_each_cpu(R4K_HIT, local_r4k_flush_cache_sigtramp, &args);
 
 	put_page(args.page);
-out:
-	up_read(&current->mm->mmap_sem);
 }
 
 static void r4k_flush_icache_all(void)
