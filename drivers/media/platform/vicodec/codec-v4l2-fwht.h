@@ -53,6 +53,9 @@ const struct v4l2_fwht_pixfmt_info *v4l2_fwht_default_fmt(u32 width_div,
 							  u32 pixenc,
 							  unsigned int start_idx);
 
+void copy_cap_to_ref(u8 *cap, const struct v4l2_fwht_pixfmt_info *info,
+		struct v4l2_fwht_state *state);
+
 int v4l2_fwht_encode(struct v4l2_fwht_state *state, u8 *p_in, u8 *p_out);
 int v4l2_fwht_decode(struct v4l2_fwht_state *state, u8 *p_in, u8 *p_out);
 
