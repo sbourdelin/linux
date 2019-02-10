@@ -41,7 +41,7 @@ static void __led_pwm_set(struct led_pwm_data *led_dat)
 
 	pwm_config(led_dat->pwm, new_duty, led_dat->period);
 
-	if (new_duty == 0)
+	if (led_dat->active_low ? new_duty == led_dat->period : new_duty == 0)
 		pwm_disable(led_dat->pwm);
 	else
 		pwm_enable(led_dat->pwm);
