@@ -592,11 +592,6 @@ static long vsoc_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case VSOC_SEND_INTERRUPT_TO_HOST:
 		writel(reg_num, vsoc_dev.regs + DOORBELL);
 		return 0;
-	case VSOC_WAIT_FOR_INCOMING_INTERRUPT:
-		wait_event_interruptible
-			(reg_data->interrupt_wait_queue,
-			 (atomic_read(reg_data->incoming_signalled) != 0));
-		break;
 
 	case VSOC_DESCRIBE_REGION:
 		return do_vsoc_describe_region

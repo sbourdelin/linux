@@ -232,13 +232,6 @@ struct vsoc_shm_layout_descriptor {
 #define VSOC_MAYBE_SEND_INTERRUPT_TO_HOST _IO(0xF5, 2)
 
 /*
- * When this returns the guest will scan host_to_guest_signal_table to
- * check for new futexes to wake.
- */
-/* TODO(ghartman): Consider moving this to the bottom half */
-#define VSOC_WAIT_FOR_INCOMING_INTERRUPT _IO(0xF5, 3)
-
-/*
  * Guest HALs will use this to retrieve the region description after
  * opening their device node.
  */
