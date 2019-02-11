@@ -518,7 +518,7 @@ static void glk_load_degamma_lut(const struct intel_crtc_state *crtc_state)
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	enum pipe pipe = crtc->pipe;
-	const u32 lut_size = 33;
+	const u32 lut_size = INTEL_INFO(dev_priv)->color.degamma_lut_size;
 	u32 i;
 
 	/*
@@ -529,14 +529,32 @@ static void glk_load_degamma_lut(const struct intel_crtc_state *crtc_state)
 	I915_WRITE(PRE_CSC_GAMC_INDEX(pipe), 0);
 	I915_WRITE(PRE_CSC_GAMC_INDEX(pipe), PRE_CSC_GAMC_AUTO_INCREMENT);
 
-	/*
-	 *  FIXME: The pipe degamma table in geminilake doesn't support
-	 *  different values per channel, so this just loads a linear table.
-	 */
-	for (i = 0; i < lut_size; i++) {
-		u32 v = (i * (1 << 16)) / (lut_size - 1);
+	if (crtc_state->base.degamma_lut) {
+		struct drm_color_lut *lut = crtc_state->base.degamma_lut->data;
 
-		I915_WRITE(PRE_CSC_GAMC_DATA(pipe), v);
+		for (i = 0; i < lut_size; i++) {
+			/*
+			 * First 33 entries represent range from 0 to 1.0
+			 * 34th and 35th entry will represent extended range
+			 * inputs 3.0 and 7.0 respectively, currently clamped
+			 * at 1.0. Since the precision is 16bit, the user
+			 * value can be directly filled to register.
+			 * The pipe degamma table in GLK+ onwards doesn't
+			 * support different values per channel, so this just
+			 * programs green value which will be equal to Red and
+			 * Blue into the lut registers.
+			 * ToDo: Extend to max 7.0. Enable 32 bit input value
+			 * as compared to just 16 to achieve this.
+			 */
+			I915_WRITE(PRE_CSC_GAMC_DATA(pipe), lut[i].green);
+		}
+	} else {
+		/* load a linear table. */
+		for (i = 0; i < lut_size; i++) {
+			u32 v = (i * (1 << 16)) / (lut_size - 1);
+
+			I915_WRITE(PRE_CSC_GAMC_DATA(pipe), v);
+		}
 	}
 
 	/* Clamp values > 1.0. */
