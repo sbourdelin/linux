@@ -47,15 +47,16 @@ int rdma_restrack_init(struct ib_device *dev)
 	struct rdma_restrack_root *rt;
 	int i;
 
-	dev->res = kzalloc(sizeof(*rt), GFP_KERNEL);
+	dev->res = kcalloc(RDMA_RESTRACK_MAX, sizeof(*rt), GFP_KERNEL);
 	if (!dev->res)
 		return -ENOMEM;
 
 	rt = dev->res;
 
-	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++)
-		xa_init_flags(&rt->xa[i], XA_FLAGS_ALLOC);
-	init_rwsem(&rt->rwsem);
+	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++) {
+		init_rwsem(&rt[i].rwsem);
+		xa_init_flags(&rt[i].xa, XA_FLAGS_ALLOC);
+	}
 
 	return 0;
 }
@@ -88,7 +89,7 @@ void rdma_restrack_clean(struct ib_device *dev)
 	int i;
 
 	for (i = 0 ; i < RDMA_RESTRACK_MAX; i++) {
-		struct xarray *xa = &dev->res->xa[i];
+		struct xarray *xa = &dev->res[i].xa;
 
 		if (!xa_empty(xa)) {
 			unsigned long index;
@@ -134,19 +135,20 @@ void rdma_restrack_clean(struct ib_device *dev)
 int rdma_restrack_count(struct ib_device *dev, enum rdma_restrack_type type,
 			struct pid_namespace *ns)
 {
-	struct xarray *xa = &dev->res->xa[type];
 	struct rdma_restrack_entry *e;
+	struct rdma_restrack_root *rt;
 	unsigned long index = 0;
 	u32 cnt = 0;
 
-	down_read(&dev->res->rwsem);
-	xa_for_each(xa, index, e) {
+	rt = &dev->res[type];
+	down_read(&rt->rwsem);
+	xa_for_each(&rt->xa, index, e) {
 		if (ns == &init_pid_ns ||
 		    (!rdma_is_kernel_res(e) &&
 		     ns == task_active_pid_ns(e->task)))
 			cnt++;
 	}
-	up_read(&dev->res->rwsem);
+	up_read(&rt->rwsem);
 	return cnt;
 }
 EXPORT_SYMBOL(rdma_restrack_count);
@@ -218,18 +220,16 @@ static void rdma_restrack_add(struct rdma_restrack_entry *res)
 {
 	struct ib_device *dev = res_to_dev(res);
 	struct rdma_restrack_root *rt;
-	struct xarray *xa;
 	int ret;
 
 	if (!dev)
 		return;
 
-	rt = dev->res;
-	xa = &dev->res->xa[res->type];
+	rt = &dev->res[res->type];
 
 	kref_init(&res->kref);
 	init_completion(&res->comp);
-	ret = rt_xa_alloc_cyclic(xa, &res->id, res, &rt->next_id[res->type]);
+	ret = rt_xa_alloc_cyclic(&rt->xa, &res->id, res, &rt->next_id);
 	if (!ret)
 		res->valid = true;
 }
@@ -283,14 +283,15 @@ struct rdma_restrack_entry *
 rdma_restrack_get_byid(struct ib_device *dev,
 		       enum rdma_restrack_type type, u32 id)
 {
-	struct xarray *xa = &dev->res->xa[type];
 	struct rdma_restrack_entry *res;
+	struct rdma_restrack_root *rt;
 
-	down_read(&dev->res->rwsem);
-	res = xa_load(xa, id);
+	rt = &dev->res[type];
+	down_read(&rt->rwsem);
+	res = xa_load(&rt->xa, id);
 	if (!res || !rdma_restrack_get(res))
 		res = ERR_PTR(-ENOENT);
-	up_read(&dev->res->rwsem);
+	up_read(&rt->rwsem);
 
 	return res;
 }
@@ -313,7 +314,7 @@ EXPORT_SYMBOL(rdma_restrack_put);
 void rdma_restrack_del(struct rdma_restrack_entry *res)
 {
 	struct ib_device *dev = res_to_dev(res);
-	struct xarray *xa;
+	struct rdma_restrack_root *rt;
 
 	if (!res->valid)
 		goto out;
@@ -334,11 +335,12 @@ void rdma_restrack_del(struct rdma_restrack_entry *res)
 	if (!dev)
 		return;
 
-	xa = &dev->res->xa[res->type];
-	down_write(&dev->res->rwsem);
-	xa_erase(xa, res->id);
+	rt = &dev->res[res->type];
+
+	down_write(&rt->rwsem);
+	xa_erase(&rt->xa, res->id);
 	res->valid = false;
-	up_write(&dev->res->rwsem);
+	up_write(&rt->rwsem);
 
 	rdma_restrack_put(res);
 	wait_for_completion(&res->comp);

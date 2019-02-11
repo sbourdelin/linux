@@ -1018,6 +1018,7 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 	const struct nldev_fill_res_entry *fe = &fill_entries[res_type];
 	struct nlattr *tb[RDMA_NLDEV_ATTR_MAX];
 	struct rdma_restrack_entry *res;
+	struct rdma_restrack_root *rt;
 	int err, ret = 0, idx = 0;
 	struct nlattr *table_attr;
 	struct nlattr *entry_attr;
@@ -1028,7 +1029,6 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 	unsigned long id;
 	u32 index, port = 0;
 	bool filled = false;
-	struct xarray *xa;
 
 	err = nlmsg_parse(cb->nlh, 0, tb, RDMA_NLDEV_ATTR_MAX - 1,
 			  nldev_policy, NULL);
@@ -1076,9 +1076,9 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 
 	has_cap_net_admin = netlink_capable(cb->skb, CAP_NET_ADMIN);
 
-	xa = &device->res->xa[res_type];
-	down_read(&device->res->rwsem);
-	xa_for_each(xa, id, res) {
+	rt = &device->res[res_type];
+	down_read(&rt->rwsem);
+	xa_for_each(&rt->xa, id, res) {
 		if (idx < start)
 			goto next;
 
@@ -1099,13 +1099,13 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 		if (!entry_attr) {
 			ret = -EMSGSIZE;
 			rdma_restrack_put(res);
-			up_read(&device->res->rwsem);
+			up_read(&rt->rwsem);
 			break;
 		}
 
-		up_read(&device->res->rwsem);
+		up_read(&rt->rwsem);
 		ret = fe->fill_res_func(skb, has_cap_net_admin, res, port);
-		down_read(&device->res->rwsem);
+		down_read(&rt->rwsem);
 		/*
 		 * Return resource back, but it won't be released till
 		 * the &device->res.rwsem will be released for write.
@@ -1126,7 +1126,7 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 		nla_nest_end(skb, entry_attr);
 next:		idx++;
 	}
-	up_read(&device->res->rwsem);
+	up_read(&rt->rwsem);
 
 	nla_nest_end(skb, table_attr);
 	nlmsg_end(skb, nlh);
@@ -1144,7 +1144,7 @@ next:		idx++;
 
 res_err:
 	nla_nest_cancel(skb, table_attr);
-	up_read(&device->res->rwsem);
+	up_read(&rt->rwsem);
 
 err:
 	nlmsg_cancel(skb, nlh);
