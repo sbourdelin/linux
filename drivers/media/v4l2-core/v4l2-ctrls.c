@@ -3150,6 +3150,9 @@ static int prepare_ext_ctrls(struct v4l2_ctrl_handler *hdl,
 		ctrl = ref->ctrl;
 		if (ctrl->flags & V4L2_CTRL_FLAG_DISABLED)
 			return -EINVAL;
+		if ((ctrl->flags & V4L2_CTRL_FLAG_REQUIRES_REQUESTS) &&
+		    !hdl->req_obj.req)
+			return -EACCES;
 
 		if (ctrl->cluster[0]->ncontrols > 1)
 			have_clusters = true;
