@@ -970,6 +970,7 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 	int start = cb->args[0];
 	bool has_cap_net_admin;
 	struct nlmsghdr *nlh;
+	unsigned long id;
 	u32 index, port = 0;
 	bool filled = false;
 
@@ -1020,7 +1021,7 @@ static int res_get_common_dumpit(struct sk_buff *skb,
 	has_cap_net_admin = netlink_capable(cb->skb, CAP_NET_ADMIN);
 
 	down_read(&device->res.rwsem);
-	hash_for_each_possible(device->res.hash, res, node, res_type) {
+	xa_for_each(&device->res.xa[res_type], id, res) {
 		if (idx < start)
 			goto next;
 
