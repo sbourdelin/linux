@@ -539,6 +539,10 @@ See also the examples in :ref:`control`.
 	``V4L2_CTRL_FLAG_GRABBED`` flag when buffers are allocated or
 	streaming is in progress since most drivers do not support changing
 	the format in that case.
+    * - ``V4L2_CTRL_FLAG_REQUIRES_REQUESTS``
+      - 0x0800
+      - This control cannot be set directly, but only through a request
+        (i.e. by setting ``which`` to ``V4L2_CTRL_WHICH_REQUEST_VAL``).
 
 
 Return Value
