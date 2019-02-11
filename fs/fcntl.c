@@ -762,10 +762,7 @@ static void send_sigio_to_task(struct task_struct *p,
 			   reasons, otherwise we could leak kernel stack into
 			   userspace.  */
 			BUG_ON((reason < POLL_IN) || ((reason - POLL_IN) >= NSIGPOLL));
-			if (reason - POLL_IN >= NSIGPOLL)
-				si.si_band  = ~0L;
-			else
-				si.si_band = mangle_poll(band_table[reason - POLL_IN]);
+			si.si_band = mangle_poll(band_table[reason - POLL_IN]);
 			si.si_fd    = fd;
 			if (!do_send_sig_info(signum, &si, p, type))
 				break;
