@@ -129,6 +129,9 @@ struct ib_umad_packet {
 	struct ib_user_mad mad;
 };
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/ib_umad.h>
+
 static const dev_t base_umad_dev = MKDEV(IB_UMAD_MAJOR, IB_UMAD_MINOR_BASE);
 static const dev_t base_issm_dev = MKDEV(IB_UMAD_MAJOR, IB_UMAD_MINOR_BASE) +
 				   IB_UMAD_NUM_FIXED_MINOR;
@@ -391,6 +394,8 @@ static ssize_t ib_umad_read(struct file *filp, char __user *buf,
 	else
 		ret = copy_send_mad(file, buf, packet, count);
 
+	trace_ib_umad_read(file, (struct ib_user_mad *)buf);
+
 	if (ret < 0) {
 		/* Requeue packet */
 		mutex_lock(&file->mutex);
@@ -507,6 +512,8 @@ static ssize_t ib_umad_write(struct file *filp, const char __user *buf,
 	}
 
 	mutex_lock(&file->mutex);
+
+	trace_ib_umad_write(file, &packet->mad);
 
 	agent = __get_agent(file, packet->mad.hdr.id);
 	if (!agent) {
