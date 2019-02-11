@@ -340,6 +340,8 @@ static void __i915_schedule(struct i915_request *rq,
 
 		engine = sched_lock_engine(node, engine);
 		lockdep_assert_held(&engine->timeline.lock);
+		if (last != engine) /* if we drop the lock, refetch priolist */
+			last = NULL;
 
 		/* Recheck after acquiring the engine->timeline.lock */
 		if (prio <= node->attr.priority || node_signaled(node))
