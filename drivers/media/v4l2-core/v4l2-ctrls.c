@@ -1299,9 +1299,11 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		break;
 	case V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS:
 		*type = V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS;
+		*flags |= V4L2_CTRL_FLAG_REQUIRES_REQUESTS;
 		break;
 	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:
 		*type = V4L2_CTRL_TYPE_MPEG2_QUANTIZATION;
+		*flags |= V4L2_CTRL_FLAG_REQUIRES_REQUESTS;
 		break;
 	default:
 		*type = V4L2_CTRL_TYPE_INTEGER;
