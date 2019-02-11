@@ -1356,6 +1356,7 @@ static void i915_wedge_me(struct work_struct *work)
 	dev_err(w->i915->drm.dev,
 		"%s timed out, cancelling all in-flight rendering.\n",
 		w->name);
+	GEM_TRACE_DUMP();
 	i915_gem_set_wedged(w->i915);
 }
 
