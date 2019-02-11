@@ -407,25 +407,29 @@ struct ib_mr *rvt_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	mr->mr.access_flags = mr_access_flags;
 	mr->umem = umem;
 
-	mr->mr.page_shift = umem->page_shift;
+	mr->mr.page_shift = PAGE_SHIFT;
 	m = 0;
 	n = 0;
 	for_each_sg(umem->sg_head.sgl, sg, umem->nmap, entry) {
-		void *vaddr;
+		int i, chunk_pages;
+		struct page *page = sg_page(sg);
 
-		vaddr = page_address(sg_page(sg));
-		if (!vaddr) {
-			ret = ERR_PTR(-EINVAL);
-			goto bail_inval;
-		}
-		mr->mr.map[m]->segs[n].vaddr = vaddr;
-		mr->mr.map[m]->segs[n].length = BIT(umem->page_shift);
-		trace_rvt_mr_user_seg(&mr->mr, m, n, vaddr,
-				      BIT(umem->page_shift));
-		n++;
-		if (n == RVT_SEGSZ) {
-			m++;
-			n = 0;
+		chunk_pages = sg_dma_len(sg) >> PAGE_SHIFT;
+		for (i = 0; i < chunk_pages; i++) {
+			void *vaddr;
+
+			vaddr = page_address(nth_page(page, i));
+			if (!vaddr) {
+				ret = ERR_PTR(-EINVAL);
+				goto bail_inval;
+			}
+			mr->mr.map[m]->segs[n].vaddr = vaddr;
+			mr->mr.map[m]->segs[n].length = PAGE_SIZE;
+			trace_rvt_mr_user_seg(&mr->mr, m, n, vaddr, PAGE_SIZE);
+			if (++n == RVT_SEGSZ) {
+				m++;
+				n = 0;
+			}
 		}
 	}
 	return &mr->ibmr;
