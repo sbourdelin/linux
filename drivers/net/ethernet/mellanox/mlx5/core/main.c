@@ -459,6 +459,7 @@ static int handle_hca_cap_atomic(struct mlx5_core_dev *dev)
 	return err;
 }
 
+#ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
 static int handle_hca_cap_odp(struct mlx5_core_dev *dev)
 {
 	void *set_hca_cap;
@@ -502,6 +503,7 @@ static int handle_hca_cap_odp(struct mlx5_core_dev *dev)
 	kfree(set_ctx);
 	return err;
 }
+#endif
 
 static int handle_hca_cap(struct mlx5_core_dev *dev)
 {
@@ -573,6 +575,35 @@ static int handle_hca_cap(struct mlx5_core_dev *dev)
 
 query_ex:
 	kfree(set_ctx);
+	return err;
+}
+
+static int set_hca_cap(struct mlx5_core_dev *dev)
+{
+	struct pci_dev *pdev = dev->pdev;
+	int err;
+
+	err = handle_hca_cap(dev);
+	if (err) {
+		dev_err(&pdev->dev, "handle_hca_cap failed\n");
+		goto out;
+	}
+
+	err = handle_hca_cap_atomic(dev);
+	if (err) {
+		dev_err(&pdev->dev, "handle_hca_cap_atomic failed\n");
+		goto out;
+	}
+
+#ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
+	err = handle_hca_cap_odp(dev);
+	if (err) {
+		dev_err(&pdev->dev, "handle_hca_cap_odp failed\n");
+		goto out;
+	}
+#endif
+
+out:
 	return err;
 }
 
@@ -963,21 +994,9 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto reclaim_boot_pages;
 	}
 
-	err = handle_hca_cap(dev);
+	err = set_hca_cap(dev);
 	if (err) {
-		dev_err(&pdev->dev, "handle_hca_cap failed\n");
-		goto reclaim_boot_pages;
-	}
-
-	err = handle_hca_cap_atomic(dev);
-	if (err) {
-		dev_err(&pdev->dev, "handle_hca_cap_atomic failed\n");
-		goto reclaim_boot_pages;
-	}
-
-	err = handle_hca_cap_odp(dev);
-	if (err) {
-		dev_err(&pdev->dev, "handle_hca_cap_odp failed\n");
+		dev_err(&pdev->dev, "set_hca_cap failed\n");
 		goto reclaim_boot_pages;
 	}
 
