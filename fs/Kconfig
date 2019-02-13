@@ -207,8 +207,9 @@ config HUGETLB_PAGE
 config MEMFD_CREATE
 	def_bool TMPFS || HUGETLBFS
 
-config ARCH_HAS_GIGANTIC_PAGE
+config COMPACTION_CORE
 	bool
+	default y if (MEMORY_ISOLATION && MIGRATION) || CMA
 
 source "fs/configfs/Kconfig"
 source "fs/efivarfs/Kconfig"
