@@ -3618,7 +3618,10 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	 */
 	if (!mutex_trylock(&oom_lock)) {
 		*did_some_progress = 1;
-		schedule_timeout_uninterruptible(1);
+		if (mutex_lock_killable(&oom_lock) == 0)
+			mutex_unlock(&oom_lock);
+		else if (!tsk_is_oom_victim(current))
+			schedule_timeout_uninterruptible(1);
 		return NULL;
 	}
 
