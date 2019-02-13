@@ -82,7 +82,6 @@ struct stmmac_channel {
 	struct stmmac_priv *priv_data;
 	u32 index;
 	int has_rx;
-	int has_tx;
 };
 
 struct stmmac_tc_entry {

@@ -2031,13 +2031,13 @@ static int stmmac_napi_check(struct stmmac_priv *priv, u32 chan)
 	struct stmmac_channel *ch = &priv->channel[chan];
 	bool needs_work = false;
 
-	if ((status & handle_rx) && ch->has_rx) {
+	if (status & handle_rx) {
 		needs_work = true;
 	} else {
 		status &= ~handle_rx;
 	}
 
-	if ((status & handle_tx) && ch->has_tx) {
+	if (status & handle_tx) {
 		needs_work = true;
 	} else {
 		status &= ~handle_tx;
@@ -3528,11 +3528,12 @@ static int stmmac_napi_poll(struct napi_struct *napi, int budget)
 	struct stmmac_priv *priv = ch->priv_data;
 	int work_done, rx_done = 0, tx_done = 0;
 	u32 chan = ch->index;
+	int i;
 
 	priv->xstats.napi_poll++;
 
-	if (ch->has_tx)
-		tx_done = stmmac_tx_clean(priv, budget, chan);
+	for (i = 0; i < priv->plat->tx_queues_to_use; i++)
+		tx_done += stmmac_tx_clean(priv, budget, i);
 	if (ch->has_rx)
 		rx_done = stmmac_rx(priv, budget, chan);
 
@@ -4325,8 +4326,6 @@ int stmmac_dvr_probe(struct device *device,
 
 		if (queue < priv->plat->rx_queues_to_use)
 			ch->has_rx = true;
-		if (queue < priv->plat->tx_queues_to_use)
-			ch->has_tx = true;
 
 		netif_napi_add(ndev, &ch->napi, stmmac_napi_poll,
 			       NAPI_POLL_WEIGHT);
