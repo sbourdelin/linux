@@ -2222,12 +2222,12 @@ irqreturn_t dwc2_handle_hcd_intr(struct dwc2_hsotg *hsotg)
 	u32 gintsts, dbg_gintsts;
 	irqreturn_t retval = IRQ_NONE;
 
+	spin_lock(&hsotg->lock);
+
 	if (!dwc2_is_controller_alive(hsotg)) {
 		dev_warn(hsotg->dev, "Controller is dead\n");
-		return retval;
+		goto out;
 	}
-
-	spin_lock(&hsotg->lock);
 
 	/* Check if HOST Mode */
 	if (dwc2_is_host_mode(hsotg)) {
@@ -2276,6 +2276,7 @@ irqreturn_t dwc2_handle_hcd_intr(struct dwc2_hsotg *hsotg)
 		}
 	}
 
+out:
 	spin_unlock(&hsotg->lock);
 
 	return retval;
