@@ -13241,6 +13241,43 @@ nla_put_failure:
 	return -ENOBUFS;
 }
 
+static int nl80211_probe_mesh_link(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	const u8 *buf;
+	size_t len;
+	u8 *dest;
+	int err;
+
+	if (!rdev->ops->probe_mesh_link)
+		return -EOPNOTSUPP;
+
+	if (!info->attrs[NL80211_ATTR_MAC] ||
+	    !info->attrs[NL80211_ATTR_FRAME]) {
+		GENL_SET_ERR_MSG(info, "Frame or MAC missing");
+		return -EINVAL;
+	}
+
+	wdev_lock(wdev);
+	if (wdev->iftype != NL80211_IFTYPE_MESH_POINT) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
+	wdev_unlock(wdev);
+
+	dest = nla_data(info->attrs[NL80211_ATTR_MAC]);
+	buf = nla_data(info->attrs[NL80211_ATTR_FRAME]);
+	len = nla_len(info->attrs[NL80211_ATTR_FRAME]);
+
+	return rdev_probe_mesh_link(rdev, dev, dest, buf, len);
+
+ out:
+	wdev_unlock(wdev);
+	return err;
+}
+
 #define NL80211_FLAG_NEED_WIPHY		0x01
 #define NL80211_FLAG_NEED_NETDEV	0x02
 #define NL80211_FLAG_NEED_RTNL		0x04
@@ -14170,6 +14207,14 @@ static const struct genl_ops nl80211_ops[] = {
 	{
 		.cmd = NL80211_CMD_NOTIFY_RADAR,
 		.doit = nl80211_notify_radar_detection,
+		.policy = nl80211_policy,
+		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_PROBE_MESH_LINK,
+		.doit = nl80211_probe_mesh_link,
 		.policy = nl80211_policy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |

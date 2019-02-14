@@ -1065,6 +1065,20 @@
  *	indicated by %NL80211_ATTR_WIPHY_FREQ and other attributes
  *	determining the width and type.
  *
+ * @NL80211_CMD_PROBE_MESH_LINK: The requirement for mesh link metric
+ *	refreshing, is that from one mesh point we be able to send some data
+ *	frames to other mesh points which are not currently selected as a
+ *	primary traffic path, but which are only 1 hop away. The absence of
+ *	the primary path to the chosen node makes it necessary to apply some
+ *	form of marking on a chosen packet stream so that the packets can be
+ *	properly steered to the selected node for testing, and not by the
+ *	regular mesh path lookup. Further, the packets must be of type data
+ *	so that the rate control (often embedded in firmware) is used for
+ *	rate selection.
+ *
+ *	Uses %NL80211_ATTR_MAC and %NL80211_ATTR_FRAME attributes. The frame
+ *	content here is ethernet data.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1284,6 +1298,7 @@ enum nl80211_commands {
 	NL80211_CMD_PEER_MEASUREMENT_COMPLETE,
 
 	NL80211_CMD_NOTIFY_RADAR,
+	NL80211_CMD_PROBE_MESH_LINK,
 
 	/* add new commands above here */
 
