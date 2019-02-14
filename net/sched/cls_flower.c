@@ -1354,90 +1354,93 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	if (err < 0)
 		goto errout;
 
-	if (!handle) {
-		handle = 1;
-		err = idr_alloc_u32(&head->handle_idr, fnew, &handle,
-				    INT_MAX, GFP_KERNEL);
-	} else if (!fold) {
-		/* user specifies a handle and it doesn't exist */
-		err = idr_alloc_u32(&head->handle_idr, fnew, &handle,
-				    handle, GFP_KERNEL);
-	}
-	if (err)
-		goto errout;
-	fnew->handle = handle;
-
 	if (tb[TCA_FLOWER_FLAGS]) {
 		fnew->flags = nla_get_u32(tb[TCA_FLOWER_FLAGS]);
 
 		if (!tc_flags_valid(fnew->flags)) {
 			err = -EINVAL;
-			goto errout_idr;
+			goto errout;
 		}
 	}
 
 	err = fl_set_parms(net, tp, fnew, mask, base, tb, tca[TCA_RATE], ovr,
 			   tp->chain->tmplt_priv, extack);
 	if (err)
-		goto errout_idr;
+		goto errout;
 
 	err = fl_check_assign_mask(head, fnew, fold, mask);
 	if (err)
-		goto errout_idr;
-
-	if (!fold && __fl_lookup(fnew->mask, &fnew->mkey)) {
-		err = -EEXIST;
-		goto errout_mask;
-	}
-
-	err = rhashtable_insert_fast(&fnew->mask->ht, &fnew->ht_node,
-				     fnew->mask->filter_ht_params);
-	if (err)
-		goto errout_mask;
+		goto errout;
 
 	if (!tc_skip_hw(fnew->flags)) {
 		err = fl_hw_replace_filter(tp, fnew, extack);
 		if (err)
-			goto errout_mask_ht;
+			goto errout_mask;
 	}
 
 	if (!tc_in_hw(fnew->flags))
 		fnew->flags |= TCA_CLS_FLAGS_NOT_IN_HW;
 
 	if (fold) {
+		fnew->handle = handle;
+
+		err = rhashtable_insert_fast(&fnew->mask->ht, &fnew->ht_node,
+					     fnew->mask->filter_ht_params);
+		if (err)
+			goto errout_hw;
+
 		rhashtable_remove_fast(&fold->mask->ht,
 				       &fold->ht_node,
 				       fold->mask->filter_ht_params);
-		if (!tc_skip_hw(fold->flags))
-			fl_hw_destroy_filter(tp, fold, NULL);
-	}
-
-	*arg = fnew;
-
-	if (fold) {
 		idr_replace(&head->handle_idr, fnew, fnew->handle);
 		list_replace_rcu(&fold->list, &fnew->list);
+
+		if (!tc_skip_hw(fold->flags))
+			fl_hw_destroy_filter(tp, fold, NULL);
 		tcf_unbind_filter(tp, &fold->res);
 		tcf_exts_get_net(&fold->exts);
 		tcf_queue_work(&fold->rwork, fl_destroy_filter_work);
 	} else {
+		if (__fl_lookup(fnew->mask, &fnew->mkey)) {
+			err = -EEXIST;
+			goto errout_hw;
+		}
+
+		if (handle) {
+			/* user specifies a handle and it doesn't exist */
+			err = idr_alloc_u32(&head->handle_idr, fnew, &handle,
+					    handle, GFP_ATOMIC);
+		} else {
+			handle = 1;
+			err = idr_alloc_u32(&head->handle_idr, fnew, &handle,
+					    INT_MAX, GFP_ATOMIC);
+		}
+		if (err)
+			goto errout_hw;
+		fnew->handle = handle;
+
+		err = rhashtable_insert_fast(&fnew->mask->ht, &fnew->ht_node,
+					     fnew->mask->filter_ht_params);
+		if (err)
+			goto errout_idr;
+
 		list_add_tail_rcu(&fnew->list, &fnew->mask->filters);
 	}
+
+	*arg = fnew;
 
 	kfree(tb);
 	kfree(mask);
 	return 0;
 
-errout_mask_ht:
-	rhashtable_remove_fast(&fnew->mask->ht, &fnew->ht_node,
-			       fnew->mask->filter_ht_params);
-
-errout_mask:
-	fl_mask_put(head, fnew->mask, false);
-
 errout_idr:
 	if (!fold)
 		idr_remove(&head->handle_idr, fnew->handle);
+errout_hw:
+	if (!tc_skip_hw(fnew->flags))
+		fl_hw_destroy_filter(tp, fnew, NULL);
+errout_mask:
+	fl_mask_put(head, fnew->mask, false);
 errout:
 	tcf_exts_destroy(&fnew->exts);
 	kfree(fnew);
