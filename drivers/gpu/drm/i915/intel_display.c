@@ -60,6 +60,12 @@
 #include "i915_reset.h"
 #include "i915_trace.h"
 
+#if IS_ENABLED(CONFIG_PROVE_LOCKING)
+#define VBLANK_EVASION_TIME_US 250
+#else
+#define VBLANK_EVASION_TIME_US 100
+#endif
+
 /* Primary plane formats for gen <= 3 */
 static const u32 i8xx_primary_formats[] = {
 	DRM_FORMAT_C8,
@@ -14311,6 +14317,9 @@ static int intel_crtc_init(struct drm_i915_private *dev_priv, enum pipe pipe)
 	intel_crtc->config = crtc_state;
 	intel_crtc->base.state = &crtc_state->base;
 	crtc_state->base.crtc = &intel_crtc->base;
+
+	ewma_evade_init(&intel_crtc->evasion);
+	ewma_evade_add(&intel_crtc->evasion, VBLANK_EVASION_TIME_US);
 
 	primary = intel_primary_plane_create(dev_priv, pipe);
 	if (IS_ERR(primary)) {

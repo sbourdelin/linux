@@ -54,11 +54,6 @@ int intel_usecs_to_scanlines(const struct drm_display_mode *adjusted_mode,
 
 /* FIXME: We should instead only take spinlocks once for the entire update
  * instead of once per mmio. */
-#if IS_ENABLED(CONFIG_PROVE_LOCKING)
-#define VBLANK_EVASION_TIME_US 250
-#else
-#define VBLANK_EVASION_TIME_US 100
-#endif
 
 /**
  * intel_pipe_update_start() - start update of a set of display registers
@@ -84,14 +79,18 @@ void intel_pipe_update_start(const struct intel_crtc_state *new_crtc_state)
 		intel_crtc_has_type(new_crtc_state, INTEL_OUTPUT_DSI);
 	DEFINE_WAIT(wait);
 	u32 psr_status;
+	int evasion;
 
 	vblank_start = adjusted_mode->crtc_vblank_start;
 	if (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE)
 		vblank_start = DIV_ROUND_UP(vblank_start, 2);
 
-	/* FIXME needs to be calibrated sensibly */
-	min = vblank_start - intel_usecs_to_scanlines(adjusted_mode,
-						      VBLANK_EVASION_TIME_US);
+	evasion = max(2 * ewma_evade_read(&crtc->evasion), 100ul);
+	DRM_DEBUG_KMS("Predicted evasion time: %lu, using %u\n",
+		      ewma_evade_read(&crtc->evasion),
+		      evasion);
+
+	min = vblank_start - intel_usecs_to_scanlines(adjusted_mode, evasion);
 	max = vblank_start - 1;
 
 	if (min <= 0 || max <= 0)
@@ -213,21 +212,19 @@ void intel_pipe_update_end(struct intel_crtc_state *new_crtc_state)
 
 	if (crtc->debug.start_vbl_count &&
 	    crtc->debug.start_vbl_count != end_vbl_count) {
-		DRM_ERROR("Atomic update failure on pipe %c (start=%u end=%u) time %lld us, min %d, max %d, scanline start %d, end %d\n",
-			  pipe_name(pipe), crtc->debug.start_vbl_count,
-			  end_vbl_count,
-			  ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time),
-			  crtc->debug.min_vbl, crtc->debug.max_vbl,
-			  crtc->debug.scanline_start, scanline_end);
+		dev_notice(dev_priv->drm.dev,
+			   "Atomic update failure on pipe %c (start=%u end=%u) time %lld us (estimated %lu us), min %d, max %d, scanline start %d, end %d\n",
+			   pipe_name(pipe), crtc->debug.start_vbl_count,
+			   end_vbl_count,
+			   ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time),
+			   ewma_evade_read(&crtc->evasion),
+			   crtc->debug.min_vbl, crtc->debug.max_vbl,
+			   crtc->debug.scanline_start, scanline_end);
 	}
-#ifdef CONFIG_DRM_I915_DEBUG_VBLANK_EVADE
-	else if (ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time) >
-		 VBLANK_EVASION_TIME_US)
-		DRM_WARN("Atomic update on pipe (%c) took %lld us, max time under evasion is %u us\n",
-			 pipe_name(pipe),
-			 ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time),
-			 VBLANK_EVASION_TIME_US);
-#endif
+
+	ewma_evade_add(&crtc->evasion,
+		       ktime_us_delta(end_vbl_time,
+				      crtc->debug.start_vbl_time));
 }
 
 int intel_plane_check_stride(const struct intel_plane_state *plane_state)

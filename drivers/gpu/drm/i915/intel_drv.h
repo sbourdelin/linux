@@ -26,6 +26,7 @@
 #define __INTEL_DRV_H__
 
 #include <linux/async.h>
+#include <linux/average.h>
 #include <linux/i2c.h>
 #include <linux/hdmi.h>
 #include <linux/sched/clock.h>
@@ -974,6 +975,8 @@ struct intel_crtc_state {
 	bool fec_enable;
 };
 
+DECLARE_EWMA(evade, 2, 4);
+
 struct intel_crtc {
 	struct drm_crtc base;
 	enum pipe pipe;
@@ -1007,6 +1010,7 @@ struct intel_crtc {
 	} wm;
 
 	int scanline_offset;
+	struct ewma_evade evasion;
 
 	struct {
 		unsigned start_vbl_count;
