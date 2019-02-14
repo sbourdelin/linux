@@ -1151,9 +1151,10 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		 */
 		if (hub_is_superspeed(hdev) &&
 		    ((portstatus & USB_PORT_STAT_LINK_STATE) ==
-						USB_SS_PORT_LS_POLLING))
+						USB_SS_PORT_LS_POLLING)) {
 			need_debounce_delay = true;
-
+			set_bit(port1, hub->event_bits);
+		}
 		/* Clear status-change flags; we'll debounce later */
 		if (portchange & USB_PORT_STAT_C_CONNECTION) {
 			need_debounce_delay = true;
@@ -2697,6 +2698,9 @@ static unsigned hub_is_wusb(struct usb_hub *hub)
 #define HUB_LONG_RESET_TIME	200
 #define HUB_RESET_TIMEOUT	800
 
+#define HUB_LFPS_TIME		24
+#define HUB_LFPS_TIMEOUT	360
+
 /*
  * "New scheme" enumeration causes an extra state transition to be
  * exposed to an xhci host and causes USB3 devices to receive control
@@ -2735,6 +2739,31 @@ static bool hub_port_warm_reset_required(struct usb_hub *hub, int port1,
 	link_state = portstatus & USB_PORT_STAT_LINK_STATE;
 	return link_state == USB_SS_PORT_LS_SS_INACTIVE
 		|| link_state == USB_SS_PORT_LS_COMP_MOD;
+}
+
+static bool hub_port_stuck_in_polling(struct usb_hub *hub, int port1,
+				      u16 portstatus)
+{
+	u16 link_state;
+	u16 portchange;
+	int lfps_delay = 0;
+
+	if (!hub_is_superspeed(hub->hdev))
+		return false;
+
+	link_state = portstatus & USB_PORT_STAT_LINK_STATE;
+
+	while (link_state == USB_SS_PORT_LS_POLLING) {
+		msleep(HUB_LFPS_TIME);
+
+		hub_port_status(hub, port1, &portstatus, &portchange);
+		link_state = portstatus & USB_PORT_STAT_LINK_STATE;
+
+		lfps_delay += HUB_LFPS_TIME;
+		if (lfps_delay > HUB_LFPS_TIMEOUT)
+			return true;
+	}
+	return false;
 }
 
 static int hub_port_wait_reset(struct usb_hub *hub, int port1,
@@ -5329,7 +5358,8 @@ static void port_event(struct usb_hub *hub, int port1)
 	 * Warm reset a USB3 protocol port if it's in
 	 * SS.Inactive state.
 	 */
-	if (hub_port_warm_reset_required(hub, port1, portstatus)) {
+	if (hub_port_warm_reset_required(hub, port1, portstatus) ||
+	    hub_port_stuck_in_polling(hub, port1, portstatus)) {
 		dev_dbg(&port_dev->dev, "do warm reset\n");
 		if (!udev || !(portstatus & USB_PORT_STAT_CONNECTION)
 				|| udev->state == USB_STATE_NOTATTACHED) {
