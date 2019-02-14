@@ -3346,7 +3346,7 @@ static void ibmvscsis_handle_crq(unsigned long data)
 	bool ack = true;
 	volatile u8 valid;
 
-	spin_lock_bh(&vscsi->intr_lock);
+	spin_lock(&vscsi->intr_lock);
 
 	dev_dbg(&vscsi->dev, "got interrupt\n");
 
@@ -3360,7 +3360,7 @@ static void ibmvscsis_handle_crq(unsigned long data)
 
 		dev_dbg(&vscsi->dev, "handle_crq, don't process: flags 0x%x, state 0x%hx\n",
 			vscsi->flags, vscsi->state);
-		spin_unlock_bh(&vscsi->intr_lock);
+		spin_unlock(&vscsi->intr_lock);
 		return;
 	}
 
@@ -3437,7 +3437,7 @@ cmd_work:
 		(int)list_empty(&vscsi->schedule_q), vscsi->flags,
 		vscsi->state);
 
-	spin_unlock_bh(&vscsi->intr_lock);
+	spin_unlock(&vscsi->intr_lock);
 }
 
 static int ibmvscsis_probe(struct vio_dev *vdev,
