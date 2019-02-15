@@ -71,7 +71,7 @@ static void assert_slb_presence(bool present, unsigned long ea)
 
 	asm volatile(__PPC_SLBFEE_DOT(%0, %1) : "=r"(tmp) : "r"(ea) : "cr0");
 
-	WARN_ON(present == (tmp == 0));
+	WARN_ON_ONCE(present == (tmp == 0));
 #endif
 }
 
